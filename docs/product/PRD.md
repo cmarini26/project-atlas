@@ -6,9 +6,9 @@
 
 # Product Summary
 
-MarketingOS is an AI-first marketing operating system that continuously learns about a business and proactively recommends, creates, and optimizes marketing campaigns.
+MarketingOS is an Autonomous Marketing Operating System that builds a Digital Twin of every business it serves and uses it to proactively recommend, create, and optimize marketing campaigns.
 
-Instead of asking users to create campaigns manually, MarketingOS identifies opportunities based on business data and prepares campaigns for approval.
+Instead of asking users to create campaigns manually, MarketingOS observes the business, maintains a living Business Brain, identifies opportunities, and prepares campaigns for approval — without waiting for a prompt.
 
 ---
 
@@ -44,33 +44,62 @@ The system understands the business and performs the work normally done by:
 
 ---
 
+# Decision Lifecycle
+
+Observe → Understand → Decide → Recommend → Prepare → Approve → Execute → Measure → Learn
+
+This loop is continuous. Every execution produces Learning that feeds back into the Business Brain and improves future Decisions.
+
+---
+
+# Digital Twin Lifecycle
+
+1. **Company created** — basic profile, brand identity, channels
+2. **Website connected** — URL or data feed provided
+3. **Initial crawl** — Atlas extracts catalog items, pages, and signals
+4. **Observations recorded** — raw data captured and timestamped
+5. **Facts extracted** — structured facts derived from observations
+6. **Knowledge synthesized** — patterns and insights derived from facts
+7. **Business Brain populated** — Digital Twin is live
+8. **Opportunities identified** — Opportunity Engine scans the Business Brain
+9. **Decision made** — Decision Engine selects the best opportunity
+10. **Recommendation surfaced** — user sees a prepared campaign awaiting approval
+11. **Campaign executed** — user approves; content is scheduled
+12. **Learning recorded** — outcomes feed back into the Digital Twin
+
+---
+
 # Primary Workflow
 
 User signs up
 
 ↓
 
-Connects website
+Connects website or data feed
 
 ↓
 
-AI analyzes business
+Atlas crawls and extracts catalog
 
 ↓
 
-Business Brain created
+Business Brain created (Digital Twin goes live)
 
 ↓
 
-AI identifies marketing opportunities
+Opportunity Engine identifies marketing moments
 
 ↓
 
-Campaign recommendation
+Decision Engine selects best opportunity
 
 ↓
 
-User approves
+Campaign recommendation surfaced with rationale
+
+↓
+
+User approves (or edits and approves)
 
 ↓
 
@@ -82,25 +111,35 @@ Scheduled for publishing
 
 ---
 
-# First Vertical
+# Initial Validation Markets
 
-Exotic Used Car Dealers
+## Comic Book Auction Houses
+
+Design partner: CBB Auctions
+
+Periodic auctions, seller stores, collectible inventory. Key marketing moments include ending-soon auctions, new high-value listings, and featured inventory.
+
+## Exotic Used Car Dealerships
+
+Dynamic vehicle inventory with high-value, visually compelling products. Key marketing moments include new arrivals, featured vehicle selection, and long-tail inventory promotion.
 
 ---
 
 # MVP Success Criteria
 
-A dealership connects its website.
+A business connects its website.
 
 Within five minutes the system can:
 
-✓ Understand inventory
+✓ Extract the catalog and populate the Business Brain
 
-✓ Recommend one featured vehicle
+✓ Identify a marketing opportunity
 
-✓ Create one week's worth of marketing
+✓ Recommend one featured catalog item
 
-✓ Present everything for approval
+✓ Create one week's worth of marketing content
+
+✓ Present everything — with rationale — for approval
 
 ---
 
@@ -141,30 +180,30 @@ Manages multiple companies.
 
 - Crawl website
 - Discover pages
-- Extract inventory
+- Extract catalog items
 - Extract services
-- Detect products
+- Detect catalog structure
 - Detect CTAs
 
 ## Business Brain
 
 Store:
 
-- Products
-- Inventory
-- Customers
-- Brand
+- Catalog and catalog items
+- Customers and audience
+- Brand identity
 - Competitors
 - Marketing history
+- Observations, Facts, Knowledge
 
 ## Recommendation Engine
 
 Recommend:
 
-- Featured product
+- Featured catalog item
 - Seasonal campaigns
 - Holiday campaigns
-- Inventory campaigns
+- Catalog campaigns
 - Engagement campaigns
 
 ## Campaign Engine
