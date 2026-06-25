@@ -113,8 +113,7 @@ All foundational documents written, reviewed, and committed.
 | Item | Introduced | Notes |
 |------|------------|-------|
 | Eloquent model stubs are placeholders only | 2026-06-25 | `Company`, `DigitalTwin`, `Catalog`, `Integration`, `Observation`, `Campaign`, `ContentAsset` have no migrations, no `$fillable`, no casts, no relationships, and do not represent implemented domain persistence. They exist solely so PHPStan can resolve the types referenced in contracts. Must be fully implemented in Milestone 2. |
-| Queue tests use `Queue::fake()` — no live worker execution | 2026-06-25 | `QueueDispatchTest` proves the dispatch mechanism and queue configuration, but does not prove that a real Redis worker picks up and executes a job. Add an integration test or smoke test for real Redis queue processing before Phase 2 is considered complete. |
-| Queue tests use Queue::fake only | 2026-06-25 | Current queue tests verify dispatch/configuration but do not prove Redis worker execution. Add an integration test or smoke test for real Redis queue processing before Phase 2 is considered complete. |
+| Queue tests use `Queue::fake` only | 2026-06-25 | Current queue tests verify dispatch/configuration but do not prove Redis worker execution. Add an integration test or smoke test for real Redis queue processing before Phase 2 is considered complete. |
 | `User` model uses integer PK | 2026-06-25 | Laravel default. Must be migrated to `char(26)` ULID before `company_memberships` (or any table with a `user_id` FK) is created. First task in Milestone 2. |
 
 ---
