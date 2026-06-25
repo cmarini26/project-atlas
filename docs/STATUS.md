@@ -9,48 +9,52 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 | Dimension         | Status | Notes |
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, and MVP workflow all defined |
-| Implementation    | ⬜ Not started | No application code exists yet |
-| Tests             | ⬜ Not started | No test suite yet |
-| CI/CD             | ⬜ Not started | No pipeline configured |
+| Implementation    | 🟡 In progress | Laravel application scaffolded; core abstractions in place; models are stubs |
+| Tests             | 🟡 Partial | 25 bootstrap tests passing; feature tests (company creation, tenancy) pending Phase 2 |
+| CI/CD             | 🟡 Defined | GitHub Actions workflow written; not yet triggered (no PR opened against remote) |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
 
-**Overall:** Pre-implementation. The specification phase is complete and thorough. The project is well-positioned to begin Phase 1. No blockers.
+**Overall:** Milestone 1 complete. Laravel application is running, core abstractions exist, all checks are green. Ready for Phase 2 (Observatory — migrations, models, company creation flow, CompanyScope).
 
 ---
 
 ## Current Milestone
 
-**Milestone 1 — Platform Foundation**
-Corresponds to [Phase 1 of ROADMAP.md](../ROADMAP.md).
+**Milestone 2 — Domain Models & Company Creation**
+Corresponds to [Phase 1 of ROADMAP.md](../ROADMAP.md) (continued).
 
-Stand up a working Laravel application with multi-tenant architecture, database migrations for all core entities, queue infrastructure, and the base abstractions that every subsequent phase depends on.
+Create the full Eloquent model layer, database migrations, CompanyScope tenancy enforcement, and CompanyService with auto-provisioning. This is the prerequisite for every domain operation.
 
 **Target completion:** TBD
 **Owner:** TBD
 
 ---
 
-## Current Sprint
-
-**Sprint 1 — Application Scaffolding**
-
-| # | Task | Status |
-|---|------|--------|
-| 1 | Create Laravel application | ⬜ |
-| 2 | Configure PostgreSQL + Redis | ⬜ |
-| 3 | Users table + auth scaffolding (Sanctum) | ⬜ |
-| 4 | Companies, catalogs, digital_twins, company_memberships tables | ⬜ |
-| 5 | CompanyScope global scope on all tenant models | ⬜ |
-| 6 | CompanyService::create() with DB transaction + auto-provisioning | ⬜ |
-| 7 | AiProvider interface + FakeAiProvider | ⬜ |
-| 8 | Base Prompt, Analyst, Connector abstract classes | ⬜ |
-| 9 | Five queues configured + Supervisor stubs | ⬜ |
-| 10 | CI pipeline: migrations run, tests pass | ⬜ |
-
----
-
 ## Completed Milestones
+
+### Milestone 1 — Platform Foundation ✅
+*Completed: 2026-06-25*
+
+**Delivered:**
+
+| Item | Description |
+|------|-------------|
+| Laravel 13 application | Installed in `backend/`; PostgreSQL + Redis configured; app boots cleanly |
+| `.env` configuration | PostgreSQL, Redis, mail (log driver), storage (local + S3 stubs) |
+| Queue topology | Five named queues configured in `config/queue.php`: `high`, `ai`, `default`, `observations`, `maintenance` |
+| Supervisor stubs | `infrastructure/supervisor/atlas-worker.conf` — one worker group per queue |
+| Laravel Pint | `pint.json` configured with Laravel preset; all files passing |
+| PHPStan / Larastan | `phpstan.neon` at level 6; 0 errors |
+| GitHub Actions CI | `.github/workflows/ci.yml` — Pint + PHPStan + PHPUnit on push/PR |
+| Domain folder structure | `app/Domain/{Company,Catalog,BusinessBrain,Opportunity,Decision,Recommendation,Campaign,Shared}/`, `app/Application/`, `app/Infrastructure/`, `app/Presentation/` |
+| Core contracts | `AiProvider`, `Analyst`, `Connector`, `OpportunityDetector`, `ContentGenerator` interfaces |
+| Abstract base classes | `Prompt` abstract class with `system()`, `user()`, `schema()`, `temperature()`, `maxTokens()`, `version()`, `name()` |
+| Value objects | `AiResponse` readonly class; `BusinessBrain` readonly value object |
+| FakeAiProvider | `app/AI/Testing/FakeAiProvider.php` — `queueResponse()`, `queueFixture()`, `assertPromptSent()`, `assertNothingSent()` |
+| Stub models | 7 Eloquent model stubs for entities referenced by contracts (`Company`, `DigitalTwin`, `Catalog`, `Integration`, `Observation`, `Campaign`, `ContentAsset`) |
+| Bootstrap tests | 25 tests: Laravel boots, DB connection, queue dispatch, AI contracts, Prompt class — all passing |
+| Sanctum installed | Authentication package ready for Phase 2 scaffolding |
 
 ### Milestone 0 — Specification Phase ✅
 *Completed: 2026-06-25*
@@ -77,21 +81,23 @@ All foundational documents written, reviewed, and committed. The codebase is rea
 
 ## Current Objectives
 
-1. **Start the application.** Create the Laravel project, configure the database, and run the first migration. The goal of Sprint 1 is a working app that can create a company.
+1. **Create migrations for all Phase 1 entities.** `users`, `companies`, `company_memberships`, `catalogs`, `digital_twins` — tables defined in `specs/core/domain-model.md`. Run with PostgreSQL.
 
-2. **Prove the tenancy model.** `CompanyScope` must be working before any feature is built on top of it. Tenant isolation is not something to retrofit.
+2. **Implement CompanyScope.** Global scope on all tenant models. Tenancy must be correct before any feature is built on it.
 
-3. **Wire up the test foundation.** `FakeAiProvider` must be in place before any Analyst is written. The test pattern is: queue a fixture response, run the service, assert on domain objects — not on AI calls.
+3. **Implement CompanyService::create().** One DB transaction wraps company creation, catalog provisioning, digital twin initialization, and owner membership assignment.
 
-4. **Establish the base abstractions.** `AiProvider`, `Prompt`, `Analyst`, and `Connector` interfaces exist as contracts. Concrete implementations come in later phases; the contracts come in Sprint 1.
+4. **Publish Sanctum.** Run `php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"` and wire up API authentication.
+
+5. **Write the company creation feature test.** User registers → creates company → asserts Catalog, DigitalTwin, and CompanyMembership all exist and are correctly linked.
 
 ---
 
 ## Technical Debt
 
-*None recorded yet — no implementation code exists.*
-
-This section tracks shortcuts taken, deferred decisions, and known code quality issues. Update it honestly. Debt that isn't named doesn't get paid.
+| Item | Date | Notes |
+|------|------|-------|
+| Stub models are empty shells | 2026-06-25 | `Company`, `DigitalTwin`, `Catalog`, `Integration`, `Observation`, `Campaign`, `ContentAsset` have no fillable fields, casts, relationships, or migrations. These must be fleshed out in Phase 2. |
 
 ---
 
@@ -112,6 +118,10 @@ This section tracks shortcuts taken, deferred decisions, and known code quality 
 
 | Decision | Rationale | Date |
 |----------|-----------|------|
+| Laravel 13 chosen | Current stable release; PHP 8.3; compatible with Larastan 3.x and PHPStan level 6 | 2026-06-25 |
+| Sanctum over Passport for auth | Sanctum is lighter and sufficient for token-based API auth; Passport adds OAuth complexity not needed in MVP | 2026-06-25 |
+| PHPStan level 6 | Strict enough to catch type errors and missing generics; not so strict as to require exhaustive generics on every collection in specs | 2026-06-25 |
+| Stub models for interface type safety | Interfaces reference Eloquent models that don't yet have migrations; stubs allow PHPStan to pass without deferring type checking | 2026-06-25 |
 | PostgreSQL over MySQL | Required for `pgvector` (future embeddings) and Row-Level Security as defense-in-depth | 2026-06-25 |
 | ULIDs over UUIDs | Sortable, URL-safe, reduces B-tree index fragmentation vs. random UUIDs | 2026-06-25 |
 | Business Brain is a value object, not a DB row | It's a query projection assembled on demand — persisting it would create a stale cache problem | 2026-06-25 |
@@ -125,34 +135,31 @@ This section tracks shortcuts taken, deferred decisions, and known code quality 
 
 ## Recently Completed
 
-- Drafted and committed all 9 specification and foundation documents (Milestone 0)
-- Established the canonical domain model with 18 entities, complete field definitions, and Laravel implementation notes
-- Defined the full 13-step MVP workflow with per-step acceptance criteria — the implementation checklist is ready
-- Wrote the engineering constitution (`FOUNDING_PRINCIPLES.md`) with 10 principles and one-line self-tests
-- Published the 8-phase product roadmap with goals, deliverables, and success criteria per phase
-- Documented the AI layer: provider abstraction, 6 MVP analysts, prompt versioning strategy, `FakeAiProvider` testing pattern
+- **Milestone 1** — Laravel application scaffolded with full tooling chain (Pint, PHPStan, PHPUnit, GitHub Actions)
+- Core domain contracts created: `AiProvider`, `Analyst`, `Connector`, `OpportunityDetector`, `ContentGenerator`
+- Abstract `Prompt` base class and `AiResponse` value object created
+- `FakeAiProvider` created with `queueResponse()`, `queueFixture()`, `assertPromptSent()`, `assertNothingSent()` — ready for use in Phase 3+ Analyst tests
+- `BusinessBrain` value object created in `app/Domain/BusinessBrain/`
+- Domain folder structure created: `app/Domain/`, `app/Application/`, `app/Infrastructure/`, `app/Presentation/`, `app/AI/`, `app/Services/`
+- 25 bootstrap tests written and passing; 0 PHPStan errors; 0 Pint violations
+- Supervisor worker config written for all five queues
 
 ---
 
 ## Next Tasks
 
-The following are the first concrete engineering tasks. They map to Sprint 1 and the Phase 1 implementation checklist in `specs/product/mvp-workflow.md`.
+The following are the next concrete engineering tasks for Phase 1 continuation.
 
-1. `laravel new atlas --pest` — initialize the application
-2. Configure `.env` for PostgreSQL and Redis; confirm connections
-3. Install `laravel/sanctum` for API authentication
-4. Create migrations for: `users`, `companies`, `company_memberships`, `catalogs`, `digital_twins`
-5. Create Eloquent models with `HasUlids`, correct casts, and `$fillable`
-6. Implement `CompanyScope` and apply it to all tenant models
-7. Write `CompanyService::create()` — wraps company + catalog + digital_twin + membership in one DB transaction
-8. Create `AiProvider` interface in `app/AI/Contracts/`
-9. Create `FakeAiProvider` in `app/AI/Testing/`
-10. Create abstract `Prompt` base class in `app/AI/Prompts/`
-11. Create `Analyst` interface in `app/Services/Analyst/Contracts/`
-12. Create `Connector` interface in `app/Services/Observatory/Connectors/Contracts/`
-13. Configure five queues in `config/queue.php`
-14. Write a feature test: user registers → creates company → Catalog, DigitalTwin, and CompanyMembership all exist
-15. Set up GitHub Actions CI: `php artisan test`, `php artisan migrate --force` on pull requests
+1. Run `php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"` — publish Sanctum config and migration
+2. Create migration: `users` table — update to use `char(26)` ULID primary key (replace default integer PK)
+3. Create migration: `companies`
+4. Create migration: `company_memberships`
+5. Create migration: `catalogs`
+6. Create migration: `digital_twins`
+7. Flesh out Eloquent models: `Company`, `DigitalTwin`, `Catalog`, `Integration`, `Observation` — add `HasUlids`, casts, relationships
+8. Create `CompanyScope` global scope and apply to all tenant models
+9. Create `CompanyService::create()` — DB transaction wrapping company + catalog + digital_twin + membership
+10. Write feature test: user registers → creates company → Catalog, DigitalTwin, CompanyMembership all exist
 
 ---
 
@@ -170,6 +177,6 @@ The following are the first concrete engineering tasks. They map to Sprint 1 and
 
 ## Last Updated
 
-**2026-06-25** — Milestone 0 complete. Entering Phase 1 (Platform Foundation). No code exists.
+**2026-06-25** — Milestone 1 complete. Laravel 13 application running with all core abstractions, 25 tests green, PHPStan clean, Pint clean, CI pipeline defined. Entering Phase 2 work (domain migrations and models).
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*

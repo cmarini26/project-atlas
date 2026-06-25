@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: atlas_test
+          POSTGRES_USER: atlas
+          POSTGRES_PASSWORD: secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo, pdo_pgsql, redis, pcntl
+          coverage: none
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: backend/vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install dependencies
+        working-directory: backend
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Copy environment file
+        working-directory: backend
+        run: cp .env.example .env
+
+      - name: Set environment for CI
+        working-directory: backend
+        run: |
+          echo "APP_KEY=" >> .env
+          echo "DB_CONNECTION=pgsql" >> .env
+          echo "DB_HOST=127.0.0.1" >> .env
+          echo "DB_PORT=5432" >> .env
+          echo "DB_DATABASE=atlas_test" >> .env
+          echo "DB_USERNAME=atlas" >> .env
+          echo "DB_PASSWORD=secret" >> .env
+          echo "REDIS_HOST=127.0.0.1" >> .env
+          echo "REDIS_PORT=6379" >> .env
+          echo "QUEUE_CONNECTION=redis" >> .env
+          echo "CACHE_STORE=redis" >> .env
+          echo "SESSION_DRIVER=redis" >> .env
+
+      - name: Generate application key
+        working-directory: backend
+        run: php artisan key:generate
+
+      - name: Run migrations
+        working-directory: backend
+        run: php artisan migrate --force
+
+      - name: Check code style (Pint)
+        working-directory: backend
+        run: ./vendor/bin/pint --test
+
+      - name: Run PHPStan
+        working-directory: backend
+        run: ./vendor/bin/phpstan analyse --no-progress
+
+      - name: Run tests
+        working-directory: backend
+        run: php artisan test --parallel
