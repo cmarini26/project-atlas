@@ -86,6 +86,80 @@ All entities below are scoped to a `company_id`. Apply a global scope on every m
 
 ---
 
+### User
+
+**Definition:** A person who has an account in Atlas. May belong to one or more Companies.
+
+**Purpose:** Authentication and authorization root. Users interact with the system through CompanyMemberships, which define their role within each Company. The `user_id` on Approval records creates the human oversight audit trail.
+
+**Table:** `users`
+
+| Column             | Type      | Notes                                                  |
+|--------------------|-----------|--------------------------------------------------------|
+| id                 | ulid      | PK                                                     |
+| name               | string    |                                                        |
+| email              | string    | unique                                                 |
+| password           | string    | hashed                                                 |
+| email_verified_at  | timestamp | nullable                                               |
+| remember_token     | string    | nullable                                               |
+| created_at         | timestamp |                                                        |
+| updated_at         | timestamp |                                                        |
+
+**Relationships:**
+- `hasMany` CompanyMembership
+- `belongsToMany` Company (through CompanyMembership)
+- `hasMany` Approval
+
+**Laravel notes:**
+- Model: `App\Models\User`
+- Use `HasUlids`, `HasApiTokens` (Sanctum), `Notifiable`
+- Standard Laravel auth user — keep it lean; role and permission logic lives in CompanyMembership
+- Do not put company-scoped data on the User model
+
+---
+
+### CompanyMembership
+
+**Definition:** The join between a User and a Company. Defines the user's role within that Company.
+
+**Purpose:** Enforces multi-tenancy access control. A User can belong to many Companies (e.g., an agency user managing multiple clients). Every company-scoped UI action is authorized against the active CompanyMembership.
+
+**Table:** `company_memberships`
+
+| Column      | Type      | Notes                                                         |
+|-------------|-----------|---------------------------------------------------------------|
+| id          | ulid      | PK                                                            |
+| company_id  | ulid      | FK                                                            |
+| user_id     | ulid      | FK                                                            |
+| role        | enum      | `owner`, `admin`, `member`, `viewer`                          |
+| invited_by  | ulid      | FK to users, nullable; who sent the invitation                |
+| joined_at   | timestamp | nullable; null until invitation is accepted                   |
+| created_at  | timestamp |                                                               |
+| updated_at  | timestamp |                                                               |
+
+**Relationships:**
+- `belongsTo` Company
+- `belongsTo` User
+- `belongsTo` User (as inviter, via `invited_by`)
+
+**Role definitions:**
+
+| Role     | Permissions                                                      |
+|----------|------------------------------------------------------------------|
+| `owner`  | Full access; can manage members, billing, and company settings   |
+| `admin`  | Can manage integrations, approve campaigns, and edit all content |
+| `member` | Can view and respond to recommendations; cannot manage members   |
+| `viewer` | Read-only; cannot approve or edit                                |
+
+**Laravel notes:**
+- Model: `App\Models\CompanyMembership`
+- Use `HasUlids`
+- Unique constraint: `(company_id, user_id)`
+- Authorization uses a `CompanyMembershipPolicy`; gate checks pull the active membership from the request context
+- Store the resolved CompanyMembership on the request or in a singleton for the duration of each request — do not re-query on every gate check
+
+---
+
 ### Digital Twin
 
 **Definition:** A living, structured model of a Company that Atlas builds and continuously maintains. One per Company.
@@ -207,6 +281,8 @@ readonly class BusinessBrain
 | catalog_id   | ulid      | FK                                                                   |
 | company_id   | ulid      | FK, denormalized for query performance                               |
 | external_id  | string    | nullable; source system identifier (feed ID, URL slug, SKU)          |
+| canonical_url| string    | nullable; the public URL for this item on the source site            |
+| source_url   | string    | nullable; the exact URL this item was crawled from (may differ from canonical_url) |
 | title        | string    |                                                                      |
 | description  | text      | nullable                                                             |
 | status       | enum      | `active`, `featured`, `sold`, `expired`, `archived`                  |
@@ -224,7 +300,7 @@ readonly class BusinessBrain
 **Relationships:**
 - `belongsTo` Catalog
 - `belongsTo` Company
-- `hasMany` Opportunity (as the subject)
+- `morphMany` Opportunity (as subject)
 
 **Lifecycle states:**
 
@@ -297,7 +373,8 @@ readonly class BusinessBrain
 | integration_id    | ulid      | FK, nullable (null for manual or internal observations)      |
 | source_type       | enum      | `crawl`, `feed`, `api`, `manual`, `internal`                 |
 | source_identifier | string    | URL, endpoint, or label that was observed                    |
-| raw_payload       | longtext  | nullable; JSON or HTML — pruned after processing             |
+| raw_payload       | longtext  | nullable; JSON or HTML — nulled out after processing         |
+| raw_payload_ref   | string    | nullable; object storage path (e.g., S3 key) for large or archived payloads |
 | status            | enum      | `pending`, `processing`, `processed`, `failed`               |
 | observed_at       | timestamp | when the observation was captured (may differ from created_at)|
 | processed_at      | timestamp | nullable                                                     |
@@ -314,7 +391,7 @@ readonly class BusinessBrain
 **Laravel notes:**
 - Model: `App\Models\Observation`
 - Use `HasUlids`
-- No soft deletes; hard-delete `raw_payload` after `processed_at` + 30 days via scheduled prune job
+- No soft deletes; null out `raw_payload` after `processed_at` + 30 days via scheduled prune job; `raw_payload_ref` points to an object storage object retained for the configured retention period (default 90 days)
 - Queued job: `App\Jobs\ProcessObservation` — dispatched on `ObservationRecorded` event
 - Index: `(company_id, status)`, `(integration_id, observed_at)`
 
@@ -407,7 +484,8 @@ readonly class BusinessBrain
 |------------------|-----------|-----------------------------------------------------------------|
 | id               | ulid      | PK                                                             |
 | company_id       | ulid      | FK                                                             |
-| catalog_item_id  | ulid      | FK, nullable; the item this opportunity is about               |
+| subject_type     | string    | nullable; polymorphic: `CatalogItem`, `Catalog`, `Company`     |
+| subject_id       | ulid      | nullable; ID of the subject record                             |
 | type             | enum      | `featured_item`, `urgency`, `new_arrival`, `re_engagement`, `seasonal`, `milestone` |
 | title            | string    | short label, e.g., "Ferrari 275 GTB — no campaign in 45 days" |
 | description      | text      | why this is an opportunity                                     |
@@ -424,7 +502,7 @@ readonly class BusinessBrain
 
 **Relationships:**
 - `belongsTo` Company
-- `belongsTo` CatalogItem (nullable)
+- `morphTo` subject (nullable; CatalogItem, Catalog, or Company)
 - `hasOne` Decision
 
 **Lifecycle states:**
@@ -441,7 +519,9 @@ readonly class BusinessBrain
 - Use `HasUlids`
 - Composite score formula: `(relevance × 0.30) + (timing × 0.25) + (confidence × 0.25) + (urgency × 0.20)`
 - Score computed in `OpportunityScorer` service, not in the model
+- Register a morph map in `AppServiceProvider` so `subject_type` stores short class names (`catalog_item`, `catalog`, `company`) rather than fully-qualified class names
 - Index: `(company_id, status, composite_score)` — primary query path for Decision Engine
+- Index: `(subject_type, subject_id)` — for polymorphic eager loading
 - Scheduled job: `App\Jobs\DetectOpportunities` — runs per company on a configurable schedule
 
 ---
@@ -463,7 +543,8 @@ readonly class BusinessBrain
 | channel_ids      | json      | array of Channel IDs selected for this campaign                  |
 | rationale        | json      | `{why_now, why_this, why_channel, why_works}` — required         |
 | confidence_score | tinyint   | 0–100                                                            |
-| expected_outcome | text      | nullable; what Atlas expects to happen                           |
+| expected_outcome | text      | nullable; narrative description of what Atlas expects to happen  |
+| expected_impact  | json      | nullable; `{reach, engagement, revenue_estimate, confidence_basis}` |
 | status           | enum      | `pending`, `recommended`, `approved`, `rejected`, `executed`, `cancelled` |
 | decided_at       | timestamp |                                                                  |
 | created_at       | timestamp |                                                                  |
@@ -490,7 +571,7 @@ readonly class BusinessBrain
 - Model: `App\Models\Decision`
 - Use `HasUlids`
 - `rationale` is required at creation — validation enforced in `DecisionService`, not just model
-- Cast `channel_ids` and `rationale` to `array`
+- Cast `channel_ids`, `rationale`, and `expected_impact` to `array`
 - Fire `DecisionCommitted` event on creation → triggers `CreateRecommendation` listener
 - The `rationale` JSON must always contain all four keys; missing keys cause a validation exception
 
@@ -513,6 +594,7 @@ readonly class BusinessBrain
 | summary             | text      | 2–3 sentence explanation of what Atlas wants to do       |
 | rationale_display   | json      | structured rationale formatted for UI rendering          |
 | confidence_score    | tinyint   | 0–100                                                    |
+| expected_impact     | json      | nullable; mirrors Decision.expected_impact; formatted for UI display |
 | status              | enum      | `pending`, `viewed`, `approved`, `edited_and_approved`, `rejected` |
 | viewed_at           | timestamp | nullable; when user first opened it                      |
 | responded_at        | timestamp | nullable                                                 |
@@ -539,7 +621,7 @@ readonly class BusinessBrain
 **Laravel notes:**
 - Model: `App\Models\Recommendation`
 - Use `HasUlids`, `SoftDeletes`
-- Cast `rationale_display` to `array`
+- Cast `rationale_display` and `expected_impact` to `array`
 - `pending` recommendations should appear as a notification/badge in the UI
 - Index: `(company_id, status)` — primary dashboard query
 
@@ -788,10 +870,17 @@ readonly class BusinessBrain
 ## Entity Relationship Summary
 
 ```
+User
+  └── CompanyMembership (1:N)
+        └── Company (N:1)
+
 Company
+  ├── CompanyMembership (1:N)
+  │   └── User (N:1)
   ├── DigitalTwin (1:1)
   ├── Catalog (1:1)
   │   └── CatalogItem (1:N)
+  │       └── Opportunity (1:N, polymorphic as subject)
   ├── Integration (1:N)
   │   └── Observation (1:N)
   │       └── Fact (1:N)
