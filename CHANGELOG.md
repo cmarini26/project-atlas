@@ -6,6 +6,24 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 1 Hardening] — 2026-06-25
+
+### Changed
+
+- `backend/phpstan.neon` — raised from level 6 to **level 8**; passes with 0 errors; no code changes required
+- `docs/STATUS.md` — stack table added (PHP 8.3+, Laravel 13.x, PHPStan level 8); technical debt section expanded with three named items; next tasks reordered to put ULID `User` PK conversion first; PHPStan level 8 decision recorded; project health notes clarified to distinguish placeholder models from implemented persistence
+- `CHANGELOG.md` — this entry
+
+### Technical Debt Recorded
+
+| Item | Notes |
+|------|-------|
+| Eloquent model stubs are placeholders only | No migrations, fillable, casts, or relationships — exist for PHPStan type resolution only |
+| Queue tests use `Queue::fake()` | Dispatch mechanism is proven; live Redis worker execution is not tested yet |
+| `User` model uses integer PK | Must be converted to `char(26)` ULID before `company_memberships` migration |
+
+---
+
 ## [Milestone 1] — Platform Foundation — 2026-06-25
 
 ### Added
@@ -16,7 +34,7 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 - `backend/.env` — configured for PostgreSQL + Redis (queue, cache, session drivers)
 - `backend/.env.example` — documented template for new environments
 - `backend/pint.json` — Laravel preset with `simplified_null_return`, `blank_line_before_statement`, `new_with_parentheses`
-- `backend/phpstan.neon` — Larastan at level 6; paths: `app/`
+- `backend/phpstan.neon` — Larastan at level 8; paths: `app/`
 
 **Queue Topology (`backend/config/queue.php`)**
 - Five named queue connections: `high`, `ai`, `default` (Redis), `observations`, `maintenance`
