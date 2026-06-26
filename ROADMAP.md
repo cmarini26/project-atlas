@@ -146,6 +146,8 @@ Design partner for all phases: **CBB Auctions**. Second validation vertical: exo
 
 *Atlas prepares the work. From a committed Decision, it produces a full campaign ready for human approval.*
 
+**Specification:** `specs/core/campaign-blueprint.md` — authoritative implementation spec for this phase.
+
 ### Goals
 - A committed Decision becomes a prepared campaign with strategy, positioning, and channel-specific content
 - The user sees a Recommendation that explains what Atlas wants to do and why

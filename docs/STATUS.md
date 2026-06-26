@@ -37,9 +37,9 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 **Milestone 5 — Campaign Preparation & Content Generation**
 Corresponds to [Phase 5 of ROADMAP.md](../ROADMAP.md).
 
-After a Decision is committed, prepare a Campaign: generate content assets per channel, create a Recommendation for user approval.
+After a Decision is committed, prepare a Campaign: generate a Campaign Blueprint, produce ContentAssets per channel, create a Recommendation for user approval.
 
-**Status:** `PrepareCampaign` job stub wired (Milestone 4 no-op). Implementation begins in Milestone 5.  
+**Status:** Campaign Blueprint spec complete (`specs/core/campaign-blueprint.md`). Implementation ready to begin.  
 **Owner:** TBD
 
 ---
@@ -230,6 +230,7 @@ All foundational documents written, reviewed, and committed.
 
 ## Recently Completed
 
+- **Milestone 5 — Campaign Blueprint spec** — `specs/core/campaign-blueprint.md` written; covers Blueprint definition, relationship to Decision, all 10 required fields with validation rules, versioning and immutability, `CampaignPreparationAnalyst` AI contract, `BlueprintGenerationFailedException`, full Blueprint→Asset→Renderer pipeline, `ChannelRenderer` interface contract, acceptance criteria, and future extensibility
 - **Milestone 4 — Decision Engine spec** — `specs/core/decision-engine.md` written; covers Decision definition, lifecycle, statuses, types, inputs, all five guard conditions, selection algorithm, required rationale fields, `RationaleGenerationAnalyst` contract, Campaign pipeline handoff (M5), M4 implementation list, explicit out-of-scope list, acceptance criteria, and extensibility
 - **Milestone 4 — Opportunity Engine spec** — `specs/core/opportunity-engine.md` written and CTO approved; covers Opportunity lifecycle, types, scoring formula, evidence chains, expiration, deduplication, `OpportunityDetector` interface, rule-based vs. AI-assisted detectors, implementation scope
 - **Milestone 3 + cleanup** — Fact extraction, knowledge synthesis, BusinessBrain assembly; `Observation.facts()` + `last_enriched_at` fix; 83 tests (81 passing); PHPStan level 8 clean
@@ -244,12 +245,20 @@ All foundational documents written, reviewed, and committed.
 
 ## Next Tasks (Milestone 5)
 
+Spec: `specs/core/campaign-blueprint.md` — authoritative; read before implementing any M5 component.
+
 1. **`AnthropicProvider`** — implement real `AiProvider`; required before any production AI calls; bind in `AppServiceProvider` for non-test environments
-2. **`CampaignPreparationAnalyst`** — implements `PrepareCampaign` job; creates `Campaign` (status: `draft`); dispatches `GenerateContent` per channel
-3. **`ContentGenerationAnalyst`** — creates `ContentAsset` per channel; uses `decision.rationale` as creative brief
-4. **`RecommendationService`** — when all `ContentAsset` records are `draft`, creates `Recommendation`, updates `Decision` to `recommended`, fires `RecommendationCreated`
-5. **Approval UI** — Vue 3 + Inertia.js (or API-first); shows Recommendation card with rationale, content preview, approve/reject controls
-6. **`PublishCampaign` job** — triggered on Recommendation approval; routes each `ContentAsset` to the appropriate channel publisher
+2. **Campaign Blueprint migrations** — add `blueprint` JSON column, `blueprint_version`, `prompt_version`, `expected_asset_count`, `generated_asset_count`, `campaign_type` to `campaigns` table; add `content_assets` table
+3. **`CampaignBlueprint` value object** — readonly PHP class with all 10 Blueprint fields
+4. **`CampaignPreparationPrompt`** — version `1.0`, temperature `0.5`; structured JSON schema; per the Blueprint spec AI generation contract
+5. **`CampaignPreparationAnalyst`** — implements `Analyst`; generates Blueprint from Decision + BusinessBrain; marks all AI-generated
+6. **`CampaignPreparationService`** — validates Blueprint against all 10 field rules; throws `BlueprintGenerationFailedException` on failure; persists Blueprint on Campaign; dispatches `GenerateContent` per channel
+7. **`GenerateContent` job** — `ai` queue; receives Campaign + Channel; calls `ContentGenerationAnalyst`; creates `ContentAsset`
+8. **`ContentGenerationAnalyst`** — channel-aware; uses Blueprint + channel strategy entry; dispatches channel-specific prompt variant
+9. **`ContentAsset` model + migration** — full implementation with `body`, `title`, `media`, `metadata` (per-channel schema), `status`
+10. **`RecommendationService::create()`** — assembles `Recommendation` from Decision + Blueprint + ContentAssets; fires `RecommendationCreated`; sends in-app notification
+11. **Approval UI** — Vue 3 + Inertia.js (or API-first); Recommendation card with rationale display, content preview per channel, approve/edit/reject controls
+12. **`CampaignAssetsReady` event** — fired when `generated_asset_count == expected_asset_count`; triggers `CreateRecommendation`
 
 ---
 
@@ -267,6 +276,6 @@ All foundational documents written, reviewed, and committed.
 
 ## Last Updated
 
-**2026-06-26** — Milestone 4 complete. Opportunity & Decision Engine fully implemented. 127 tests passing (2 Redis skipped). PHPStan level 8 clean. Full pipeline operational: `BusinessBrain → Opportunity Detection → Scoring → Deduplication → Decision Selection → Rationale Generation → DecisionCommitted`. `PrepareCampaign` stub wired. Milestone 5 (Campaign Preparation) ready to begin.
+**2026-06-26** — Milestone 5 Campaign Blueprint spec complete. `specs/core/campaign-blueprint.md` is the authoritative implementation spec for the full Campaign Preparation pipeline: Blueprint generation, ContentAsset creation per channel, `ChannelRenderer` interface contract, and Recommendation assembly. Milestone 5 implementation ready to begin.
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*

@@ -6,6 +6,30 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 5 Specification — Campaign Blueprint] — 2026-06-26
+
+### Added
+
+- `specs/core/campaign-blueprint.md` — authoritative specification for the Campaign Blueprint; source of truth for Milestone 5 implementation
+
+**Defines:**
+- Campaign Blueprint as the strategic creative brief generated between a Decision and channel-specific content generation
+- 10 required fields: `goal`, `audience`, `core_message`, `supporting_points`, `call_to_action`, `offer`, `tone`, `landing_page`, `success_metrics`, `channel_strategy`
+- Blueprint schema with `version` and `prompt_version` fields for auditability
+- Blueprint immutability rule: stored on `campaigns.blueprint`; never modified after write
+- `CampaignPreparationAnalyst` contract: inputs (Decision, BusinessBrain), output (`CampaignBlueprint` VO), temperature `0.5`, failure handling
+- `BlueprintGenerationFailedException` — thrown when any required key is missing; Campaign stays `draft`
+- Validation rules for all 10 fields with specific character minimums and enum values
+- Acceptance criteria for Milestone 5 (Blueprint generation, goal mapping, channel strategy, failure paths, versioning)
+- Pipeline: Blueprint → `GenerateContent` jobs per channel → `ContentGenerationAnalyst` → `ContentAsset` records → `CampaignAssetsReady` → `RecommendationService::create()`
+- `ContentGenerationPrompt` variants per channel type: `SocialContentPrompt`, `EmailContentPrompt`, `SmsContentPrompt`, `BlogContentPrompt`, `LandingPageContentPrompt`
+- `ContentAsset.body` + `metadata` schema per channel type (ready for Milestone 6 rendering)
+- `ChannelRenderer` interface contract (Milestone 6 implementation target)
+- `expected_asset_count` / `generated_asset_count` tracking on Campaign for deterministic `CampaignAssetsReady` event
+- Future extensibility: human-authored blueprints, vertical templates, A/B variants, multi-wave campaigns, per-company calibration
+
+---
+
 ## [Milestone 4 — Opportunity & Decision Engine] — 2026-06-26
 
 ### Added
