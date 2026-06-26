@@ -28,7 +28,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
 
-**Overall:** Milestone 6 complete. Publishing Infrastructure fully implemented and tested. 211 tests passing (2 Redis skipped). PHPStan level 8 clean. Full pipeline: `RecommendationApproved → PublishCampaign → PublishContent × n → LogChannelPublisher → Execution completed → CampaignPublished`. No real platform publishers in M6 — all channels use `LogChannelPublisher`.
+**Overall:** Milestone 6.5 complete. Publishing hardened before EmailPublisher. 239 tests passing (2 Redis skipped). PHPStan level 8 clean. Renderer layer (`ChannelRendererRegistry`, `GenericRenderer`, `FakeChannelRenderer`) integrated into `LogChannelPublisher`. Blueprint validation hardened (tone, landing_page, success_metrics, channel_strategy). Credential repository validated (not found / revoked / expired / error). `CampaignPublished` event corrected — no longer fires on cancelled campaigns.
 
 ---
 
@@ -45,6 +45,26 @@ Implement the first real platform publisher: `EmailPublisher`. Wire it into the 
 ---
 
 ## Completed Milestones
+
+### Milestone 6.5 — Publishing Hardening ✅
+*Completed: 2026-06-26*
+
+**Delivered:**
+
+| Item | Description |
+|------|-------------|
+| `ChannelRendererRegistry` | Mirrors `ChannelPublisherRegistry`; `register()`, `for()`, `all()`; throws `UnknownChannelException` |
+| `GenericRenderer` | `supports()` returns true for all channel types; wraps asset body/title/media/metadata into `PlatformPayload` |
+| `FakeChannelRenderer` | Test double; `assertRendered()`, `assertNotRendered()`, `renderedItems()` |
+| `LogChannelPublisher` updated | Now injects `ChannelRendererRegistry`; calls `render()` before logging payload |
+| `PublisherServiceProvider` updated | Registers both `ChannelRendererRegistry` and `ChannelPublisherRegistry` as singletons; boots `GenericRenderer` |
+| `CredentialsExpiredException` | New non-retryable exception; `userMessage()` instructs reconnection |
+| `ChannelCredentialsRepository` updated | Three-stage validation: not found/revoked → `CredentialsNotFoundException`; expired → `CredentialsExpiredException`; error → `AuthenticationException` |
+| Blueprint validation hardened | 8 new checks: `tone.voice`, `tone.modifier`, `tone.avoid`, `landing_page`, `success_metrics.*` (4 fields), channel_strategy count and field completeness |
+| `CampaignPublished` bug fixed | Event no longer fires when all executions fail; campaign marked `cancelled` without event |
+| `docs/technical/Tenancy.md` | Documents CompanyScope, required middleware pattern, production-readiness requirement |
+| 28 new tests | `RendererIntegrationTest` (5), `ChannelCredentialsRepositoryTest` (9), `CampaignPreparationServiceTest` (14 new) |
+| PHPStan level 8 | 0 errors |
 
 ### Milestone 6 — Publishing Infrastructure ✅
 *Completed: 2026-06-26*
@@ -267,6 +287,8 @@ All foundational documents written, reviewed, and committed.
 
 ## Recently Completed
 
+- **Milestone 6.5 — Publishing Hardening** — Renderer layer integrated, credential validation hardened, blueprint validation expanded, `CampaignPublished` event bug fixed. 28 new tests (239 total, 237 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. See [Milestone-6.5-Review.md](reviews/Milestone-6.5-Review.md).
+
 - **Milestone 6 — Publishing Infrastructure** — Full pipeline implemented: `RecommendationApproved → PublishCampaign → PublishContent × n → LogChannelPublisher → Execution completed → CampaignPublished`. 47 new tests (211 total, 209 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. See [Milestone-6-Review.md](reviews/Milestone-6-Review.md).
 
 - **Milestone 5 — Campaign Engine** — Full Campaign Preparation + Content Generation + Approval Workflow implemented. `CampaignBlueprint` VO, `CampaignPreparationAnalyst`, `CampaignPreparationService`, 5 `ContentGenerationPrompt` variants, `ContentGenerationAnalyst`, `ContentGenerationService`, `RecommendationService`, `ApprovalService` (approve + reject with full status transitions). Jobs: `PrepareCampaign` (full), `GenerateContent`, `CreateRecommendation`. Events: `CampaignAssetsReady`, `RecommendationCreated`, `RecommendationApproved`, `RecommendationRejected`. Filament admin panel with 6 resources (Company, Opportunity, Decision, Campaign, ContentAsset, Recommendation) + approve/reject actions. 35 new tests (164 total, 162 passing, 2 Redis skipped). PHPStan level 8 — 0 errors.
@@ -309,6 +331,6 @@ Milestone 7 wires the first real platform publisher into the M6 infrastructure.
 
 ## Last Updated
 
-**2026-06-26** — Milestone 6 complete. Publishing Infrastructure fully implemented: `Execution` + `ExecutionAttempt` + `ChannelCredentials` models, `ExecutionService`, `RollbackService`, `PublishCampaign` + `PublishContent` + `PublishScheduledContent` + `CheckChannelHealth` jobs, `ChannelPublisher` + `ChannelRenderer` + `SupportsRollback` interfaces, `ChannelPublisherRegistry`, `FakeChannelPublisher`, `LogChannelPublisher`, `PublisherServiceProvider`, Filament `ExecutionResource`, 47 tests — 211 total passing. PHPStan level 8 — 0 errors.
+**2026-06-26** — Milestone 6.5 complete. Renderer layer (`ChannelRendererRegistry`, `GenericRenderer`, `FakeChannelRenderer`) integrated into `LogChannelPublisher`. Credential repository hardened with three-stage validation. Blueprint validation expanded (tone, landing_page, success_metrics, channel_strategy structure). `CampaignPublished` event corrected to not fire on cancelled campaigns. `docs/technical/Tenancy.md` added. 28 new tests — 239 total passing (2 Redis skipped). PHPStan level 8 — 0 errors.
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*

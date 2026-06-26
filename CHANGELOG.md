@@ -6,6 +6,46 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 6.5 — Publishing Hardening] — 2026-06-26
+
+### Added
+
+**Renderer Layer**
+
+- `app/Services/Publishing/ChannelRendererRegistry.php` — mirrors `ChannelPublisherRegistry`; `register()`, `for(channelType)`, `all()`; throws `UnknownChannelException` when no renderer matches
+- `app/Services/Publishing/GenericRenderer.php` — implements `ChannelRenderer`; `supports()` returns `true` for all channel types; wraps `ContentAsset` body/title/media/metadata into `PlatformPayload`
+- `app/Services/Publishing/FakeChannelRenderer.php` — test double; `render()` records calls; `assertRendered(int)`, `assertNotRendered()`, `renderedCount()`, `renderedItems()`
+
+**Exceptions**
+
+- `app/Services/Publishing/Exceptions/CredentialsExpiredException.php` — non-retryable; `userMessage()` directs user to reconnect their account
+
+**Documentation**
+
+- `docs/technical/Tenancy.md` — explains `CompanyScope` mechanism, required `ResolveCurrentCompany` middleware pattern, subdomain vs. route parameter strategies; marked as production-readiness requirement not yet implemented
+
+**Tests** (28 new, 239 total)
+
+- `tests/Feature/Publishing/RendererIntegrationTest.php` — 5 tests: proves `PublishContent → LogChannelPublisher → ChannelRenderer` chain; asserts `FakeChannelRenderer::assertRendered(1)` after job handle; asserts correct asset and channel passed; asserts renderer called once per execution; `GenericRenderer` returns payload with body; `GenericRenderer` supports all channel types
+- `tests/Feature/Publishing/ChannelCredentialsRepositoryTest.php` — 9 tests: returns active credentials; throws `CredentialsNotFoundException` (not found, revoked, wrong company); throws `CredentialsExpiredException` (status=expired, expires_at in past); does not throw when expires_at is future; throws `AuthenticationException` for error status; exceptions are non-retryable
+- `tests/Feature/Campaign/CampaignPreparationServiceTest.php` — 14 new tests: tone.voice missing, tone.modifier missing, tone.avoid not array, invalid landing_page URL, null/valid URL accepted, primary_metric missing, secondary_metrics not array, baseline missing, timeframe missing, channel_strategy count too low, strategy missing format/angle, constraints not array, priority not numeric
+
+### Changed
+
+**`LogChannelPublisher`** — now injects `ChannelRendererRegistry`; calls `$renderers->for($channel->type)->render($asset, $channel)` before logging; logs `channel_type` from `PlatformPayload` instead of raw `channel_id`
+
+**`PublisherServiceProvider`** — `register()` now binds both `ChannelRendererRegistry` and `ChannelPublisherRegistry` as singletons; `boot()` registers `GenericRenderer` in renderer registry before registering `LogChannelPublisher`
+
+**`ChannelCredentialsRepository::for()`** — three-stage validation: `null | revoked → CredentialsNotFoundException`; `isExpired() | status=expired → CredentialsExpiredException`; `status=error → AuthenticationException`
+
+**`CampaignPreparationService::validateBlueprint()`** — now takes `Decision $decision` as second parameter; 8 new validation checks: `tone.voice`, `tone.modifier`, `tone.avoid`, `landing_page` URL, `success_metrics.primary_metric`, `success_metrics.secondary_metrics`, `success_metrics.baseline`, `success_metrics.timeframe`, channel_strategy count vs. decision channels, per-strategy `format`/`angle`/`constraints`/`priority` fields
+
+**`ExecutionService::checkCampaignCompletion()`** — `CampaignPublished` event now only dispatched when `$anyCompleted` is true; cancelled campaigns update status without firing the event
+
+**`ExecutionServiceTest` / `PublishingPipelineTest`** — updated two tests to assert `Event::assertNotDispatched(CampaignPublished::class)` on all-failed-executions path
+
+---
+
 ## [Milestone 6 — Publishing Infrastructure] — 2026-06-26
 
 ### Added

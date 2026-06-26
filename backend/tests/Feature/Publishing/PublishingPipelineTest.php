@@ -239,6 +239,6 @@ class PublishingPipelineTest extends TestCase
 
         $this->campaign->refresh();
         $this->assertEquals('cancelled', $this->campaign->status);
-        Event::assertDispatched(CampaignPublished::class);
+        Event::assertNotDispatched(CampaignPublished::class);
     }
 }

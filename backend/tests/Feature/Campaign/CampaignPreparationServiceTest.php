@@ -206,6 +206,231 @@ class CampaignPreparationServiceTest extends TestCase
         $this->assertArrayHasKey('channel_strategy', $campaign->blueprint);
     }
 
+    // --- tone validation ---
+
+    public function test_throws_on_missing_tone_voice(): void
+    {
+        $bp = $this->loadFixture();
+        unset($bp['tone']['voice']);
+        $this->fake->queueResponse(json_encode($bp));
+
+        $this->expectException(BlueprintGenerationFailedException::class);
+        $this->expectExceptionMessage('tone.voice is required');
+
+        $this->service->prepare($this->decision, $this->makeBrain());
+    }
+
+    public function test_throws_on_missing_tone_modifier(): void
+    {
+        $bp = $this->loadFixture();
+        unset($bp['tone']['modifier']);
+        $this->fake->queueResponse(json_encode($bp));
+
+        $this->expectException(BlueprintGenerationFailedException::class);
+        $this->expectExceptionMessage('tone.modifier is required');
+
+        $this->service->prepare($this->decision, $this->makeBrain());
+    }
+
+    public function test_throws_when_tone_avoid_is_not_an_array(): void
+    {
+        $bp = $this->loadFixture();
+        $bp['tone']['avoid'] = 'not-an-array';
+        $this->fake->queueResponse(json_encode($bp));
+
+        $this->expectException(BlueprintGenerationFailedException::class);
+        $this->expectExceptionMessage('tone.avoid must be an array');
+
+        $this->service->prepare($this->decision, $this->makeBrain());
+    }
+
+    // --- landing_page validation ---
+
+    public function test_throws_on_invalid_landing_page_url(): void
+    {
+        $bp = $this->loadFixture();
+        $bp['landing_page'] = 'not-a-valid-url';
+        $this->fake->queueResponse(json_encode($bp));
+
+        $this->expectException(BlueprintGenerationFailedException::class);
+        $this->expectExceptionMessage('landing_page must be a valid URL or null');
+
+        $this->service->prepare($this->decision, $this->makeBrain());
+    }
+
+    public function test_accepts_null_landing_page(): void
+    {
+        $bp = $this->loadFixture();
+        $bp['landing_page'] = null;
+        $this->fake->queueResponse(json_encode($bp));
+
+        $campaign = $this->service->prepare($this->decision, $this->makeBrain());
+
+        $this->assertEquals('draft', $campaign->status);
+    }
+
+    public function test_accepts_valid_landing_page_url(): void
+    {
+        $bp = $this->loadFixture();
+        $bp['landing_page'] = 'https://example.com/auction';
+        $this->fake->queueResponse(json_encode($bp));
+
+        $campaign = $this->service->prepare($this->decision, $this->makeBrain());
+
+        $this->assertEquals('draft', $campaign->status);
+    }
+
+    // --- success_metrics validation ---
+
+    public function test_throws_on_missing_primary_metric(): void
+    {
+        $bp = $this->loadFixture();
+        unset($bp['success_metrics']['primary_metric']);
+        $this->fake->queueResponse(json_encode($bp));
+
+        $this->expectException(BlueprintGenerationFailedException::class);
+        $this->expectExceptionMessage('success_metrics.primary_metric is required');
+
+        $this->service->prepare($this->decision, $this->makeBrain());
+    }
+
+    public function test_throws_when_secondary_metrics_is_not_an_array(): void
+    {
+        $bp = $this->loadFixture();
+        $bp['success_metrics']['secondary_metrics'] = 'not-an-array';
+        $this->fake->queueResponse(json_encode($bp));
+
+        $this->expectException(BlueprintGenerationFailedException::class);
+        $this->expectExceptionMessage('success_metrics.secondary_metrics must be an array');
+
+        $this->service->prepare($this->decision, $this->makeBrain());
+    }
+
+    public function test_throws_on_missing_baseline(): void
+    {
+        $bp = $this->loadFixture();
+        unset($bp['success_metrics']['baseline']);
+        $this->fake->queueResponse(json_encode($bp));
+
+        $this->expectException(BlueprintGenerationFailedException::class);
+        $this->expectExceptionMessage('success_metrics.baseline is required');
+
+        $this->service->prepare($this->decision, $this->makeBrain());
+    }
+
+    public function test_throws_on_missing_timeframe(): void
+    {
+        $bp = $this->loadFixture();
+        unset($bp['success_metrics']['timeframe']);
+        $this->fake->queueResponse(json_encode($bp));
+
+        $this->expectException(BlueprintGenerationFailedException::class);
+        $this->expectExceptionMessage('success_metrics.timeframe is required');
+
+        $this->service->prepare($this->decision, $this->makeBrain());
+    }
+
+    // --- channel_strategy count validation ---
+
+    public function test_throws_when_channel_strategy_count_is_less_than_decision_channels(): void
+    {
+        $channel2 = Channel::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id,
+            'type' => 'sms',
+            'name' => 'SMS',
+            'is_active' => true,
+        ]);
+
+        $opportunity = Opportunity::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id,
+            'subject_type' => 'catalog_item',
+            'type' => 'featured_item',
+            'title' => 'Two-Channel',
+            'description' => 'Requires two channel strategies',
+            'relevance_score' => 80,
+            'timing_score' => 75,
+            'confidence_score' => 70,
+            'urgency_score' => 65,
+            'composite_score' => 73,
+            'status' => 'selected',
+            'detected_at' => now(),
+        ]);
+
+        $twoChannelDecision = Decision::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id,
+            'opportunity_id' => $opportunity->id,
+            'campaign_type' => 'featured_item',
+            'channel_ids' => [$this->decision->channel_ids[0], $channel2->id],
+            'rationale' => ['why_now' => 'Now.'],
+            'expected_impact' => ['summary' => 'Lift'],
+            'confidence_score' => 70,
+            'status' => 'recommended',
+            'decided_at' => now(),
+        ]);
+
+        // Blueprint with only 1 channel strategy, but decision has 2 channels
+        $bp = $this->loadFixture();
+        $bp['channel_strategy'] = [
+            'email' => $bp['channel_strategy']['email'],
+        ];
+        $this->fake->queueResponse(json_encode($bp));
+
+        $this->expectException(BlueprintGenerationFailedException::class);
+        $this->expectExceptionMessage('channel_strategy must have at least one entry per decision channel');
+
+        $this->service->prepare($twoChannelDecision, $this->makeBrain());
+    }
+
+    // --- channel_strategy entry field validation ---
+
+    public function test_throws_when_channel_strategy_entry_missing_format(): void
+    {
+        $bp = $this->loadFixture();
+        unset($bp['channel_strategy']['email']['format']);
+        $this->fake->queueResponse(json_encode($bp));
+
+        $this->expectException(BlueprintGenerationFailedException::class);
+        $this->expectExceptionMessage('missing required field: format');
+
+        $this->service->prepare($this->decision, $this->makeBrain());
+    }
+
+    public function test_throws_when_channel_strategy_entry_missing_angle(): void
+    {
+        $bp = $this->loadFixture();
+        unset($bp['channel_strategy']['email']['angle']);
+        $this->fake->queueResponse(json_encode($bp));
+
+        $this->expectException(BlueprintGenerationFailedException::class);
+        $this->expectExceptionMessage('missing required field: angle');
+
+        $this->service->prepare($this->decision, $this->makeBrain());
+    }
+
+    public function test_throws_when_channel_strategy_constraints_not_array(): void
+    {
+        $bp = $this->loadFixture();
+        $bp['channel_strategy']['email']['constraints'] = 'not-an-array';
+        $this->fake->queueResponse(json_encode($bp));
+
+        $this->expectException(BlueprintGenerationFailedException::class);
+        $this->expectExceptionMessage('constraints must be an array');
+
+        $this->service->prepare($this->decision, $this->makeBrain());
+    }
+
+    public function test_throws_when_channel_strategy_priority_not_numeric(): void
+    {
+        $bp = $this->loadFixture();
+        $bp['channel_strategy']['email']['priority'] = 'high';
+        $this->fake->queueResponse(json_encode($bp));
+
+        $this->expectException(BlueprintGenerationFailedException::class);
+        $this->expectExceptionMessage('priority must be a number');
+
+        $this->service->prepare($this->decision, $this->makeBrain());
+    }
+
     private function makeBrain(): BusinessBrain
     {
         return new BusinessBrain(
@@ -217,6 +442,15 @@ class CampaignPreparationServiceTest extends TestCase
             catalog: $this->catalog,
             featuredItems: collect(),
             recentCampaigns: collect(),
+        );
+    }
+
+    /** @return array<string, mixed> */
+    private function loadFixture(): array
+    {
+        return json_decode(
+            file_get_contents(base_path('tests/Fixtures/AI/campaign-blueprint.json')),
+            true
         );
     }
 }

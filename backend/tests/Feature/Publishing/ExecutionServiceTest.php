@@ -333,6 +333,7 @@ class ExecutionServiceTest extends TestCase
 
         $this->campaign->refresh();
         $this->assertEquals('cancelled', $this->campaign->status);
+        Event::assertNotDispatched(CampaignPublished::class);
     }
 
     public function test_campaign_not_settled_while_executions_are_pending(): void

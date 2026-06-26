@@ -149,10 +149,9 @@ class ExecutionService
 
         if ($anyCompleted) {
             $campaign->update(['status' => 'published', 'completed_at' => now()]);
+            CampaignPublished::dispatch($campaign);
         } else {
             $campaign->update(['status' => 'cancelled']);
         }
-
-        CampaignPublished::dispatch($campaign);
     }
 }
