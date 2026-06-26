@@ -28,16 +28,16 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
 
-**Overall:** Milestone 2 complete + cleanup pass applied. `IntegrationService::create()` implemented, `SyncIntegration` now uniqueness-guarded, default catalog type corrected to `mixed`. 48 tests, 46 passing (2 Redis skipped). PHPStan level 8 clean. Ready for Milestone 3.
+**Overall:** Milestone 3 complete. Fact extraction, knowledge synthesis, and BusinessBrain assembly all implemented and tested. AI pipeline live (uses FakeAiProvider in tests; needs real provider for production). 82 tests, 80 passing, 2 Redis skipped. PHPStan level 8 clean. Ready for Milestone 4.
 
 ---
 
 ## Current Milestone
 
-**Milestone 3 — Fact Extraction & Knowledge Synthesis**
-Corresponds to [Phase 1 of ROADMAP.md](../ROADMAP.md) (continued).
+**Milestone 4 — Opportunity Detection & Decision Engine**
+Corresponds to [Phase 2 of ROADMAP.md](../ROADMAP.md).
 
-Process raw Observations into structured Facts using AI analysts. Synthesise Facts into a live BusinessBrain for each Company.
+Detect marketing opportunities from the BusinessBrain. Score them. Commit Decisions. Produce Recommendations.
 
 **Target completion:** TBD
 **Owner:** TBD
@@ -45,6 +45,31 @@ Process raw Observations into structured Facts using AI analysts. Synthesise Fac
 ---
 
 ## Completed Milestones
+
+### Milestone 3 — Fact Extraction & Knowledge Synthesis ✅
+*Completed: 2026-06-26*
+
+**Delivered:**
+
+| Item | Description |
+|------|-------------|
+| `Fact` model + migration | `facts` table; ULID PK; `is_current` versioning; `(company_id, key, is_current)` index |
+| `Knowledge` model + migration | `knowledge_entries` table; `active()` scope with `expires_at` handling |
+| `FactData` value object | Readonly VO: key, value, dataType, confidence — decouples analyst from Eloquent |
+| `FactRepository` + `KnowledgeRepository` | Encapsulated Eloquent queries with `withoutGlobalScopes()` |
+| `FactExtractionPrompt` | Versioned prompt (v1.0); structured JSON schema; temperature 0.1 |
+| `StructuredResponseParser` | Parses AI JSON; strips markdown fences; throws on invalid response |
+| `WebsiteAnalyst` | Implements `Analyst`; calls `AiProvider`; returns `Collection<FactData>`; short-circuits on empty payload |
+| `FactService` | `storeExtracted()`: persists Facts; supersedes existing current facts; fires `FactExtracted` |
+| `KnowledgeService` | `synthesizeForCompany()`: groups facts by domain; upserts Knowledge; activates DigitalTwin; fires events |
+| `BusinessBrainService` | `for(Company): BusinessBrain`; assembles from current Facts, active Knowledge, recent Observations |
+| Real `ProcessObservation` | Full pipeline: analyze → store facts → synthesize knowledge → mark processed; marks failed on error |
+| 4 domain events | `FactExtracted`, `KnowledgeSynthesized`, `ObservationProcessed`, `DigitalTwinActivated` |
+| Company model | Added `facts()` and `knowledge()` `hasMany` relationships |
+| `AiProvider` binding | Bound to `FakeAiProvider` in `testing` environment |
+| AI fixture | `tests/Fixtures/AI/website-facts.json` |
+| 34 new tests | 7 test classes covering all new services, AI layer, and end-to-end pipeline — 82 total (80 passing) |
+| PHPStan level 8 | 0 errors |
 
 ### Milestone 2 — Discovery & Knowledge Platform ✅
 *Completed: 2026-06-26*
@@ -117,13 +142,13 @@ All foundational documents written, reviewed, and committed.
 
 ## Current Objectives
 
-1. **Implement Fact extraction.** `ProcessObservation` job is currently a stub. Wire it to an AI Analyst that extracts structured Facts from raw observation payloads.
+1. **Bind real `AiProvider` for production.** `AppServiceProvider` currently binds `FakeAiProvider` in testing only. A real `AnthropicProvider` (or `OpenAiProvider`) must be implemented and bound before `ProcessObservation` can run in production.
 
-2. **Create `Fact` model and migration.** Facts are the atomic unit of Knowledge — extracted from Observations and stored as typed key-value pairs with source attribution.
+2. **Implement `Opportunity` model and migration.** Spec defined in `domain-model.md`. Polymorphic `subject` (CatalogItem, Catalog, Company).
 
-3. **Implement `BusinessBrainService::for(Company)`.** Assemble a live `BusinessBrain` value object from a company's current Facts.
+3. **Implement `OpportunityDetector` contract.** Rule-based detectors run first; AI analyst supplements for non-obvious opportunities.
 
-4. **Write Analyst for website observations.** A `WebsiteAnalyst` that reads `WebPageData` payloads and extracts business facts (name, products, services, USPs, contact info, geography).
+4. **Implement `Decision` model and migration.** One Decision per Opportunity; required `rationale` JSON (`why_now`, `why_this`, `why_channel`, `why_works`); enforced in `DecisionService`.
 
 ---
 
@@ -172,6 +197,7 @@ All foundational documents written, reviewed, and committed.
 
 ## Recently Completed
 
+- **Milestone 3** — Fact extraction, knowledge synthesis, BusinessBrain assembly; 82 tests (80 passing); PHPStan level 8 clean
 - **Milestone 2 + cleanup** — `IntegrationService::create()`, `SyncIntegration` uniqueness guard, catalog type fix; 48 tests (46 passing); PHPStan level 8 clean
 - **Milestone 1 hardening** — PHPStan raised to level 8 (0 errors); stack versions documented; technical debt items recorded; CHANGELOG updated
 - **Milestone 1** — Laravel 13 / PHP 8.3 application scaffolded with full tooling chain (Pint, PHPStan, PHPUnit, GitHub Actions)
@@ -183,11 +209,11 @@ All foundational documents written, reviewed, and committed.
 
 ## Next Tasks
 
-1. Implement `Fact` model and migration — source_type, source_id, key, value, confidence, extracted_at
-2. Wire `ProcessObservation` job to `WebsiteAnalyst` — extract Facts from crawled page payloads
-3. Implement `WebsiteAnalyst` — uses AI to extract business facts from `WebPageData` body text
-4. Implement `BusinessBrainService::for(Company)` — assemble live `BusinessBrain` from current Facts
-5. Write tests: fact creation, analyst dispatch, BusinessBrain assembly
+1. Implement real `AiProvider` (AnthropicProvider or OpenAiProvider) — required before any production AI calls
+2. Implement `Opportunity` model + migration + `OpportunityDetector` contract implementations
+3. Implement `Decision` model + migration + `DecisionService` (rationale required)
+4. Implement `Recommendation` model + migration
+5. Wire `DecisionCommitted → CreateRecommendation` listener
 
 ---
 
@@ -205,6 +231,6 @@ All foundational documents written, reviewed, and committed.
 
 ## Last Updated
 
-**2026-06-26** — Milestone 2 cleanup pass complete. `IntegrationService::create()` implemented, `SyncIntegration` uniqueness-guarded, catalog default type corrected. 48 tests (46 passing), PHPStan level 8 clean, Pint clean. Ready for Milestone 3.
+**2026-06-26** — Milestone 3 complete. Fact extraction (`WebsiteAnalyst` + `FactExtractionPrompt`), knowledge synthesis (`KnowledgeService`), and BusinessBrain assembly all shipped. 82 tests (80 passing), PHPStan level 8 clean, Pint clean. Ready for Milestone 4.
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*

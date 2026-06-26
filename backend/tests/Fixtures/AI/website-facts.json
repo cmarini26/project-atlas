@@ -1,0 +1,28 @@
+{
+    "facts": [
+        {
+            "key": "business.name",
+            "value": "CBB Auctions",
+            "data_type": "string",
+            "confidence": 95
+        },
+        {
+            "key": "business.description",
+            "value": "A comic book auction house and marketplace",
+            "data_type": "string",
+            "confidence": 85
+        },
+        {
+            "key": "services.primary",
+            "value": "comic book auctions",
+            "data_type": "string",
+            "confidence": 90
+        },
+        {
+            "key": "contact.email",
+            "value": "hello@cbbauctions.com",
+            "data_type": "string",
+            "confidence": 80
+        }
+    ]
+}

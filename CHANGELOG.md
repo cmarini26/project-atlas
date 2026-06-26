@@ -6,6 +6,79 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 3] — Fact Extraction & Knowledge Synthesis — 2026-06-26
+
+### Added
+
+**Database Migrations (`backend/database/migrations/`)**
+- `2026_06_26_001000_create_facts_table.php` — `facts` table; `char(26)` ULID PK; `is_current` boolean; `superseded_by_id` self-referential; compound index `(company_id, key, is_current)`
+- `2026_06_26_001100_create_knowledge_entries_table.php` — `knowledge_entries` table; `char(26)` ULID PK; type enum; `is_active` boolean; `expires_at` nullable; compound index `(company_id, type, is_active)`
+
+**Eloquent Models (`backend/app/Models/`)**
+- `Fact.php` — `BelongsToCompany`, `HasUlids`; `value` cast as `json`; `is_current` boolean cast; `current()` local scope; `observation()` and `supersededBy()` relationships
+- `Knowledge.php` — `BelongsToCompany`, `HasUlids`; table `knowledge_entries`; `active()` local scope with `expires_at` handling
+- `Company.php` — added `facts()` and `knowledge()` `hasMany` relationships
+
+**AI Layer (`backend/app/AI/`)**
+- `Prompts/FactExtractionPrompt.php` — extends `Prompt`; structured JSON schema; version `1.0`; temperature `0.1`; system prompt defines fact key conventions and confidence rules
+- `StructuredResponseParser.php` — parses AI response to `array`; strips markdown code fences; throws `InvalidArgumentException` on non-JSON or non-array
+
+**Analysts (`backend/app/Services/Analyst/`)**
+- `WebsiteAnalyst.php` — implements `Analyst`; reads `Observation.raw_payload` as WebPageData JSON; calls `AiProvider::complete(FactExtractionPrompt)`; returns `Collection<int, FactData>`; short-circuits on empty `bodyText`
+
+**Brain Services (`backend/app/Services/Brain/`)**
+- `Data/FactData.php` — readonly VO: key, value, dataType, confidence
+- `FactRepository.php` — `findCurrent(companyId, key)`, `currentForCompany(companyId)` — always `withoutGlobalScopes()`
+- `KnowledgeRepository.php` — `activeForCompany(companyId)`, `findActiveForSubject(companyId, subject)`
+- `FactService.php` — `storeExtracted(Observation, Collection<FactData>): Collection<Fact>`; creates new Facts; supersedes existing current fact for same key; fires `FactExtracted`
+- `KnowledgeService.php` — `synthesizeForCompany(Company)`: groups current Facts by domain key; upserts Knowledge (type: `context`); fires `KnowledgeSynthesized`; activates DigitalTwin if `initializing`
+- `BusinessBrainService.php` — `for(Company): BusinessBrain`; assembles from current Facts, active Knowledge, recent Observations, DigitalTwin, Catalog
+
+**Events (`backend/app/Events/`)**
+- `FactExtracted.php` — fired per Fact created by `FactService`
+- `KnowledgeSynthesized.php` — fired per Knowledge entry upserted
+- `ObservationProcessed.php` — fired when `ProcessObservation` marks an observation processed
+- `DigitalTwinActivated.php` — fired when `KnowledgeService` transitions twin `initializing → active`
+
+**Jobs (`backend/app/Jobs/`)**
+- `ProcessObservation.php` — fully implemented (was stub); pipeline: `markProcessing → WebsiteAnalyst → FactService → KnowledgeService → markProcessed → ObservationProcessed`; `markFailed()` + re-throw on error
+
+**Providers**
+- `AppServiceProvider.php` — `register()` binds `AiProvider` to `FakeAiProvider` in `testing` environment
+
+**Test Fixture**
+- `tests/Fixtures/AI/website-facts.json` — 4-fact sample response used by analyst and pipeline tests
+
+**Feature Tests (`backend/tests/Feature/Brain/`)**
+- `WebsiteAnalystTest.php` — 3 tests: fact extraction, field mapping, empty payload short-circuit
+- `FactServiceTest.php` — 4 tests: persist, supersede, observation linkage, empty input
+- `KnowledgeServiceTest.php` — 6 tests: synthesis, events, twin activation, no duplicate, idempotent, empty input
+- `BusinessBrainServiceTest.php` — 6 tests: company/twin, current facts, superseded excluded, active knowledge, catalog, empty M3 collections
+- `ProcessObservationTest.php` — 6 tests: observation processed, facts created, knowledge created, twin activated, event fired, failure path
+
+**Unit Tests (`backend/tests/Unit/AI/`)**
+- `StructuredResponseParserTest.php` — 4 tests: plain JSON, markdown fences, code fences, invalid JSON exception
+- `FactExtractionPromptTest.php` — 5 tests: system/user strings, schema structure, version, low temperature
+
+### Result
+
+- 82 tests total; 80 passing, 2 skipped (Redis); PHPStan level 8 — 0 errors; Pint — clean
+
+### Spec Deviations
+
+None. All implemented entities match `specs/core/domain-model.md` exactly.
+
+### Technical Debt Introduced
+
+| Item | Notes |
+|------|-------|
+| No production `AiProvider` implementation | Production deployment requires `AnthropicProvider` before AI jobs run |
+| Knowledge synthesis is rule-based in M3 | AI-powered pattern synthesis deferred to M4+ |
+| `DigitalTwin.last_enriched_at` only updated on activation | Should also update on re-synthesis |
+| `Observation hasMany Fact` not added to Observation model | Deferred — not yet needed by any query path |
+
+---
+
 ## [Milestone 2 Cleanup] — 2026-06-26
 
 ### Fixed

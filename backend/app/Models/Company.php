@@ -71,4 +71,16 @@ class Company extends Model
     {
         return $this->hasMany(Observation::class);
     }
+
+    /** @return HasMany<Fact, $this> */
+    public function facts(): HasMany
+    {
+        return $this->hasMany(Fact::class);
+    }
+
+    /** @return HasMany<Knowledge, $this> */
+    public function knowledge(): HasMany
+    {
+        return $this->hasMany(Knowledge::class);
+    }
 }
