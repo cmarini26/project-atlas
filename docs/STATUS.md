@@ -34,11 +34,11 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
-**Milestone 7.5 — Analytics Engine Specification**
+**Milestone 8 — Analytics Engine**
 
-Specification-only milestone. No application code. `specs/core/analytics-engine.md` written and approved.
+Implementation plan at `docs/plans/Milestone-8-Implementation.md`. Spec at `specs/core/analytics-engine.md`.
 
-**Status:** Complete (spec only). Implementation begins in Phase 7.
+**Status:** Not yet started. Plan complete — ready to implement Phase 1 (domain models).
 
 ---
 
@@ -312,6 +312,23 @@ All foundational documents written, reviewed, and committed.
 
 ---
 
+## Next Tasks (Milestone 8 — Analytics Engine)
+
+Full implementation plan: `docs/plans/Milestone-8-Implementation.md`
+
+1. **Phase 1** — Migrations + models: `ExecutionMetric`, `CampaignKpiSnapshot`, `MetricRetrievalLog`
+2. **Phase 2** — `AnalyticsProvider` interface, `AnalyticsProviderRegistry`, `FakeAnalyticsProvider`, `LogAnalyticsProvider`, `WebhookEvent` VO, `AnalyticsServiceProvider`
+3. **Phase 3** — `ScheduleMetricRetrieval` listener, `RetrieveExecutionMetrics` job, `PruneRawMetrics` job
+4. **Phase 4** — `AnalyticsWebhookHandler` interface, `WebhookHandlerRegistry`, `AnalyticsWebhookController`, `PostmarkWebhookHandler`, `ProcessAnalyticsWebhookEvent` job
+5. **Phase 5** — `normalize()` implementations, cross-channel normalised keys, `isWindowClosed()` logic
+6. **Phase 6** — `CampaignKpiService` (aggregate, snapshotIfReady, ratePerformance, bestChannel)
+7. **Phase 7** — `RecommendationKpiService`, `DecisionEffectivenessService`
+8. **Phase 8** — `LearningService::recordFromMetrics()`, 8 signal types
+9. **Phase 9** — Filament campaign KPI panel, ExecutionMetric visibility, company approval rate
+10. **Phase 10** — ≥ 40 new tests across 16 test files
+
+---
+
 ## Recently Completed
 
 - **Milestone 7.5 — Analytics Engine Specification** — `specs/core/analytics-engine.md` written. Covers domain model (`ExecutionMetric`, `CampaignKpiSnapshot`, `MetricRetrievalLog`), pull polling + webhook push ingestion, `AnalyticsProvider` interface and registry, normalised metric keys, campaign KPIs, recommendation KPIs, decision effectiveness metrics, BusinessBrain feedback loop, learning inputs, privacy constraints, acceptance criteria, and future extensibility. `ROADMAP.md` Phase 7 updated with concrete deliverables.
@@ -359,6 +376,6 @@ All foundational documents written, reviewed, and committed.
 
 ## Last Updated
 
-**2026-06-26** — Milestone 7.5 complete (spec only). `specs/core/analytics-engine.md` written covering domain model, pull + webhook ingestion, `AnalyticsProvider` abstraction, 6 channel metric sets, campaign KPIs, recommendation KPIs, decision effectiveness, BusinessBrain feedback loop, 10 learning pathways, privacy model, 18 acceptance criteria. `ROADMAP.md` Phase 7 updated. Previously: Milestone 7 complete. `EmailPublisher` + `EmailRenderer` + `EmailProviderRegistry` + `LogEmailProvider` + `FakeEmailProvider` all wired into M6 infrastructure. `EmailRenderer` resolves `metadata.subject_line → title → throw`; registered first in `ChannelRendererRegistry`. `EmailPublisher` resolves credentials, renders via `ChannelRendererRegistry`, creates `EmailPayload`, resolves provider from `EmailProviderRegistry`, sends. 29 new tests — 268 total passing (2 Redis skipped). PHPStan level 8 — 0 errors.
+**2026-06-26** — Milestone 8 implementation plan written (`docs/plans/Milestone-8-Implementation.md`). 10 implementation phases covering domain models, provider infrastructure, retrieval jobs, webhook ingestion, metric normalisation, KPI aggregation, recommendation/decision KPIs, BusinessBrain feedback, Filament UI, and ≥ 40 tests. Previously: Milestone 7.5 spec complete. `EmailPublisher` + `EmailRenderer` + `EmailProviderRegistry` + `LogEmailProvider` + `FakeEmailProvider` all wired into M6 infrastructure. `EmailRenderer` resolves `metadata.subject_line → title → throw`; registered first in `ChannelRendererRegistry`. `EmailPublisher` resolves credentials, renders via `ChannelRendererRegistry`, creates `EmailPayload`, resolves provider from `EmailProviderRegistry`, sends. 29 new tests — 268 total passing (2 Redis skipped). PHPStan level 8 — 0 errors.
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*

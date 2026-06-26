@@ -6,6 +6,27 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 8 — Analytics Engine Implementation Plan] — 2026-06-26
+
+### Added
+
+**Planning**
+
+- `docs/plans/Milestone-8-Implementation.md` — engineering implementation plan for the Analytics Engine (Phase 7 of roadmap); breaks work into 10 sequential phases:
+  - **Phase 1 — Domain models:** `execution_metrics`, `campaign_kpi_snapshots`, `metric_retrieval_logs` migrations; `ExecutionMetric`, `CampaignKpiSnapshot`, `MetricRetrievalLog` Eloquent models with scopes, casts, and relationships
+  - **Phase 2 — Provider infrastructure:** `AnalyticsProvider` interface, `AnalyticsProviderRegistry`, `FakeAnalyticsProvider` (test double, queue/assert API), `LogAnalyticsProvider` (no-op for blog/landing page), `WebhookEvent` VO, `AnalyticsServiceProvider`
+  - **Phase 3 — Retrieval jobs:** `ScheduleMetricRetrieval` listener (`ExecutionCompleted` → delayed dispatch), `RetrieveExecutionMetrics` job (polls, self-reschedules until window closes, calls `snapshotIfReady`), `PruneRawMetrics` job (monthly, nulls `raw` after 1 year)
+  - **Phase 4 — Webhook infrastructure:** `AnalyticsWebhookHandler` interface, `WebhookHandlerRegistry`, `AnalyticsWebhookController` (HMAC verified, `POST /api/analytics/webhooks/{provider}`), `PostmarkWebhookHandler` (Open/Click/Bounce/Delivery/SpamComplaint), `ProcessAnalyticsWebhookEvent` job (idempotent counter merging)
+  - **Phase 5 — Metric normalisation:** per-provider `normalize()` rules, three cross-channel normalised keys (`normalised_reach`, `normalised_engagement`, `normalised_engagement_rate`), `isWindowClosed()` logic, division-by-zero handling
+  - **Phase 6 — Campaign KPI aggregation:** `CampaignKpiService` (`aggregate`, `snapshotIfReady`, `ratePerformance`, `bestChannel`); interim → final snapshot upgrade; `expected_impact` comparison; performance rating thresholds (125%/75%)
+  - **Phase 7 — Recommendation and decision KPIs:** `RecommendationKpiService` (approval/rejection/edit rates, median time-to-decision, 30-day trend), `DecisionEffectivenessService` (accuracy rate, by detector, by campaign type, score-band correlation)
+  - **Phase 8 — BusinessBrain feedback:** `LearningService::recordFromMetrics()` — 8 signal types; idempotency guard; consecutive-failure detection for `campaign_type_underperformed`; `applied_at = null` on all records
+  - **Phase 9 — Filament UI:** campaign performance panel (rating badge, KPI breakdown, expected vs. actual), ExecutionMetric sub-panel on execution view, company approval rate on company view
+  - **Phase 10 — Tests:** 16 test files, ≥ 40 new tests, all using `FakeAnalyticsProvider`; zero real API calls
+- Full scope, dependency, risk, acceptance criteria, deliverable list, and exit criteria documented
+
+---
+
 ## [Milestone 7.5 — Analytics Engine Specification] — 2026-06-26
 
 ### Added
