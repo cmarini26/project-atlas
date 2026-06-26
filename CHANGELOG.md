@@ -6,6 +6,41 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 4 Specification — Decision Engine] — 2026-06-25
+
+### Added
+
+- `specs/core/decision-engine.md` — pre-implementation design specification for the Decision Engine
+
+**Document covers:**
+- What a Decision is and what distinguishes it from an Opportunity (the full comparison table)
+- Decision lifecycle from `pending` through `executed`; M4 boundary explicitly at `pending`
+- Six Decision statuses with transition rules and who sets each
+- Decision types (`campaign_type`) and how they map from Opportunity types
+- Decision inputs: selected Opportunity, BusinessBrain, score components, guard conditions, company context
+- Five guard conditions with implementation logic, query shapes, and on-failure behaviour:
+  - Guard 1: minimum score (composite_score >= 30)
+  - Guard 2: duplicate recommendation (no `pending`/`viewed` Recommendation of same campaign_type)
+  - Guard 3: campaign cooldown (per-type windows: 3 days for urgency_promotion, 14 days for others)
+  - Guard 4: catalog availability (CatalogItem must still be `active`; on failure: Opportunity dismissed)
+  - Guard 5: channel availability (at least one active Channel exists)
+- Selection algorithm: score-ordered, deterministic, with tie-breaking rules
+- Channel selection logic and type-affinity defaults
+- Five required rationale fields with good/bad examples and validation rules enforced in `DecisionService`
+- `RationaleGenerationAnalyst` interface: inputs, output shape, prompt design (temperature 0.4, versioned), failure handling
+- Campaign pipeline handoff (Milestone 5): full flow from `DecisionCommitted` through Recommendation
+- Decision fields that drive the Campaign Engine (`campaign_type`, `channel_ids`, rationale keys, `confidence_score`)
+- Complete M4 implementation list: models, services, jobs, events, listeners, exceptions
+- Explicit out-of-scope list per milestone
+- Acceptance criteria (all verifiable by automated tests): detection, guards, commitment, rationale, failure paths, expiry, test requirements
+- Future extensibility: additional guards, per-company scoring weights (Phase 8), channel affinity learning, multiple Decisions per cycle, vertical calibration, human-initiated Decisions
+
+### Updated
+
+- `specs/core/opportunity-engine.md` — authority claim narrowed: DecisionEngine removed from scope (decision-engine.md is now authoritative for guard conditions and rationale); cross-reference to decision-engine.md added to header
+
+---
+
 ## [Milestone 4 Specification — CTO Review & Scope Finalisation] — 2026-06-25
 
 ### Updated

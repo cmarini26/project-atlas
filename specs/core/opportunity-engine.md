@@ -2,9 +2,10 @@
 
 **Version:** 1.0  
 **Status:** Approved — authoritative specification for Milestone 4  
-**Depends on:** `specs/core/domain-model.md`, `specs/product/mvp-workflow.md`
+**Depends on:** `specs/core/domain-model.md`, `specs/product/mvp-workflow.md`  
+**See also:** `specs/core/decision-engine.md` — authoritative spec for Decision Engine, guard conditions, and rationale generation
 
-When this document conflicts with others, this document wins for anything related to the Opportunity Engine, OpportunityDetectors, OpportunityScorer, and DecisionEngine. Update the others.
+When this document conflicts with others, this document wins for anything related to the Opportunity Engine, OpportunityDetectors, and OpportunityScorer. For the Decision Engine, guard conditions, and rationale, `specs/core/decision-engine.md` is authoritative.
 
 ---
 

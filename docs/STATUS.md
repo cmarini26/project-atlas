@@ -39,7 +39,10 @@ Corresponds to [Phase 4 of ROADMAP.md](../ROADMAP.md).
 
 Detect marketing opportunities from the BusinessBrain. Score them. Commit Decisions. Produce Recommendations.
 
-**Specification:** `specs/core/opportunity-engine.md` — CTO reviewed and approved  
+**Specifications:**
+- `specs/core/opportunity-engine.md` — CTO reviewed and approved
+- `specs/core/decision-engine.md` — pre-implementation design spec; complete
+
 **Status:** Ready for implementation  
 **Target completion:** TBD  
 **Owner:** TBD
@@ -199,7 +202,8 @@ All foundational documents written, reviewed, and committed.
 
 ## Recently Completed
 
-- **Milestone 4 spec** — `specs/core/opportunity-engine.md` written; covers Opportunity lifecycle, types, scoring formula, evidence chains, expiration, deduplication, `OpportunityDetector` interface, rule-based vs. AI-assisted detectors, Decision guard conditions, rationale requirements, acceptance criteria, extensibility guidance, and implementation scope (required types, permitted supporting tables, explicit out-of-scope list)
+- **Milestone 4 — Decision Engine spec** — `specs/core/decision-engine.md` written; covers Decision definition, lifecycle, statuses, types, inputs, all five guard conditions, selection algorithm, required rationale fields, `RationaleGenerationAnalyst` contract, Campaign pipeline handoff (M5), M4 implementation list, explicit out-of-scope list, acceptance criteria, and extensibility
+- **Milestone 4 — Opportunity Engine spec** — `specs/core/opportunity-engine.md` written and CTO approved; covers Opportunity lifecycle, types, scoring formula, evidence chains, expiration, deduplication, `OpportunityDetector` interface, rule-based vs. AI-assisted detectors, implementation scope
 - **Milestone 3 + cleanup** — Fact extraction, knowledge synthesis, BusinessBrain assembly; `Observation.facts()` + `last_enriched_at` fix; 83 tests (81 passing); PHPStan level 8 clean
 - **Milestone 2 + cleanup** — `IntegrationService::create()`, `SyncIntegration` uniqueness guard, catalog type fix; 48 tests (46 passing); PHPStan level 8 clean
 - **Milestone 1 hardening** — PHPStan raised to level 8 (0 errors); stack versions documented; technical debt items recorded; CHANGELOG updated
@@ -237,6 +241,6 @@ All foundational documents written, reviewed, and committed.
 
 ## Last Updated
 
-**2026-06-25** — Milestone 3 and Opportunity Engine specification CTO reviewed and approved. Spec updated: implementation scope section moved to the top of the document, restated authoritatively. Required types confirmed (featured_item, urgency, new_arrival, re_engagement). Supporting models scoped minimally (CatalogItem, Campaign, Recommendation). Hard out-of-scope list recorded. Ready to implement Milestone 4.
+**2026-06-25** — Decision Engine pre-implementation spec written (`specs/core/decision-engine.md`). Covers all 16 points: Decision definition, lifecycle, statuses, campaign types, inputs (Opportunity, BusinessBrain, score components, guard conditions, company context), all five guard conditions with query logic, selection algorithm, channel selection, five required rationale fields with validation rules, `RationaleGenerationAnalyst` contract, Campaign pipeline handoff (M5), M4 implementation list, explicit out-of-scope list, acceptance criteria, extensibility. `specs/core/opportunity-engine.md` updated with cross-reference.
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*
