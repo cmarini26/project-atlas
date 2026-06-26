@@ -1,0 +1,16 @@
+{
+    "opportunities": [
+        {
+            "type": "seasonal",
+            "subject_type": null,
+            "subject_id": null,
+            "title": "Summer auction season — promote high-value collectibles",
+            "description": "Summer is historically the strongest auction season for comic collectibles. With active high-value inventory, now is an ideal time to run a seasonal awareness campaign to attract serious bidders.",
+            "expires_at": null,
+            "relevance_score": 72,
+            "timing_score": 68,
+            "confidence_score": 60,
+            "urgency_score": 45
+        }
+    ]
+}

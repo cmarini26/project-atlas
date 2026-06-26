@@ -83,4 +83,16 @@ class Company extends Model
     {
         return $this->hasMany(Knowledge::class);
     }
+
+    /** @return HasMany<Opportunity, $this> */
+    public function opportunities(): HasMany
+    {
+        return $this->hasMany(Opportunity::class);
+    }
+
+    /** @return HasMany<Decision, $this> */
+    public function decisions(): HasMany
+    {
+        return $this->hasMany(Decision::class);
+    }
 }

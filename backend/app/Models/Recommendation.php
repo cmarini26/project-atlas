@@ -7,32 +7,31 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class Campaign extends Model
+class Recommendation extends Model
 {
     use BelongsToCompany, HasUlids, SoftDeletes;
 
     protected $fillable = [
         'company_id',
         'decision_id',
-        'recommendation_id',
         'campaign_type',
         'title',
-        'strategy',
-        'target_audience',
-        'positioning',
-        'call_to_action',
+        'summary',
+        'rationale_display',
+        'confidence_score',
+        'expected_impact',
         'status',
-        'scheduled_start_at',
-        'scheduled_end_at',
-        'completed_at',
+        'viewed_at',
+        'responded_at',
     ];
 
     protected function casts(): array
     {
         return [
-            'scheduled_start_at' => 'datetime',
-            'scheduled_end_at' => 'datetime',
-            'completed_at' => 'datetime',
+            'rationale_display' => 'array',
+            'expected_impact' => 'array',
+            'viewed_at' => 'datetime',
+            'responded_at' => 'datetime',
         ];
     }
 }

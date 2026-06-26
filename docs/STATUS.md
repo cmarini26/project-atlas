@@ -28,28 +28,56 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
 
-**Overall:** Milestone 3 complete + cleanup. Opportunity Engine specification written (`specs/core/opportunity-engine.md`) — authoritative design doc for Milestone 4. 83 tests, 81 passing, 2 Redis skipped. PHPStan level 8 clean. Ready to implement Milestone 4.
+**Overall:** Milestone 4 complete. Opportunity & Decision Engine fully implemented and tested. 127 tests passing (2 Redis skipped). PHPStan level 8 clean. Full pipeline: `BusinessBrain → Opportunity Detection → Scoring → Deduplication → Decision Selection → Rationale Generation → DecisionCommitted Event`.
 
 ---
 
 ## Current Milestone
 
-**Milestone 4 — Opportunity Detection & Decision Engine**
-Corresponds to [Phase 4 of ROADMAP.md](../ROADMAP.md).
+**Milestone 5 — Campaign Preparation & Content Generation**
+Corresponds to [Phase 5 of ROADMAP.md](../ROADMAP.md).
 
-Detect marketing opportunities from the BusinessBrain. Score them. Commit Decisions. Produce Recommendations.
+After a Decision is committed, prepare a Campaign: generate content assets per channel, create a Recommendation for user approval.
 
-**Specifications:**
-- `specs/core/opportunity-engine.md` — CTO reviewed and approved
-- `specs/core/decision-engine.md` — pre-implementation design spec; complete
-
-**Status:** Ready for implementation  
-**Target completion:** TBD  
+**Status:** `PrepareCampaign` job stub wired (Milestone 4 no-op). Implementation begins in Milestone 5.  
 **Owner:** TBD
 
 ---
 
 ## Completed Milestones
+
+### Milestone 4 — Opportunity & Decision Engine ✅
+*Completed: 2026-06-26*
+
+**Delivered:**
+
+| Item | Description |
+|------|-------------|
+| 6 new migrations | `catalog_items`, `channels`, `opportunities`, `decisions`, `campaigns`, `recommendations` |
+| `CatalogItem` model | `BelongsToCompany`, `HasUlids`, `SoftDeletes`, datetime casts; `isActive()` |
+| `Channel` model | `HasUlids` only; nullable `company_id` (system channels) |
+| `Campaign` model | Full implementation; `campaign_type`, `completed_at` for Guard 3 |
+| `Recommendation` model | Minimal; `campaign_type` for Guard 2 |
+| `Opportunity` model | Full: polymorphic subject, score fields, lifecycle methods |
+| `Decision` model | Full: JSON casts for `channel_ids`, `rationale`, `expected_impact` |
+| `OpportunityCandidate` VO | Readonly; all 4 score fields + `aiDetected` |
+| `OpportunityScorer` | Composite formula; min-30 threshold; AI confidence cap at 75 |
+| 4 rule-based detectors | `FeaturedItemDetector`, `UrgencyDetector`, `NewArrivalDetector`, `ReEngagementDetector` |
+| `OpportunityDetectionAnalyst` | AI-assisted supplemental detection; never bypasses scoring/deduplication |
+| `OpportunityEngine::scan()` | Orchestrates detectors → AI → dedup → score → persist → fire events |
+| `DecisionContext` VO | Immutable: `Opportunity`, `BusinessBrain`, `campaignType`, `channelIds` |
+| `DecisionEngine::evaluate()` | 5 guard conditions; score-ordered selection; channel affinity resolution |
+| `DecisionService::commit()` | Validates 5 rationale keys + 4 `expected_impact` sub-keys; persists; fires event |
+| `RationaleGenerationAnalyst` | AI rationale generation; temperature 0.4; versioned prompt |
+| `RationaleGenerationFailedException` | Hard failure when rationale is incomplete |
+| 4 jobs | `DetectOpportunities` (default), `CommitDecision` (ai, `ShouldBeUnique`), `ExpireOpportunities` (maintenance), `PrepareCampaign` stub (ai) |
+| 2 events | `OpportunityDetected`, `DecisionCommitted` |
+| 3 listeners | `TriggerOpportunityDetection`, `TriggerDecisionEvaluation`, `DispatchCampaignPreparation` |
+| Morph map | `catalog_item`, `catalog`, `company` registered in `AppServiceProvider` |
+| `BusinessBrainService` | `featuredItems` and `recentCampaigns` now populated from DB |
+| 2 AI fixtures | `opportunity-detection.json`, `rationale-generation.json` |
+| 44 new tests | All M4 components tested with `FakeAiProvider`; no live AI; 127 total passing |
+| PHPStan level 8 | 0 errors |
 
 ### Milestone 3 — Fact Extraction & Knowledge Synthesis ✅
 *Completed: 2026-06-26*
@@ -214,16 +242,14 @@ All foundational documents written, reviewed, and committed.
 
 ---
 
-## Next Tasks
+## Next Tasks (Milestone 5)
 
-1. **`Opportunity` model + migration** — all fields defined in `specs/core/domain-model.md`; type enum includes all six types from `specs/core/opportunity-engine.md`
-2. **Four rule-based detectors** — `FeaturedItemDetector`, `UrgencyDetector`, `NewArrivalDetector`, `ReEngagementDetector` implementing `OpportunityDetector`
-3. **`OpportunityScorer`** — composite formula `(relevance × 0.30) + (timing × 0.25) + (confidence × 0.25) + (urgency × 0.20)`; minimum threshold 30; AI-detected cap at confidence ≤ 75
-4. **`OpportunityEngine::scan()`** — merges rule-based + AI candidates, deduplicates, scores, persists; dispatches `CommitDecision`
-5. **`Decision` model + migration + `DecisionService`** — rationale validation; `RationaleGenerationFailedException` if any key missing
-6. **`DecisionEngine::evaluate()`** — guard conditions (cooldown, no duplicate recommendation, catalog availability); `RationaleGenerationAnalyst`
-7. **`CommitDecision` job** — `ShouldBeUnique` per company
-8. **Implement real `AiProvider`** (AnthropicProvider or OpenAiProvider) — required before any production AI calls
+1. **`AnthropicProvider`** — implement real `AiProvider`; required before any production AI calls; bind in `AppServiceProvider` for non-test environments
+2. **`CampaignPreparationAnalyst`** — implements `PrepareCampaign` job; creates `Campaign` (status: `draft`); dispatches `GenerateContent` per channel
+3. **`ContentGenerationAnalyst`** — creates `ContentAsset` per channel; uses `decision.rationale` as creative brief
+4. **`RecommendationService`** — when all `ContentAsset` records are `draft`, creates `Recommendation`, updates `Decision` to `recommended`, fires `RecommendationCreated`
+5. **Approval UI** — Vue 3 + Inertia.js (or API-first); shows Recommendation card with rationale, content preview, approve/reject controls
+6. **`PublishCampaign` job** — triggered on Recommendation approval; routes each `ContentAsset` to the appropriate channel publisher
 
 ---
 
@@ -241,6 +267,6 @@ All foundational documents written, reviewed, and committed.
 
 ## Last Updated
 
-**2026-06-25** — Decision Engine pre-implementation spec written (`specs/core/decision-engine.md`). Covers all 16 points: Decision definition, lifecycle, statuses, campaign types, inputs (Opportunity, BusinessBrain, score components, guard conditions, company context), all five guard conditions with query logic, selection algorithm, channel selection, five required rationale fields with validation rules, `RationaleGenerationAnalyst` contract, Campaign pipeline handoff (M5), M4 implementation list, explicit out-of-scope list, acceptance criteria, extensibility. `specs/core/opportunity-engine.md` updated with cross-reference.
+**2026-06-26** — Milestone 4 complete. Opportunity & Decision Engine fully implemented. 127 tests passing (2 Redis skipped). PHPStan level 8 clean. Full pipeline operational: `BusinessBrain → Opportunity Detection → Scoring → Deduplication → Decision Selection → Rationale Generation → DecisionCommitted`. `PrepareCampaign` stub wired. Milestone 5 (Campaign Preparation) ready to begin.
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*

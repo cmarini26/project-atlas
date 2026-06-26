@@ -6,6 +6,100 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 4 — Opportunity & Decision Engine] — 2026-06-26
+
+### Added
+
+**Opportunity Domain**
+
+- `database/migrations/2026_06_26_001200_create_catalog_items_table.php` — `catalog_items` table: ULID PK, `status` enum, `price`, `media`, `metadata`, `promoted_at`, `expires_at`, soft deletes, compound indexes
+- `database/migrations/2026_06_26_001300_create_channels_table.php` — `channels` table: nullable `company_id` (null = system template), `type` enum, `is_active`
+- `database/migrations/2026_06_26_001400_create_opportunities_table.php` — `opportunities` table: all four score columns, `composite_score`, `ai_detected`, polymorphic `subject`, `status` enum, `expires_at`, `detected_at`
+- `database/migrations/2026_06_26_001500_create_decisions_table.php` — `decisions` table: `campaign_type` enum, `channel_ids` JSON, `rationale` JSON, `expected_impact` JSON, `prompt_version`, `decided_at`
+- `database/migrations/2026_06_26_001600_create_campaigns_table.php` — `campaigns` table: `campaign_type`, `completed_at`, full status enum (used for Guard 3 cooldown)
+- `database/migrations/2026_06_26_001700_create_recommendations_table.php` — `recommendations` table: `campaign_type` (used for Guard 2 duplicate check), status enum
+
+**Models**
+
+- `app/Models/CatalogItem.php` — full implementation: `BelongsToCompany`, `HasUlids`, `SoftDeletes`, datetime casts, `scopeActive()`, `isActive()`
+- `app/Models/Channel.php` — `HasUlids` only (no `BelongsToCompany`; `company_id` is nullable for system channels)
+- `app/Models/Campaign.php` — updated from stub: full fillable, `campaign_type`, `completed_at`, datetime casts
+- `app/Models/Recommendation.php` — new: `BelongsToCompany`, `HasUlids`, `SoftDeletes`, `campaign_type`
+- `app/Models/Opportunity.php` — new: `BelongsToCompany`, `HasUlids`, polymorphic `subject()`, `decision()`, `scopeOpen()`, `select()`, `dismiss()`
+- `app/Models/Decision.php` — new: `BelongsToCompany`, `HasUlids`, `opportunity()`, `recommendation()`, `campaign()`, JSON casts for `channel_ids`, `rationale`, `expected_impact`
+- `app/Models/Company.php` — added `opportunities()` and `decisions()` `HasMany` relationships
+
+**Opportunity Engine**
+
+- `app/Services/Opportunity/OpportunityCandidate.php` — readonly VO with all four score fields + `aiDetected` flag
+- `app/Services/Opportunity/Detectors/Contracts/OpportunityDetector.php` — updated interface: `detect(Company, BusinessBrain)` → `Collection<int, OpportunityCandidate>`
+- `app/Services/Opportunity/OpportunityRepository.php` — `hasDuplicate()`, `openForCompany()`, `expiredCandidates()`
+- `app/Services/Opportunity/OpportunityScorer.php` — composite formula `(r×0.30 + t×0.25 + c×0.25 + u×0.20)`; minimum 30 threshold; AI confidence cap at 75
+- `app/Services/Opportunity/Detectors/FeaturedItemDetector.php` — rule-based: detects un-promoted items; 14-day / 45-day cooldown by value; scores by price tier
+- `app/Services/Opportunity/Detectors/UrgencyDetector.php` — rule-based: item-level expiry within 48h; falls back to `catalog.ending_within_48h_count` Fact
+- `app/Services/Opportunity/Detectors/NewArrivalDetector.php` — rule-based: items created within 48h; timing score degrades with age
+- `app/Services/Opportunity/Detectors/ReEngagementDetector.php` — rule-based: uses `marketing.days_since_last_campaign` Fact or `recentCampaigns`; 14-day threshold
+- `app/Services/Opportunity/OpportunityEngine.php` — orchestrates all detectors → AI analyst → deduplication → scoring → persistence → `OpportunityDetected` event per candidate
+
+**AI: Opportunity Detection**
+
+- `app/AI/Prompts/OpportunityDetectionPrompt.php` — version `1.0`, temperature `0.3`; structured JSON schema; passes already-detected types to avoid overlap
+- `app/Services/Analyst/OpportunityDetectionAnalyst.php` — implements `Analyst`; calls `OpportunityDetectionPrompt`; marks all results `aiDetected: true`; validates required fields
+- `tests/Fixtures/AI/opportunity-detection.json` — fixture: one seasonal candidate
+
+**Decision Engine**
+
+- `app/Services/Decision/DecisionContext.php` — immutable readonly VO: `Opportunity`, `BusinessBrain`, `campaignType`, `channelIds`
+- `app/Services/Decision/Exceptions/RationaleGenerationFailedException.php` — thrown when any of 5 required rationale keys is missing or empty
+- `app/Services/Decision/DecisionRepository.php` — `openForCompany()`, `findByOpportunity()`
+- `app/Services/Decision/DecisionEngine.php` — five guard conditions in order; deterministic score-ordered selection; channel affinity resolution; commits via `DecisionService`
+- `app/Services/Decision/DecisionService.php` — calls `RationaleGenerationAnalyst`, validates all 5 rationale keys + 4 `expected_impact` sub-keys, persists `Decision`, transitions Opportunity to `selected`, fires `DecisionCommitted`
+- `app/AI/Prompts/RationaleGenerationPrompt.php` — version `1.0`, temperature `0.4`; includes Opportunity, company identity, selected channels, Facts, Knowledge, subject item (if CatalogItem); structured JSON schema
+- `app/Services/Analyst/RationaleGenerationAnalyst.php` — implements `Analyst`; returns raw rationale array for caller to validate
+- `tests/Fixtures/AI/rationale-generation.json` — fixture: complete 5-key rationale with all `expected_impact` sub-keys
+
+**Jobs**
+
+- `app/Jobs/DetectOpportunities.php` — `default` queue; calls `BusinessBrainService::for()` then `OpportunityEngine::scan()`
+- `app/Jobs/CommitDecision.php` — `ai` queue; `ShouldBeUnique` per company (`uniqueId()` = company ID); calls `DecisionEngine::evaluate()`
+- `app/Jobs/ExpireOpportunities.php` — `maintenance` queue; bulk-expires open Opportunities past `expires_at`
+- `app/Jobs/PrepareCampaign.php` — `ai` queue; Milestone 4 no-op stub; wired and dispatched; implemented in Milestone 5
+
+**Events & Listeners**
+
+- `app/Events/OpportunityDetected.php` — fired per persisted Opportunity from `OpportunityEngine::scan()`
+- `app/Events/DecisionCommitted.php` — fired after `DecisionService` persists a Decision
+- `app/Listeners/TriggerOpportunityDetection.php` — `DigitalTwinActivated` → dispatches `DetectOpportunities`
+- `app/Listeners/TriggerDecisionEvaluation.php` — `OpportunityDetected` → dispatches `CommitDecision`
+- `app/Listeners/DispatchCampaignPreparation.php` — `DecisionCommitted` → dispatches `PrepareCampaign`
+
+**Infrastructure Updates**
+
+- `app/Providers/AppServiceProvider.php` — added morph map (`catalog_item`, `catalog`, `company`); wired 3 new event/listener pairs
+- `app/Services/Brain/BusinessBrainService.php` — populated `featuredItems` with active/featured `CatalogItem` records; populated `recentCampaigns` with 10 most recent `Campaign` records
+
+**Tests** (127 passing, 2 Redis skipped)
+
+- `tests/Unit/Opportunity/OpportunityScorerTest.php` — 5 unit tests: threshold, clamp, AI cap, weighted formula, score output shape
+- `tests/Feature/Opportunity/FeaturedItemDetectorTest.php` — 6 tests: empty brain, never-promoted, in-cooldown, out-of-cooldown, high-value cooldown
+- `tests/Feature/Opportunity/UrgencyDetectorTest.php` — 5 tests: no expiry, item-level 24h, item-level 36h, catalog-fact fallback, item priority over fact
+- `tests/Feature/Opportunity/NewArrivalDetectorTest.php` — not enumerated here; covered by engine integration test
+- `tests/Feature/Opportunity/ReEngagementDetectorTest.php` — 5 tests: no items, below threshold, above threshold from fact, campaign fallback, 999-day never-campaigned
+- `tests/Feature/Opportunity/OpportunityEngineTest.php` — 4 tests: persists candidates, deduplicates by type+subject, fires `OpportunityDetected`, marks AI candidates
+- `tests/Feature/Opportunity/OpportunityExpiryTest.php` — 3 tests: expires past-expiry, leaves future open, ignores null-expiry
+- `tests/Feature/Opportunity/OpportunityDetectionAnalystTest.php` — 6 tests: parses fixture, marks AI detected, sends correct prompt, empty response, invalid fields filtered, scores clamped
+- `tests/Feature/Decision/DecisionEngineTest.php` — 7 tests: Guard 1–5, commits on all-pass, selects highest score
+- `tests/Feature/Decision/RationaleGenerationAnalystTest.php` — 2 tests: parses complete fixture, sends correct prompt
+- `tests/Feature/Decision/DecisionPipelineTest.php` — 2 tests: full committed decision, rationale failure leaves opportunity open
+
+### Updated
+
+- `app/Models/Company.php` — added `opportunities()` and `decisions()` `HasMany` relationships
+- `app/Services/Brain/BusinessBrainService.php` — `featuredItems` and `recentCampaigns` now populated from DB
+- `app/Providers/AppServiceProvider.php` — morph map + new events
+
+---
+
 ## [Milestone 4 Specification — Decision Engine] — 2026-06-25
 
 ### Added

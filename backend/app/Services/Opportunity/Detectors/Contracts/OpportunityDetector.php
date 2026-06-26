@@ -3,24 +3,26 @@
 namespace App\Services\Opportunity\Detectors\Contracts;
 
 use App\Domain\BusinessBrain\BusinessBrain;
+use App\Models\Company;
+use App\Services\Opportunity\OpportunityCandidate;
 use Illuminate\Support\Collection;
 
 interface OpportunityDetector
 {
     /**
-     * Returns the vertical slugs this detector applies to.
-     * Return ['*'] to apply to all verticals.
+     * The opportunity types this detector can produce.
      *
      * @return string[]
      */
     public function appliesTo(): array;
 
     /**
-     * Detect opportunities from the given Business Brain snapshot.
-     * Returns a collection of unsaved Opportunity-like value objects
-     * for the OpportunityEngine to score and persist.
+     * Inspect the BusinessBrain and return opportunity candidates.
+     * Must not perform database writes.
+     * Must not call AiProvider.
+     * Must return empty Collection when no candidates found.
      *
-     * @return Collection<int, mixed>
+     * @return Collection<int, OpportunityCandidate>
      */
-    public function detect(BusinessBrain $brain): Collection;
+    public function detect(Company $company, BusinessBrain $brain): Collection;
 }

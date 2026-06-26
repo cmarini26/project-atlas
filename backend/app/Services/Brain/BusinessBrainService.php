@@ -3,7 +3,9 @@
 namespace App\Services\Brain;
 
 use App\Domain\BusinessBrain\BusinessBrain;
+use App\Models\Campaign;
 use App\Models\Catalog;
+use App\Models\CatalogItem;
 use App\Models\Company;
 use App\Models\DigitalTwin;
 use App\Models\Observation;
@@ -36,6 +38,19 @@ class BusinessBrainService
             ->limit(10)
             ->get();
 
+        /** @var Collection<int, CatalogItem> $featuredItems */
+        $featuredItems = CatalogItem::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->whereIn('status', ['active', 'featured'])
+            ->get();
+
+        /** @var Collection<int, Campaign> $recentCampaigns */
+        $recentCampaigns = Campaign::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->latest()
+            ->limit(10)
+            ->get();
+
         return new BusinessBrain(
             company: $company,
             twin: $twin,
@@ -43,8 +58,8 @@ class BusinessBrainService
             activeKnowledge: $activeKnowledge,
             recentObservations: $recentObservations,
             catalog: $catalog,
-            featuredItems: collect(),
-            recentCampaigns: collect(),
+            featuredItems: $featuredItems,
+            recentCampaigns: $recentCampaigns,
         );
     }
 }
