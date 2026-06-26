@@ -28,18 +28,20 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
 
-**Overall:** Milestone 3 complete + cleanup. `Observation.facts()` relationship added, `DigitalTwin.last_enriched_at` updated on every synthesis run. 83 tests, 81 passing, 2 Redis skipped. PHPStan level 8 clean. Ready for Milestone 4.
+**Overall:** Milestone 3 complete + cleanup. Opportunity Engine specification written (`specs/core/opportunity-engine.md`) — authoritative design doc for Milestone 4. 83 tests, 81 passing, 2 Redis skipped. PHPStan level 8 clean. Ready to implement Milestone 4.
 
 ---
 
 ## Current Milestone
 
 **Milestone 4 — Opportunity Detection & Decision Engine**
-Corresponds to [Phase 2 of ROADMAP.md](../ROADMAP.md).
+Corresponds to [Phase 4 of ROADMAP.md](../ROADMAP.md).
 
 Detect marketing opportunities from the BusinessBrain. Score them. Commit Decisions. Produce Recommendations.
 
-**Target completion:** TBD
+**Specification:** `specs/core/opportunity-engine.md` — complete and approved  
+**Status:** Ready for implementation  
+**Target completion:** TBD  
 **Owner:** TBD
 
 ---
@@ -197,6 +199,7 @@ All foundational documents written, reviewed, and committed.
 
 ## Recently Completed
 
+- **Milestone 4 spec** — `specs/core/opportunity-engine.md` written; covers Opportunity lifecycle, types, scoring formula, evidence chains, expiration, deduplication, `OpportunityDetector` interface, rule-based vs. AI-assisted detectors, Decision guard conditions, rationale requirements, acceptance criteria, and extensibility guidance
 - **Milestone 3 + cleanup** — Fact extraction, knowledge synthesis, BusinessBrain assembly; `Observation.facts()` + `last_enriched_at` fix; 83 tests (81 passing); PHPStan level 8 clean
 - **Milestone 2 + cleanup** — `IntegrationService::create()`, `SyncIntegration` uniqueness guard, catalog type fix; 48 tests (46 passing); PHPStan level 8 clean
 - **Milestone 1 hardening** — PHPStan raised to level 8 (0 errors); stack versions documented; technical debt items recorded; CHANGELOG updated
@@ -209,11 +212,14 @@ All foundational documents written, reviewed, and committed.
 
 ## Next Tasks
 
-1. Implement real `AiProvider` (AnthropicProvider or OpenAiProvider) — required before any production AI calls
-2. Implement `Opportunity` model + migration + `OpportunityDetector` contract implementations
-3. Implement `Decision` model + migration + `DecisionService` (rationale required)
-4. Implement `Recommendation` model + migration
-5. Wire `DecisionCommitted → CreateRecommendation` listener
+1. **`Opportunity` model + migration** — all fields defined in `specs/core/domain-model.md`; type enum includes all six types from `specs/core/opportunity-engine.md`
+2. **Four rule-based detectors** — `FeaturedItemDetector`, `UrgencyDetector`, `NewArrivalDetector`, `ReEngagementDetector` implementing `OpportunityDetector`
+3. **`OpportunityScorer`** — composite formula `(relevance × 0.30) + (timing × 0.25) + (confidence × 0.25) + (urgency × 0.20)`; minimum threshold 30; AI-detected cap at confidence ≤ 75
+4. **`OpportunityEngine::scan()`** — merges rule-based + AI candidates, deduplicates, scores, persists; dispatches `CommitDecision`
+5. **`Decision` model + migration + `DecisionService`** — rationale validation; `RationaleGenerationFailedException` if any key missing
+6. **`DecisionEngine::evaluate()`** — guard conditions (cooldown, no duplicate recommendation, catalog availability); `RationaleGenerationAnalyst`
+7. **`CommitDecision` job** — `ShouldBeUnique` per company
+8. **Implement real `AiProvider`** (AnthropicProvider or OpenAiProvider) — required before any production AI calls
 
 ---
 
@@ -231,6 +237,6 @@ All foundational documents written, reviewed, and committed.
 
 ## Last Updated
 
-**2026-06-26** — Milestone 3 complete + cleanup. `Observation.facts()` relationship added. `KnowledgeService` now updates `last_enriched_at` on every synthesis run (not only on activation). 83 tests (81 passing), PHPStan level 8 clean, Pint clean. Ready for Milestone 4.
+**2026-06-25** — Opportunity Engine specification complete (`specs/core/opportunity-engine.md`). Covers all 14 design points: Opportunity lifecycle, six types with scoring profiles, composite score formula, evidence chain, expiration rules, deduplication, `OpportunityDetector` interface contract, rule-based vs. AI-assisted detection, Decision guard conditions, rationale requirements, acceptance criteria for Milestone 4, and extensibility design. Ready to implement Milestone 4.
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*
