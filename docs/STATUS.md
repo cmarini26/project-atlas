@@ -39,7 +39,7 @@ Corresponds to [Phase 4 of ROADMAP.md](../ROADMAP.md).
 
 Detect marketing opportunities from the BusinessBrain. Score them. Commit Decisions. Produce Recommendations.
 
-**Specification:** `specs/core/opportunity-engine.md` — complete and approved  
+**Specification:** `specs/core/opportunity-engine.md` — complete and approved (includes implementation scope section)  
 **Status:** Ready for implementation  
 **Target completion:** TBD  
 **Owner:** TBD
@@ -199,7 +199,7 @@ All foundational documents written, reviewed, and committed.
 
 ## Recently Completed
 
-- **Milestone 4 spec** — `specs/core/opportunity-engine.md` written; covers Opportunity lifecycle, types, scoring formula, evidence chains, expiration, deduplication, `OpportunityDetector` interface, rule-based vs. AI-assisted detectors, Decision guard conditions, rationale requirements, acceptance criteria, and extensibility guidance
+- **Milestone 4 spec** — `specs/core/opportunity-engine.md` written; covers Opportunity lifecycle, types, scoring formula, evidence chains, expiration, deduplication, `OpportunityDetector` interface, rule-based vs. AI-assisted detectors, Decision guard conditions, rationale requirements, acceptance criteria, extensibility guidance, and implementation scope (required types, permitted supporting tables, explicit out-of-scope list)
 - **Milestone 3 + cleanup** — Fact extraction, knowledge synthesis, BusinessBrain assembly; `Observation.facts()` + `last_enriched_at` fix; 83 tests (81 passing); PHPStan level 8 clean
 - **Milestone 2 + cleanup** — `IntegrationService::create()`, `SyncIntegration` uniqueness guard, catalog type fix; 48 tests (46 passing); PHPStan level 8 clean
 - **Milestone 1 hardening** — PHPStan raised to level 8 (0 errors); stack versions documented; technical debt items recorded; CHANGELOG updated
@@ -237,6 +237,6 @@ All foundational documents written, reviewed, and committed.
 
 ## Last Updated
 
-**2026-06-25** — Opportunity Engine specification complete (`specs/core/opportunity-engine.md`). Covers all 14 design points: Opportunity lifecycle, six types with scoring profiles, composite score formula, evidence chain, expiration rules, deduplication, `OpportunityDetector` interface contract, rule-based vs. AI-assisted detection, Decision guard conditions, rationale requirements, acceptance criteria for Milestone 4, and extensibility design. Ready to implement Milestone 4.
+**2026-06-25** — Opportunity Engine specification updated with "Milestone 4 Implementation Scope" section. Clarifies required opportunity types (featured_item, urgency, new_arrival, re_engagement), optional types (seasonal, milestone), supporting tables permitted in M4 (CatalogItem, Campaign, Recommendation — minimal scope only), and explicit out-of-scope list (Campaign Engine, content generation, Marketing Assets, Channel Renderers, publishing). Ready to implement Milestone 4.
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*
