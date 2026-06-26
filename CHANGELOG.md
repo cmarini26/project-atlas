@@ -6,6 +6,35 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 7.5 — Analytics Engine Specification] — 2026-06-26
+
+### Added
+
+**Specification**
+
+- `specs/core/analytics-engine.md` — full Phase 7 analytics implementation blueprint:
+  - **Domain model:** `ExecutionMetric` table (per-execution platform metrics, raw + normalised, retrieval window tracking), `CampaignKpiSnapshot` table (campaign-level rollup, expected vs. actual, performance rating), `MetricRetrievalLog` append-only audit table
+  - **Event ingestion:** dual-mode pull (scheduled polling via `RetrieveExecutionMetrics` job with per-channel delay and re-poll schedules) + push (webhook callbacks via `AnalyticsWebhookController` → `ProcessAnalyticsWebhookEvent` job)
+  - **Provider webhook interface:** `AnalyticsWebhookHandler` interface, `WebhookEvent` VO, `WebhookHandlerRegistry`, HMAC verification pattern, idempotent event processing
+  - **Provider abstraction:** `AnalyticsProvider` interface (`pull`, `normalize`, `isWindowClosed`, `pollingDelayHours`, `repollingIntervalHours`), `AnalyticsProviderRegistry`, `FakeAnalyticsProvider` test double, provider map by channel type
+  - **Attribution model:** platform-reported only in Phase 7; no cross-channel attribution; expected vs. actual comparison producing `exceeded|met|below|insufficient_data` rating
+  - **Metrics by channel:** email (14 keys), Instagram/Facebook (10 keys), LinkedIn (8 keys), X (7 keys), SMS (5 keys), blog/landing page (6 keys); three normalised cross-channel keys (`normalised_reach`, `normalised_engagement`, `normalised_engagement_rate`)
+  - **Campaign KPIs:** `CampaignKpiService` — `aggregate()`, `snapshotIfReady()`, `ratePerformance()`, `bestChannel()`; full `actual_kpis` JSON shape documented
+  - **Recommendation KPIs:** `RecommendationKpiService` — approval rate, rejection rate, edit rate, median time-to-decision, breakdowns by opportunity type and channel, 30-day trend
+  - **Decision effectiveness metrics:** `DecisionEffectivenessService` — accuracy rate by detector, by campaign type, by composite score band; correlation between score and outcome
+  - **BusinessBrain feedback loop:** finalized `CampaignKpiSnapshot` → `LearningService::recordFromMetrics()` → `Learning` records (8 signal types documented) → Phase 8 applies
+  - **Learning inputs table:** 10 analytics-to-learning pathways with source, signal, and Phase 8 action
+  - **Data retention:** raw provider responses pruned at 1 year; normalised metrics permanent; KPI snapshots permanent; retrieval logs 90 days
+  - **Privacy:** no individual tracking, no PII in `metrics` column, Apple MPP caveat for email opens, CAN-SPAM/GDPR unsubscribe signal surfacing, data classification as Company Confidential
+  - **Acceptance criteria:** 18 checkboxes covering retrieval, webhooks, KPI snapshots, learning records, provider abstraction, and privacy
+  - **Future extensibility:** optimal send time, cross-channel attribution, A/B content testing, industry benchmarks, real-time streaming, prompt performance tracking
+
+### Changed
+
+**`ROADMAP.md`** — Phase 7 now references `specs/core/analytics-engine.md` as authoritative spec; Major Deliverables section replaced with concrete model/service/job list matching the spec
+
+---
+
 ## [Milestone 7 — EmailPublisher] — 2026-06-26
 
 ### Added

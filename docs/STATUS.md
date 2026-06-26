@@ -34,15 +34,25 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
-**Milestone 8 — Real AI Provider + Postmark Email**
+**Milestone 7.5 — Analytics Engine Specification**
 
-No milestone is currently in progress. The next milestone is Milestone 8.
+Specification-only milestone. No application code. `specs/core/analytics-engine.md` written and approved.
 
-**Status:** Not yet started.
+**Status:** Complete (spec only). Implementation begins in Phase 7.
 
 ---
 
 ## Completed Milestones
+
+### Milestone 7.5 — Analytics Engine Specification ✅
+*Completed: 2026-06-26*
+
+**Delivered:**
+
+| Item | Description |
+|------|-------------|
+| `specs/core/analytics-engine.md` | Full Phase 7 implementation blueprint: domain model, event ingestion, webhook interface, attribution, metrics by channel, campaign KPIs, recommendation KPIs, decision effectiveness metrics, BusinessBrain feedback loop, learning inputs, provider abstraction, data retention, privacy considerations, acceptance criteria, future extensibility |
+| `ROADMAP.md` updated | Phase 7 now references `analytics-engine.md` as authoritative spec; Major Deliverables expanded with concrete models, services, and jobs |
 
 ### Milestone 7 — EmailPublisher ✅
 *Completed: 2026-06-26*
@@ -304,6 +314,8 @@ All foundational documents written, reviewed, and committed.
 
 ## Recently Completed
 
+- **Milestone 7.5 — Analytics Engine Specification** — `specs/core/analytics-engine.md` written. Covers domain model (`ExecutionMetric`, `CampaignKpiSnapshot`, `MetricRetrievalLog`), pull polling + webhook push ingestion, `AnalyticsProvider` interface and registry, normalised metric keys, campaign KPIs, recommendation KPIs, decision effectiveness metrics, BusinessBrain feedback loop, learning inputs, privacy constraints, acceptance criteria, and future extensibility. `ROADMAP.md` Phase 7 updated with concrete deliverables.
+
 - **Milestone 7 — EmailPublisher** — First real channel publisher shipped. `EmailProvider` interface + `EmailProviderRegistry` + `LogEmailProvider` + `FakeEmailProvider` + `EmailRenderer` + `EmailPublisher` all wired into M6 infrastructure. 29 new tests (268 total, 266 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. See [Milestone-7-Review.md](reviews/Milestone-7-Review.md).
 
 - **Milestone 6.5 — Publishing Hardening** — Renderer layer integrated, credential validation hardened, blueprint validation expanded, `CampaignPublished` event bug fixed. 28 new tests (239 total, 237 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. See [Milestone-6.5-Review.md](reviews/Milestone-6.5-Review.md).
@@ -347,6 +359,6 @@ All foundational documents written, reviewed, and committed.
 
 ## Last Updated
 
-**2026-06-26** — Milestone 7 complete. `EmailPublisher` + `EmailRenderer` + `EmailProviderRegistry` + `LogEmailProvider` + `FakeEmailProvider` all wired into M6 infrastructure. `EmailRenderer` resolves `metadata.subject_line → title → throw`; registered first in `ChannelRendererRegistry`. `EmailPublisher` resolves credentials, renders via `ChannelRendererRegistry`, creates `EmailPayload`, resolves provider from `EmailProviderRegistry`, sends. 29 new tests — 268 total passing (2 Redis skipped). PHPStan level 8 — 0 errors.
+**2026-06-26** — Milestone 7.5 complete (spec only). `specs/core/analytics-engine.md` written covering domain model, pull + webhook ingestion, `AnalyticsProvider` abstraction, 6 channel metric sets, campaign KPIs, recommendation KPIs, decision effectiveness, BusinessBrain feedback loop, 10 learning pathways, privacy model, 18 acceptance criteria. `ROADMAP.md` Phase 7 updated. Previously: Milestone 7 complete. `EmailPublisher` + `EmailRenderer` + `EmailProviderRegistry` + `LogEmailProvider` + `FakeEmailProvider` all wired into M6 infrastructure. `EmailRenderer` resolves `metadata.subject_line → title → throw`; registered first in `ChannelRendererRegistry`. `EmailPublisher` resolves credentials, renders via `ChannelRendererRegistry`, creates `EmailPayload`, resolves provider from `EmailProviderRegistry`, sends. 29 new tests — 268 total passing (2 Redis skipped). PHPStan level 8 — 0 errors.
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*

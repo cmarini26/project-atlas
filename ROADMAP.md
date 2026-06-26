@@ -215,18 +215,28 @@ Design partner for all phases: **CBB Auctions**. Second validation vertical: exo
 
 *Atlas measures what happened. Performance data comes back in and campaigns can be evaluated.*
 
+**Specification:** `specs/core/analytics-engine.md` — authoritative implementation spec for this phase.
+
 ### Goals
 - Atlas retrieves engagement metrics from publishing platforms after campaigns run
 - Actual performance is compared to the `expected_impact` from the original Decision
 - Users can see how campaigns performed, what content drove results, and which channels outperformed
 
 ### Major Deliverables
-- Platform metric retrieval: pull impressions, reach, engagement, link clicks from each connected channel API
-- Execution result enrichment: metrics stored on `Execution.result` after the publishing window closes
-- Campaign performance view: per-campaign breakdown of expected vs. actual impact
-- Channel effectiveness summary: which channels consistently outperform for this company
-- Content performance tagging: which content angles, CTAs, and formats drove the most engagement
-- Comparison across campaigns: trend view showing improvement (or decline) over time
+- `ExecutionMetric` and `CampaignKpiSnapshot` domain models and migrations
+- `AnalyticsProvider` interface and `AnalyticsProviderRegistry` — provider-per-channel-type resolution
+- `FakeAnalyticsProvider` — test double; mirrors `FakeEmailProvider` pattern
+- `RetrieveExecutionMetrics` job — scheduled polling; re-polls until `isWindowClosed()`
+- `ProcessAnalyticsWebhookEvent` job — processes normalised webhook events into `ExecutionMetric`
+- `AnalyticsWebhookController` — validates HMAC; dispatches webhook events
+- `WebhookHandlerRegistry` + `AnalyticsWebhookHandler` interface — per-provider webhook parsing
+- `CampaignKpiService` — aggregates metrics; creates `CampaignKpiSnapshot`; rates performance against `expected_impact`
+- `RecommendationKpiService` — approval rate, rejection rate, edit rate, trend per opportunity type
+- `DecisionEffectivenessService` — decision accuracy rate by detector, campaign type, and composite score band
+- `LearningService::recordFromMetrics()` — creates `Learning` records from finalized KPI snapshots
+- Normalised metric keys across all channel types: `normalised_reach`, `normalised_engagement`, `normalised_engagement_rate`
+- Campaign performance view in Filament admin: expected vs. actual KPIs, best channel, per-execution breakdown
+- `MetricRetrievalLog` — append-only audit of every pull attempt
 
 ### Success Criteria
 - After a campaign runs, Atlas retrieves and displays real engagement data from each channel
