@@ -1,0 +1,39 @@
+{
+  "version": "1.0",
+  "goal": "conversion",
+  "audience": "Comic book collectors aged 25-45 who actively bid in online auctions and have previously purchased Silver Age Marvel books",
+  "core_message": "This week's auction features the rarest Silver Age Marvel collection we've seen in two years — bid now before it's gone forever",
+  "supporting_points": [
+    "40 Silver Age books graded CGC 8.0 or higher — the highest concentration in a single auction this year",
+    "Starting bids set at 30% below recent market comparables for this grade tier",
+    "Auction closes Sunday at 10pm ET — no extensions, no second chances"
+  ],
+  "call_to_action": "Register and place your opening bid before Sunday 10pm ET",
+  "offer": "Free shipping on all winning bids over $200 this auction",
+  "tone": {
+    "voice": "authoritative",
+    "modifier": "urgent",
+    "avoid": ["cheap", "discount", "sale", "junk"]
+  },
+  "landing_page": null,
+  "success_metrics": {
+    "primary_metric": "Auction registration rate from campaign traffic",
+    "secondary_metrics": ["Bid count per item", "Average hammer price vs. comparable"],
+    "baseline": "Previous auction: 12% registration rate from email",
+    "timeframe": "7 days from campaign launch to auction close"
+  },
+  "channel_strategy": {
+    "email": {
+      "format": "single send — pre-auction preview",
+      "angle": "Exclusive first look for serious collectors",
+      "constraints": ["Subject line under 60 chars", "Single CTA button"],
+      "priority": 1
+    },
+    "social_post": {
+      "format": "carousel of top 5 books with grades",
+      "angle": "Countdown to close — scarcity play",
+      "constraints": ["Max 300 chars caption", "Include auction end time"],
+      "priority": 2
+    }
+  }
+}

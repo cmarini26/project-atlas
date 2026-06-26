@@ -6,6 +6,99 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 5 — Campaign Engine] — 2026-06-26
+
+### Added
+
+**Domain**
+
+- `app/Domain/Campaign/Exceptions/BlueprintGenerationFailedException.php` — thrown when blueprint generation fails validation
+- `app/Domain/Campaign/ValueObjects/CampaignBlueprint.php` — readonly VO: 10 required Blueprint fields; `fromArray()` / `toArray()`
+- `app/Domain/Content/ValueObjects/ContentAssetData.php` — readonly VO: type, body, title, media, metadata, promptName, promptVersion
+
+**AI Prompts**
+
+- `app/AI/Prompts/CampaignPreparationPrompt.php` — version `1.0`; temperature `0.5`; full Blueprint JSON schema
+- `app/AI/Prompts/Content/SocialContentPrompt.php` — for `instagram`, `facebook`, `linkedin`, `x` channels
+- `app/AI/Prompts/Content/EmailContentPrompt.php` — for `email` channel
+- `app/AI/Prompts/Content/SmsContentPrompt.php` — for `sms` channel (160-char constraint)
+- `app/AI/Prompts/Content/BlogContentPrompt.php` — for `blog` channel
+- `app/AI/Prompts/Content/LandingPageContentPrompt.php` — for `landing_page` channel
+
+**Analysts**
+
+- `app/Services/Analyst/CampaignPreparationAnalyst.php` — calls AI → returns `CampaignBlueprint` VO
+- `app/Services/Analyst/Content/ContentGenerationAnalyst.php` — dispatches channel-specific prompt; returns `ContentAssetData`
+
+**Services**
+
+- `app/Services/Campaign/CampaignPreparationService.php` — validates Blueprint (7 rules); persists Campaign in `draft`; sets `expected_asset_count`
+- `app/Services/Content/ContentGenerationService.php` — creates `ContentAsset`; increments `generated_asset_count`; fires `CampaignAssetsReady` when complete
+- `app/Services/Recommendation/RecommendationService.php` — builds `rationale_display` from Decision; creates Recommendation; updates Decision to `recommended`; fires `RecommendationCreated`
+- `app/Services/Recommendation/ApprovalService.php` — `approve()`: transitions Recommendation/Campaign/ContentAssets; `reject()`: cancels Campaign, archives assets; fires `RecommendationApproved/Rejected`
+
+**Jobs**
+
+- `app/Jobs/PrepareCampaign.php` — full implementation (was stub): loads Decision + Company + BusinessBrain → `CampaignPreparationService` → dispatches `GenerateContent` per channel
+- `app/Jobs/GenerateContent.php` — `ai` queue; loads Campaign + Channel; calls `ContentGenerationAnalyst` → `ContentGenerationService`
+- `app/Jobs/CreateRecommendation.php` — `default` queue; calls `RecommendationService::create()`
+
+**Events**
+
+- `app/Events/CampaignAssetsReady.php`
+- `app/Events/RecommendationCreated.php`
+- `app/Events/RecommendationApproved.php`
+- `app/Events/RecommendationRejected.php`
+
+**Listeners**
+
+- `app/Listeners/TriggerRecommendationCreation.php` — handles `CampaignAssetsReady` → dispatches `CreateRecommendation`
+
+**Models**
+
+- `app/Models/ContentAsset.php` — full: `HasUlids`, `BelongsToCompany`, `SoftDeletes`; all fillable fields; JSON casts; `campaign()` + `channel()` relationships
+- `app/Models/Approval.php` — full: `HasUlids`, `BelongsToCompany`; `morphTo approvable`; `user()` relationship
+- `app/Models/Campaign.php` — updated: blueprint fields + `contentAssets()` relationship + `allAssetsGenerated()` helper; `$casts` property form
+- `app/Models/Recommendation.php` — updated: `campaign_id` added; `$casts` property form; `decision()` + `campaign()` relationships
+- `app/Models/Decision.php` — updated: `$casts` property form (fixes Larastan type inference for `channel_ids`, `rationale`, `expected_impact`)
+- `app/Models/User.php` — implements `FilamentUser` interface + `canAccessPanel()` for Filament admin access
+
+**Migrations**
+
+- `2026_06_26_001800_add_blueprint_columns_to_campaigns_table.php` — `blueprint`, `blueprint_version`, `prompt_version`, `expected_asset_count`, `generated_asset_count`
+- `2026_06_26_001900_create_content_assets_table.php` — full `content_assets` table with type enum, status enum, media/metadata JSON, soft deletes
+- `2026_06_26_002000_create_approvals_table.php` — `approvals` table with polymorphic `approvable`, `user_id`, `action` enum, `edits` JSON
+- `2026_06_26_002100_add_campaign_id_to_recommendations_table.php` — adds `campaign_id` to `recommendations`
+
+**Filament Admin Panel**
+
+- `app/Filament/Resources/RecommendationResource.php` — list with status badge; Approve + Reject actions (with notes form); View page
+- `app/Filament/Resources/CampaignResource.php` — list with status/asset count columns; View page
+- `app/Filament/Resources/ContentAssetResource.php` — list with type/status; View page
+- `app/Filament/Resources/CompanyResource.php`, `DecisionResource.php`, `OpportunityResource.php` — inspect-only views
+- `app/Providers/Filament/AdminPanelProvider.php` — auto-discovers resources at `/admin`
+- `backend/phpstan.neon` — `app/Filament` excluded from PHPStan scanning
+
+**Tests**
+
+- `tests/Feature/Campaign/CampaignPreparationServiceTest.php` — 8 tests: creates Campaign, sets expected_asset_count, sends prompt, throws on invalid goal/audience/CTA/channel_strategy, persists blueprint
+- `tests/Feature/Campaign/ContentGenerationServiceTest.php` — 6 tests: creates email/social assets, increments count, fires `CampaignAssetsReady` when complete, does not fire prematurely, stores prompt metadata
+- `tests/Feature/Campaign/RecommendationServiceTest.php` — 5 tests: creates pending recommendation, builds rationale_display, updates decision status, fires event, copies expected_impact
+- `tests/Feature/Campaign/ApprovalServiceTest.php` — 12 tests: approve/reject transitions, status cascade, approval record, events, invalid state guards, no publishing
+- `tests/Feature/Campaign/CampaignPipelineTest.php` — 4 tests: job dispatches GenerateContent, full E2E pipeline, no publishing
+
+**AI Fixtures**
+
+- `tests/Fixtures/AI/campaign-blueprint.json` — conversion blueprint for CBB Auctions Silver Age auction
+- `tests/Fixtures/AI/social-content.json` — Instagram/social post content
+- `tests/Fixtures/AI/email-content.json` — email with subject line, body, preview text
+
+**AppServiceProvider**
+
+- `CampaignAssetsReady → TriggerRecommendationCreation` event wiring added
+
+---
+
 ## [Milestone 5 Specification — Campaign Blueprint] — 2026-06-26
 
 ### Added

@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\AI\Contracts\AiProvider;
 use App\AI\Testing\FakeAiProvider;
+use App\Events\CampaignAssetsReady;
 use App\Events\DecisionCommitted;
 use App\Events\DigitalTwinActivated;
 use App\Events\ObservationRecorded;
@@ -12,6 +13,7 @@ use App\Listeners\DispatchCampaignPreparation;
 use App\Listeners\DispatchObservationProcessing;
 use App\Listeners\TriggerDecisionEvaluation;
 use App\Listeners\TriggerOpportunityDetection;
+use App\Listeners\TriggerRecommendationCreation;
 use App\Models\Catalog;
 use App\Models\CatalogItem;
 use App\Models\Company;
@@ -43,5 +45,6 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(DigitalTwinActivated::class, TriggerOpportunityDetection::class);
         Event::listen(OpportunityDetected::class, TriggerDecisionEvaluation::class);
         Event::listen(DecisionCommitted::class, DispatchCampaignPreparation::class);
+        Event::listen(CampaignAssetsReady::class, TriggerRecommendationCreation::class);
     }
 }

@@ -12,6 +12,7 @@ class Decision extends Model
 {
     use BelongsToCompany, HasUlids;
 
+    /** @var list<string> */
     protected $fillable = [
         'company_id',
         'opportunity_id',
@@ -26,16 +27,14 @@ class Decision extends Model
         'decided_at',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'channel_ids' => 'array',
-            'rationale' => 'array',
-            'expected_impact' => 'array',
-            'confidence_score' => 'integer',
-            'decided_at' => 'datetime',
-        ];
-    }
+    /** @var array<string, string> */
+    protected $casts = [
+        'channel_ids' => 'array',
+        'rationale' => 'array',
+        'expected_impact' => 'array',
+        'confidence_score' => 'integer',
+        'decided_at' => 'datetime',
+    ];
 
     /** @return BelongsTo<Opportunity, $this> */
     public function opportunity(): BelongsTo
