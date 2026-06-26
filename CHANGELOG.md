@@ -6,6 +6,47 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 7 — EmailPublisher] — 2026-06-26
+
+### Added
+
+**Email Domain — Value Objects**
+
+- `app/Domain/Publishing/ValueObjects/EmailPayload.php` — readonly VO: `subject`, `fromName`, `fromEmail`, `body`, `previewText`; `fromPlatformPayload(PlatformPayload): self` factory; throws `MalformedPayloadException` if subject is empty
+
+**Email Provider Layer**
+
+- `app/Services/Publishing/Email/Contracts/EmailProvider.php` — interface: `send(EmailPayload, ChannelCredentials): string`, `ping(ChannelCredentials): PingResult`, `supports(string): bool`
+- `app/Services/Publishing/Email/EmailProviderRegistry.php` — resolves `EmailProvider` by `provider_type`; first-match; `register()`, `for()`, `all()`; throws `UnknownEmailProviderException` when no provider matches
+- `app/Services/Publishing/Email/Exceptions/UnknownEmailProviderException.php` — extends `PublishingException`; `retryable: false`; `userMessage()` returns "The configured email provider is not supported. Contact support."
+- `app/Services/Publishing/Email/LogEmailProvider.php` — writes to `publishing` log channel; returns `'log-email-{ulid}'`; `supports('log')` only; `ping()` returns `reachable: true`
+- `app/Services/Publishing/Email/FakeEmailProvider.php` — test double; `queueMessageId(string)`, `queueFailure(PublishingException)`, `assertSent(int)`, `assertNotSent()`, `sentCount()`, `sentItems()`; `supports()` returns `true` for all provider types
+
+**Publisher + Renderer**
+
+- `app/Services/Publishing/EmailRenderer.php` — implements `ChannelRenderer`; reads `metadata.subject_line` → fallback `asset->title` → throws `MalformedPayloadException`; packs `subject/from_name/from_email/body/preview_text` into `PlatformPayload`; `supports('email')` only
+- `app/Services/Publishing/EmailPublisher.php` — implements `ChannelPublisher`; resolves `ChannelCredentials`, renders via `ChannelRendererRegistry`, converts to `EmailPayload`, picks provider from `EmailProviderRegistry`, sends; `ping()` delegates to resolved provider; `supports('email')` only
+
+**Tests** (29 new, 268 total)
+
+- `tests/Feature/Publishing/Email/EmailRendererTest.php` — 6 tests: renders all fields, falls back to `title` when `metadata.subject_line` absent, throws on missing subject, supports only `'email'`, rejects other channel types, empty metadata fields become empty strings
+- `tests/Feature/Publishing/Email/EmailProviderRegistryTest.php` — 6 tests: resolves registered provider, resolves `LogEmailProvider` by `'log'`, throws `UnknownEmailProviderException` for unknown type, `all()` returns all registered, first-match priority wins, exception is non-retryable
+- `tests/Feature/Publishing/Email/LogEmailProviderTest.php` — 6 tests: message ID starts with `'log-email-'`, unique IDs per call, writes to `publishing` log with subject in context, `ping()` returns reachable, supports `'log'`, rejects other provider types
+- `tests/Feature/Publishing/Email/EmailPublisherTest.php` — 12 tests: sends via provider, passes correct subject, returns `ExecutionResult` with email metadata, uses provider message ID as `platformId`, propagates non-retryable exception, throws `CredentialsNotFoundException`, throws `AuthenticationException` for error-status credentials, supports only `'email'`, `ping()` delegates to provider, full `PublishContent` job integration, result metadata includes `provider` and `subject`
+
+### Changed
+
+**`app/Providers/PublisherServiceProvider.php`**
+
+- `register()` now also binds `EmailProviderRegistry` as a singleton
+- `boot()` registers `EmailRenderer` **before** `GenericRenderer` (first-match priority for email channel type) and `EmailPublisher` **before** `LogChannelPublisher` (first-match priority for email channel type); registers `LogEmailProvider` in `EmailProviderRegistry`
+
+**`tests/Feature/Publishing/LogChannelPublisherTest.php`**
+
+- Added `'title' => 'Test email subject line'` to `makeExecution()` asset; required because `EmailRenderer` is now registered first and intercepts `email` channel type, requiring a non-empty subject
+
+---
+
 ## [Milestone 6.5 — Publishing Hardening] — 2026-06-26
 
 ### Added

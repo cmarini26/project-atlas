@@ -96,6 +96,7 @@ class LogChannelPublisherTest extends TestCase
             'campaign_id' => $this->campaign->id,
             'channel_id' => $this->channel->id,
             'type' => 'email',
+            'title' => 'Test email subject line',
             'body' => 'This is the email body content for testing.',
             'status' => 'scheduled',
         ]);

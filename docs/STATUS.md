@@ -28,23 +28,40 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
 
-**Overall:** Milestone 6.5 complete. Publishing hardened before EmailPublisher. 239 tests passing (2 Redis skipped). PHPStan level 8 clean. Renderer layer (`ChannelRendererRegistry`, `GenericRenderer`, `FakeChannelRenderer`) integrated into `LogChannelPublisher`. Blueprint validation hardened (tone, landing_page, success_metrics, channel_strategy). Credential repository validated (not found / revoked / expired / error). `CampaignPublished` event corrected — no longer fires on cancelled campaigns.
+**Overall:** Milestone 7 complete. First real channel publisher shipped. 268 tests passing (2 Redis skipped). PHPStan level 8 clean. `EmailPublisher` + `EmailRenderer` + `EmailProviderRegistry` + `LogEmailProvider` + `FakeEmailProvider` all in place. Email executions use `EmailRenderer` (subject/from/body/preview_text) and route through `EmailProviderRegistry`. `FakeEmailProvider` used in all tests — no real SMTP/API calls in CI.
 
 ---
 
 ## Current Milestone
 
-**Milestone 7 — Email Publisher**
-Corresponds to [Phase 7 of ROADMAP.md](../ROADMAP.md).
+**Milestone 8 — Real AI Provider + Postmark Email**
 
-Implement the first real platform publisher: `EmailPublisher`. Wire it into the existing publishing infrastructure established in M6. All the retry, idempotency, audit logging, and `CampaignPublished` event machinery is already in place.
+No milestone is currently in progress. The next milestone is Milestone 8.
 
-**Status:** Not yet started.  
-**Owner:** TBD
+**Status:** Not yet started.
 
 ---
 
 ## Completed Milestones
+
+### Milestone 7 — EmailPublisher ✅
+*Completed: 2026-06-26*
+
+**Delivered:**
+
+| Item | Description |
+|------|-------------|
+| `EmailPayload` VO | Readonly: `subject`, `fromName`, `fromEmail`, `body`, `previewText`; `fromPlatformPayload()` throws `MalformedPayloadException` if subject is empty |
+| `EmailProvider` interface | `send(EmailPayload, ChannelCredentials): string`, `ping(ChannelCredentials): PingResult`, `supports(string): bool` |
+| `EmailProviderRegistry` | Resolves `EmailProvider` by `provider_type` string; throws `UnknownEmailProviderException` (non-retryable); `register()`, `for()`, `all()` |
+| `UnknownEmailProviderException` | Extends `PublishingException`; non-retryable; `userMessage()` directs user to contact support |
+| `LogEmailProvider` | Sends to `publishing` log channel; returns `'log-email-{ulid}'`; supports only `'log'` provider type |
+| `FakeEmailProvider` | Queue/assertion test double; `queueMessageId()`, `queueFailure()`, `assertSent()`, `assertNotSent()`, `sentItems()` |
+| `EmailRenderer` | Implements `ChannelRenderer`; reads `metadata.subject_line` → fallback `title` → throws; packs `subject/from_name/from_email/body/preview_text` into `PlatformPayload`; supports only `'email'` channel type |
+| `EmailPublisher` | Implements `ChannelPublisher`; resolves credentials → renders → creates `EmailPayload` → picks provider from registry → sends; `ping()` delegates to provider; supports only `'email'` |
+| `PublisherServiceProvider` updated | `EmailRenderer` registered first (priority over `GenericRenderer`); `EmailPublisher` registered first (priority over `LogChannelPublisher`) |
+| 29 new tests | `EmailRendererTest` (6), `EmailProviderRegistryTest` (6), `LogEmailProviderTest` (6), `EmailPublisherTest` (12, including full `PublishContent` job integration) |
+| PHPStan level 8 | 0 errors |
 
 ### Milestone 6.5 — Publishing Hardening ✅
 *Completed: 2026-06-26*
@@ -287,6 +304,8 @@ All foundational documents written, reviewed, and committed.
 
 ## Recently Completed
 
+- **Milestone 7 — EmailPublisher** — First real channel publisher shipped. `EmailProvider` interface + `EmailProviderRegistry` + `LogEmailProvider` + `FakeEmailProvider` + `EmailRenderer` + `EmailPublisher` all wired into M6 infrastructure. 29 new tests (268 total, 266 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. See [Milestone-7-Review.md](reviews/Milestone-7-Review.md).
+
 - **Milestone 6.5 — Publishing Hardening** — Renderer layer integrated, credential validation hardened, blueprint validation expanded, `CampaignPublished` event bug fixed. 28 new tests (239 total, 237 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. See [Milestone-6.5-Review.md](reviews/Milestone-6.5-Review.md).
 
 - **Milestone 6 — Publishing Infrastructure** — Full pipeline implemented: `RecommendationApproved → PublishCampaign → PublishContent × n → LogChannelPublisher → Execution completed → CampaignPublished`. 47 new tests (211 total, 209 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. See [Milestone-6-Review.md](reviews/Milestone-6-Review.md).
@@ -305,15 +324,12 @@ All foundational documents written, reviewed, and committed.
 
 ---
 
-## Next Tasks (Milestone 7 — Email Publisher)
+## Next Tasks (Milestone 8 — Real AI Provider + Postmark)
 
-Milestone 7 wires the first real platform publisher into the M6 infrastructure.
-
-1. **`EmailPublisher`** — implements `ChannelPublisher`; sends via Laravel `Mail` or a transactional provider (Mailgun, Postmark, SES); registered in `PublisherServiceProvider` for `email` channel type; replaces `LogChannelPublisher` for email
-2. **`EmailRenderer`** — implements `ChannelRenderer`; transforms `ContentAsset` body + metadata into a formatted email payload (`subject`, `body`, `preview_text`)
-3. **Credential management** — `ChannelCredentials` record for email; encrypted from/reply-to config; `CheckChannelHealth` pings the SMTP/API connection
-4. **Tests** — `FakeChannelPublisher` for unit tests; integration test asserting email is queued when `PublishContent` runs
-5. **Milestone 7 Review** — document what shipped
+1. **`AnthropicProvider`** — real `AiProvider` implementation using Anthropic Claude API; versioned prompts; tool-use for structured output; bind in `AppServiceProvider` for non-testing environments
+2. **`PostmarkEmailProvider`** — implements `EmailProvider`; sends via Postmark API; registered in `EmailProviderRegistry` for `'postmark'` provider type; credential validation pings `/server` endpoint
+3. **Credential rotation** — `CheckChannelHealth` job pings Postmark credentials and marks `status=error` on failure
+4. **End-to-end smoke test** — `ProcessObservation → FactExtraction → KnowledgeSynthesis` with a real AnthropicProvider fixture or recorded response
 
 ---
 
@@ -331,6 +347,6 @@ Milestone 7 wires the first real platform publisher into the M6 infrastructure.
 
 ## Last Updated
 
-**2026-06-26** — Milestone 6.5 complete. Renderer layer (`ChannelRendererRegistry`, `GenericRenderer`, `FakeChannelRenderer`) integrated into `LogChannelPublisher`. Credential repository hardened with three-stage validation. Blueprint validation expanded (tone, landing_page, success_metrics, channel_strategy structure). `CampaignPublished` event corrected to not fire on cancelled campaigns. `docs/technical/Tenancy.md` added. 28 new tests — 239 total passing (2 Redis skipped). PHPStan level 8 — 0 errors.
+**2026-06-26** — Milestone 7 complete. `EmailPublisher` + `EmailRenderer` + `EmailProviderRegistry` + `LogEmailProvider` + `FakeEmailProvider` all wired into M6 infrastructure. `EmailRenderer` resolves `metadata.subject_line → title → throw`; registered first in `ChannelRendererRegistry`. `EmailPublisher` resolves credentials, renders via `ChannelRendererRegistry`, creates `EmailPayload`, resolves provider from `EmailProviderRegistry`, sends. 29 new tests — 268 total passing (2 Redis skipped). PHPStan level 8 — 0 errors.
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*
