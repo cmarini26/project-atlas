@@ -6,21 +6,18 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
-## [Milestone 4 Specification — Scope Clarification] — 2026-06-25
+## [Milestone 4 Specification — CTO Review & Scope Finalisation] — 2026-06-25
 
 ### Updated
 
-- `specs/core/opportunity-engine.md` — added "Milestone 4 Implementation Scope" section (Section 15)
+- `specs/core/opportunity-engine.md` — CTO reviewed; implementation scope section rewritten and moved to the top of the document (immediately after the header block), replacing the earlier Section 15 draft
 
-**Section covers:**
+**Scope section now records authoritatively:**
 - Required opportunity types in M4: `featured_item`, `urgency`, `new_arrival`, `re_engagement`
-- Optional / defined but not required: `seasonal`, `milestone` (enum entries only; zero candidates in M4)
-- Supporting tables permitted in M4 with explicit "what to implement / what not to implement" boundaries:
-  - `CatalogItem` — fields needed for detection and guard condition 3 only; no content, media, pricing, or UI
-  - `Campaign` — `status` and `campaign_type` fields for cooldown enforcement only; no Campaign Engine behavior
-  - `Recommendation` — `status` and `campaign_type` for guard condition 1 only; no approval workflow or UI
-- Explicit out-of-scope list: Campaign preparation, content generation, Marketing Assets, Channel Renderers, publishing, Execution records, approval workflow, Recommendation UI
-- Milestone 4 end state: at least one `opportunities` row and one `decisions` row with all rationale fields; `DecisionCommitted` event fired; `PrepareCampaign` stub dispatched
+- Optional / spec-defined but not required in M4: `seasonal`, `milestone`
+- Supporting models permitted: `CatalogItem`, `Campaign`, `Recommendation` — intentionally minimal; exist only to support detection, subject validation, evidence tracking, deduplication, cooldown checks, and duplicate recommendation guard conditions
+- Hard DO NOT list: Campaign Engine behavior, campaign preparation, Marketing Assets, ContentAssets, channel renderers, any publishing integration (Facebook, Instagram, Email, SMS, LinkedIn, Google Ads, Meta Ads, Blog, Landing Pages), analytics, learning
+- Goal of Milestone 4: produce a validated Decision with a complete rationale; Campaign creation begins in Milestone 5
 
 ---
 

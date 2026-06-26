@@ -39,7 +39,7 @@ Corresponds to [Phase 4 of ROADMAP.md](../ROADMAP.md).
 
 Detect marketing opportunities from the BusinessBrain. Score them. Commit Decisions. Produce Recommendations.
 
-**Specification:** `specs/core/opportunity-engine.md` — complete and approved (includes implementation scope section)  
+**Specification:** `specs/core/opportunity-engine.md` — CTO reviewed and approved  
 **Status:** Ready for implementation  
 **Target completion:** TBD  
 **Owner:** TBD
@@ -237,6 +237,6 @@ All foundational documents written, reviewed, and committed.
 
 ## Last Updated
 
-**2026-06-25** — Opportunity Engine specification updated with "Milestone 4 Implementation Scope" section. Clarifies required opportunity types (featured_item, urgency, new_arrival, re_engagement), optional types (seasonal, milestone), supporting tables permitted in M4 (CatalogItem, Campaign, Recommendation — minimal scope only), and explicit out-of-scope list (Campaign Engine, content generation, Marketing Assets, Channel Renderers, publishing). Ready to implement Milestone 4.
+**2026-06-25** — Milestone 3 and Opportunity Engine specification CTO reviewed and approved. Spec updated: implementation scope section moved to the top of the document, restated authoritatively. Required types confirmed (featured_item, urgency, new_arrival, re_engagement). Supporting models scoped minimally (CatalogItem, Campaign, Recommendation). Hard out-of-scope list recorded. Ready to implement Milestone 4.
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*

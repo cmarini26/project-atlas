@@ -8,6 +8,63 @@ When this document conflicts with others, this document wins for anything relate
 
 ---
 
+## Milestone 4 Implementation Scope
+
+Milestone 4 implements the Opportunity Engine and Decision Engine.
+
+Because item-level opportunities depend on catalog data and campaign history, Milestone 4 may introduce minimal supporting domain objects and database tables required for the Opportunity and Decision pipeline.
+
+Supporting models that may be introduced:
+
+- CatalogItem
+- Campaign
+- Recommendation
+
+These models exist only to support:
+
+- item-level opportunity detection
+- subject validation
+- evidence tracking
+- deduplication
+- cooldown checks
+- duplicate recommendation guard conditions
+
+These models are intentionally minimal.
+
+Do NOT implement Campaign Engine behavior.
+
+Do NOT implement campaign preparation.
+
+Do NOT implement Marketing Assets.
+
+Do NOT implement ContentAssets.
+
+Do NOT implement channel renderers.
+
+Do NOT implement Facebook, Instagram, Email, SMS, LinkedIn, Google Ads, Meta Ads, Blog, Landing Pages, or any publishing integrations.
+
+Do NOT implement analytics.
+
+Do NOT implement learning.
+
+The required Opportunity types for Milestone 4 are:
+
+- featured_item
+- urgency
+- new_arrival
+- re_engagement
+
+The following Opportunity types remain defined by the specification but are optional for Milestone 4:
+
+- seasonal
+- milestone
+
+The goal of Milestone 4 is to produce a validated Decision with a complete rationale.
+
+Campaign creation begins in Milestone 5.
+
+---
+
 ## 1. What Is an Opportunity?
 
 An **Opportunity** is a specific, time-sensitive marketing moment that Atlas has identified for a company — a condition under which a campaign would be timely, relevant, and likely to perform.
@@ -705,80 +762,6 @@ New verticals (beyond comic books and exotic cars) will add vertical-specific de
 ### Manual Opportunity Creation (Future)
 
 Users may eventually be able to manually create Opportunities ("I want to promote this item"). A `ManualOpportunity` would bypass the detection pipeline and enter the lifecycle at `open` status with user-supplied evidence. The Decision Engine and Campaign Engine process it identically. This is not in scope for MVP.
-
----
-
-## 15. Milestone 4 Implementation Scope
-
-This section clarifies exactly what Milestone 4 builds, what it defers, and which supporting tables are permitted to be introduced.
-
-### Required Opportunity Types
-
-| Type | Required in M4 | Notes |
-|------|---------------|-------|
-| `featured_item` | **Yes** | Requires `CatalogItem` lookup |
-| `urgency` | **Yes** | Requires `CatalogItem.expires_at` |
-| `new_arrival` | **Yes** | Requires `CatalogItem.created_at` |
-| `re_engagement` | **Yes** | Company-scoped; no item lookup required |
-| `seasonal` | Optional | Calendar event registry not required in M4; type is defined in the enum for future use |
-| `milestone` | Optional | Deferred; type defined in the enum only |
-
-Milestone 4 ships with four working detectors. `seasonal` and `milestone` are named in the type enum and documented in this spec but produce zero candidates in M4.
-
-### Supporting Tables Permitted in Milestone 4
-
-Milestone 4 may introduce minimal models and migrations for the following, to the extent required by Opportunity detection, deduplication, and Decision guard conditions. Nothing beyond that extent should be implemented.
-
-#### `CatalogItem`
-
-**Why needed:** `FeaturedItemDetector`, `UrgencyDetector`, and `NewArrivalDetector` operate on individual catalog items. Deduplication uses `subject_id` to identify which item an open Opportunity refers to. Guard condition 3 checks whether the item is still active before committing a Decision.
-
-**What to implement:**
-- Migration and model with the fields necessary for detection: `catalog_id`, `company_id`, `title`, `status` (active/sold/archived/draft), `expires_at` (nullable), `created_at`
-- `BelongsToCompany` trait and `HasUlids`
-- `active()` local scope
-- Relationship from `Catalog hasMany CatalogItem`
-
-**What not to implement:** item content fields, media handling, pricing, schema-driven metadata, storefront rendering, feed ingestion, or any form of CatalogItem CRUD UI.
-
-#### `Campaign`
-
-**Why needed:** Cooldown enforcement in `DecisionEngine::evaluate()` queries for a completed Campaign of the same `campaign_type` within the cooldown window. Without at least a `campaigns` table with `status` and `campaign_type`, cooldown is untestable.
-
-**What to implement:**
-- Migration and model with: `company_id`, `campaign_type`, `status` (draft/active/completed/cancelled), `decision_id` (nullable FK), `completed_at` (nullable)
-- `BelongsToCompany` trait and `HasUlids`
-- No content fields, no channel assignments, no ContentAsset relationship required in M4
-
-**What not to implement:** Campaign preparation logic, content generation, `CampaignPreparationAnalyst`, `GenerateContent` jobs, ContentAssets, channel rendering, or any publishing behavior. The Campaign Engine is Milestone 5.
-
-#### `Recommendation`
-
-**Why needed:** Guard condition 1 in `DecisionEngine::evaluate()` checks for an existing open Recommendation of the same `campaign_type`. Without a `recommendations` table, this guard condition cannot be enforced.
-
-**What to implement:**
-- Migration and model with: `company_id`, `decision_id`, `campaign_type`, `status` (pending/viewed/approved/rejected/expired)
-- `BelongsToCompany` trait and `HasUlids`
-
-**What not to implement:** Recommendation assembly logic, content previews, approval workflow, `ApprovalService`, `ApprovalController`, in-app notifications, or any UI surface. That is Milestone 5.
-
-### Explicit Out-of-Scope for Milestone 4
-
-The following must not be implemented during Milestone 4, even if the scaffolding is tempting:
-
-- Campaign preparation or `CampaignPreparationAnalyst`
-- Content generation or `ContentGenerationAnalyst`
-- Marketing Assets (`ContentAsset` model/migration)
-- Channel Renderers or channel-specific content
-- Publishing or Execution records
-- Approval workflow or `ApprovalService`
-- Recommendation UI or in-app notifications
-
-Milestone 4 ends when:
-- At least one `opportunities` row exists with a composite score, all four component scores, and `status: open`
-- At least one `decisions` row exists with `status: pending` and all five rationale fields populated
-- `DecisionCommitted` event has fired
-- `CommitDecision` job dispatches a stub `PrepareCampaign` job (listener wired, job is a no-op in M4)
 
 ---
 
