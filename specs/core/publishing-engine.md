@@ -11,28 +11,111 @@ When this document conflicts with others, this document wins for anything relate
 
 ## Milestone 6 Implementation Scope
 
-Milestone 6 implements the Publishing Engine: the path from an approved Recommendation to published content across one or more channels.
+Milestone 6 implements the **publishing infrastructure** — the contracts, jobs, models, registry, and test tooling that all real publishers will depend on. It does not implement any real platform publishers. The first real publisher (`EmailPublisher`) is a follow-up milestone.
 
-The trigger is `RecommendationApproved`. The output is one `Execution` record per `ContentAsset`, each reaching `completed` status with a platform response recorded.
+The goal of Milestone 6 is to prove the full pipeline end-to-end using `LogChannelPublisher`, so that adding a real publisher later requires only implementing `ChannelPublisher` and registering it — no structural changes.
+
+### What Milestone 6 Includes
+
+**Domain models and migrations**
+
+- `Execution` model + `executions` table — status lifecycle, scheduling, idempotency key, result JSON, audit fields
+- `ExecutionAttempt` model + `execution_attempts` table — append-only per-attempt log
+- `ChannelCredentials` model + `channel_credentials` table — encrypted credential storage, status, provider type, `expires_at`
+
+**Services**
+
+- `ExecutionService` — `queueForCampaign()`, `checkCampaignCompletion()`, `markFailed()`, `markCompleted()`
+
+**Jobs**
+
+- `PublishCampaign` — triggered by `RecommendationApproved`; creates `Execution` records; dispatches `PublishContent` per asset
+- `PublishContent` — resolves publisher from registry; calls `publish()`; handles retry/backoff; records result or failure
+- `PublishScheduledContent` — maintenance queue; runs every 5 minutes; dispatches due `Executions`
+
+**Interfaces and contracts**
+
+- `ChannelPublisher` interface — `publish()`, `supports()`, `ping()`
+- `ChannelRenderer` interface — `render()`, `supports()`
+- `ChannelPublisherRegistry` — resolution by channel type; `UnknownChannelException` on missing publisher
+
+**Publisher implementations**
+
+- `FakeChannelPublisher` — for tests; `queueResult()`, `queueFailure()`, `assertPublished()`, `assertNotPublished()`
+- `LogChannelPublisher` — for local and demo environments; writes payload to the `publishing` log channel instead of calling a platform API; always returns a synthetic `ExecutionResult`
+
+**Infrastructure**
+
+- Encrypted credential storage (`ChannelCredentials`, `ChannelCredentialsRepository`)
+- Health check structure (`ping()` contract, `CheckChannelHealth` maintenance job, `PingResult` VO)
+- Circuit breaker logic (Redis-backed, per channel type)
+- Retry and backoff (`PublishingException` hierarchy, retryable vs. non-retryable)
+- Idempotency (key assignment, pre-flight status check)
+- Audit logging (`ExecutionAttempt` records, structured `publishing` log channel)
+- Rollback interface (`SupportsRollback`, `RollbackService`)
+
+**Admin visibility**
+
+- Filament `ExecutionResource` — read-only inspection of Execution records; status badge; attempts; last error; result JSON
+
+**Events**
+
+- `ExecutionCompleted` — fires when `Execution.status → completed`
+- `ExecutionFailed` — fires when `Execution` reaches final failed state
+- `CampaignPublished` — fires when all Executions for a Campaign have settled
+
+**Tests**
+
+- All tests use `FakeChannelPublisher` — no live platform calls in CI
+- `LogChannelPublisher` tested via log assertion (`Log::assertLogged(...)`)
+- Full pipeline test: `RecommendationApproved → PublishCampaign → PublishContent → Execution(completed) → CampaignPublished`
+
+---
+
+### What Milestone 6 Does Not Include
+
+No real platform publishers are implemented in Milestone 6.
+
+| Publisher | Status | Notes |
+|-----------|--------|-------|
+| `InstagramPublisher` | Not in M6 | Requires Graph API credentials and OAuth setup |
+| `FacebookPublisher` | Not in M6 | Requires Graph API credentials and page token |
+| `LinkedInPublisher` | Not in M6 | Requires LinkedIn OAuth |
+| `XPublisher` | Not in M6 | Requires X API v2 credentials |
+| `SmsPublisher` | Not in M6 | Requires Twilio / Vonage credentials |
+| `BlogPublisher` | Not in M6 | Requires CMS API or file-based publishing target |
+| `LandingPagePublisher` | Not in M6 | Requires hosted page service |
+| `EmailPublisher` | **First real publisher** | Targeted for the milestone immediately following M6 |
+
+The `EmailPublisher` is prioritised as the first real publisher because:
+1. Email does not require an OAuth flow or social platform approval
+2. Transactional email providers (Mailchimp, Postmark, Klaviyo) have well-documented APIs
+3. Email publishing is directly measurable (opens, clicks) — feeds Milestone 7 analytics earliest
+4. CBB Auctions and exotic car dealers both have existing email lists, making it immediately valuable
+
+Analytics retrieval (open rates, engagement, clicks) is Milestone 7. Learning from execution outcomes is Milestone 8. Paid media and white-label publishing surfaces are not on the current roadmap.
+
+---
+
+### End-to-End Flow in Milestone 6
 
 ```
 RecommendationApproved
 → PublishCampaign job (high queue)
 → [one PublishContent job per ContentAsset]
-→ ChannelPublisher::publish()
-    → ChannelRenderer::render()     ← platform payload
-    → Platform API call             ← live credentials
+→ ChannelPublisherRegistry::for($channelType)
+→ LogChannelPublisher::publish()    ← writes to 'publishing' log channel
+    → ChannelRenderer::render()     ← platform payload (real transformation)
+    → Log::channel('publishing')    ← no real API call
+    → ExecutionResult (synthetic)
 → Execution (completed)
+→ ExecutionAttempt (logged)
 → [all Executions complete]
 → Campaign (published)
+→ CampaignPublished event
 ```
 
-Milestone 6 must not implement:
-
-- Analytics retrieval from platforms (open rates, engagement, clicks) — that is Milestone 7
-- Learning from execution outcomes — that is Milestone 8
-- Paid media (ads) integrations
-- White-label or API-only publishing surfaces
+In production before a real publisher exists, `LogChannelPublisher` is registered for all channel types. When `EmailPublisher` is added, it is registered for `email` only — all other types remain on `LogChannelPublisher` until their real publishers are implemented.
 
 ---
 

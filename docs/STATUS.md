@@ -230,7 +230,7 @@ All foundational documents written, reviewed, and committed.
 
 ## Recently Completed
 
-- **Milestone 6 — Publishing Engine spec** — `specs/core/publishing-engine.md` written; covers `ChannelPublisher` interface, `ChannelRenderer` vs `ChannelPublisher` separation, `Execution` model and schema, Execution status lifecycle (queued → executing → completed/failed/cancelled), scheduling (immediate vs. `scheduled_at`), retry strategy (retryable vs. non-retryable exception hierarchy, 3-attempt exponential backoff), idempotency (idempotency key + pre-flight status check + platform deduplication), provider abstraction (registry pattern, sub-provider selection per company), credential storage (encrypted, per-company per-channel, OAuth refresh), provider health checks (pre-dispatch ping, scheduled maintenance check, circuit breaker), failure handling (exception hierarchy, user-visible messages, non-retryable fast fail), audit logging (`execution_attempts` append-only table, structured log channel), rollback behavior (channel-by-channel coverage, `SupportsRollback` interface, limitation acknowledgment), multi-channel orchestration (independent per-channel jobs, campaign completion detection, priority-ordered dispatch), acceptance criteria (all `FakeChannelPublisher`-testable), and future extensibility (optimal send time, webhooks, paid media, A/B timing)
+- **Milestone 6 — Publishing Engine spec (revised)** — `specs/core/publishing-engine.md` updated with explicit implementation scope: M6 implements publishing infrastructure and `FakeChannelPublisher` + `LogChannelPublisher` only — no real platform publishers. Deliverables: `Execution` + `ExecutionAttempt` + `ChannelCredentials` models/migrations, `ExecutionService`, `PublishCampaign` + `PublishContent` + `PublishScheduledContent` jobs, `ChannelPublisher` + `ChannelRenderer` interfaces, `ChannelPublisherRegistry`, `FakeChannelPublisher` (tests), `LogChannelPublisher` (local/demo), encrypted credential storage, health check structure, retry/idempotency/audit behavior, `ExecutionCompleted` + `ExecutionFailed` + `CampaignPublished` events, Filament `ExecutionResource`. First real publisher (`EmailPublisher`) is the follow-up milestone; social/SMS/blog/landing-page publishers follow after. Architecture covers all 16 spec sections; end-to-end flow uses `LogChannelPublisher` in M6
 
 - **Milestone 5 — Campaign Engine** — Full Campaign Preparation + Content Generation + Approval Workflow implemented. `CampaignBlueprint` VO, `CampaignPreparationAnalyst`, `CampaignPreparationService`, 5 `ContentGenerationPrompt` variants, `ContentGenerationAnalyst`, `ContentGenerationService`, `RecommendationService`, `ApprovalService` (approve + reject with full status transitions). Jobs: `PrepareCampaign` (full), `GenerateContent`, `CreateRecommendation`. Events: `CampaignAssetsReady`, `RecommendationCreated`, `RecommendationApproved`, `RecommendationRejected`. Filament admin panel with 6 resources (Company, Opportunity, Decision, Campaign, ContentAsset, Recommendation) + approve/reject actions. 35 new tests (164 total, 162 passing, 2 Redis skipped). PHPStan level 8 — 0 errors.
 - **Milestone 5 — Campaign Blueprint spec** — `specs/core/campaign-blueprint.md` written; covers Blueprint definition, relationship to Decision, all 10 required fields with validation rules, versioning and immutability, `CampaignPreparationAnalyst` AI contract, `BlueprintGenerationFailedException`, full Blueprint→Asset→Renderer pipeline, `ChannelRenderer` interface contract, acceptance criteria, and future extensibility
@@ -248,11 +248,18 @@ All foundational documents written, reviewed, and committed.
 
 ## Next Tasks (Milestone 6)
 
-1. **`AnthropicProvider`** — implement real `AiProvider`; required before any production AI calls; bind in `AppServiceProvider` for non-test environments
-2. **Channel publishing** — implement platform-specific publishers (email, social, SMS); triggered by `RecommendationApproved`
-3. **Campaign analytics** — track opens, clicks, conversions; ingest via webhook or polling; store as Observations
-4. **Learning loop** — use campaign performance data to improve future recommendations; update BusinessBrain
-5. **Frontend approval UI** — Vue 3 + Inertia.js Recommendation card with rationale, content preview per channel, approve/edit/reject controls (Filament admin covers MVP)
+Milestone 6 implements publishing infrastructure and log/fake publishers. No real platform publishers in M6. See `specs/core/publishing-engine.md` for full scope.
+
+1. **`Execution` + `ExecutionAttempt` + `ChannelCredentials` models** — migrations, models, fillable, casts, relationships; `ExecutionService`
+2. **`PublishCampaign` job** — triggered by `RecommendationApproved`; creates `Execution` records; health check per channel type
+3. **`PublishContent` job** — resolves publisher from registry; calls `publish()`; retry/backoff; records result or failure; appends `ExecutionAttempt`
+4. **`PublishScheduledContent` job** — maintenance queue, every 5 min; dispatches due Executions
+5. **`ChannelPublisher` + `ChannelRenderer` interfaces + `ChannelPublisherRegistry`** — contracts and resolution logic
+6. **`FakeChannelPublisher`** — test double; `queueResult()`, `queueFailure()`, `assertPublished()`, `assertNotPublished()`
+7. **`LogChannelPublisher`** — local/demo publisher; writes rendered payload to `publishing` log channel; returns synthetic `ExecutionResult`; registered for all channel types in M6
+8. **Events** — `ExecutionCompleted`, `ExecutionFailed`, `CampaignPublished`
+9. **Filament `ExecutionResource`** — read-only inspection; status badge, attempts, last error, result JSON
+10. **Tests** — full pipeline test with `FakeChannelPublisher`; `AnthropicProvider` real AI binding (required before production use)
 
 ---
 
