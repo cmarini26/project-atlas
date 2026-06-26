@@ -6,6 +6,32 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 6 — Publishing Engine Spec] — 2026-06-26
+
+### Added
+
+**Specification**
+
+- `specs/core/publishing-engine.md` — authoritative publishing engine spec for Milestone 6; 16 sections:
+  1. **Publisher interface** — `ChannelPublisher` contract with `publish(Execution): ExecutionResult`, `supports(string): bool`, `ping(ChannelCredentials): PingResult`; `ChannelPublisherRegistry` for resolution by channel type
+  2. **ChannelRenderer vs ChannelPublisher** — `ChannelRenderer` transforms `ContentAsset → PlatformPayload` (no API calls, unit-testable); `ChannelPublisher` calls platform API (credentials required, integration-testable); separation enables isolated render testing and retry without re-rendering
+  3. **Execution model** — `executions` table schema: ULID PK, `company_id`, `campaign_id`, `content_asset_id` (unique), `channel_id`, `status` enum, `scheduled_at`, `executed_at`, `completed_at`, `attempts`, `last_error`, `idempotency_key`, `result` JSON; Eloquent model with `BelongsToCompany`, `HasUlids`
+  4. **Execution status lifecycle** — `queued → executing → completed | failed | cancelled`; Campaign transitions (`approved → published` when all complete; `cancelled` if all fail/cancel); ContentAsset transitions (`approved → scheduled → published`; reverts to `approved` on final failure)
+  5. **Scheduling** — `scheduled_at = null` means immediate; `PublishScheduledContent` job (maintenance queue, every 5 min) dispatches due Executions; timezone stored as UTC; `scheduled_at` locked once `executing`
+  6. **Retry strategy** — retryable (rate limit, network, 5xx, expired token); non-retryable (content policy, auth failure, credential missing, malformed payload); backoff: 60s → 300s → 900s; max 3 retries; `$this->fail($e)` on non-retryable
+  7. **Idempotency** — ULID `idempotency_key` per Execution (never changes across retries); pre-attempt status check (skip if already `completed`); platform-side key forwarded where supported (Mailchimp, some CMS APIs)
+  8. **Provider abstraction** — `PublisherServiceProvider` registers all publishers; sub-provider registry for email (`mailchimp`, `klaviyo`, `postmark`) and SMS (`twilio`, `vonage`); provider resolved from `ChannelCredentials.provider_type` at runtime; swapping provider = credential update only
+  9. **Provider credentials** — `channel_credentials` table; `credentials` column encrypted via `Crypt::encryptString()`; OAuth structure (access/refresh token, page ID); API key structure (key, list/from); SMS structure (SID, auth token, from number); `ChannelCredentialsRepository::for()` throws typed exceptions; OAuth refresh on token expiry
+  10. **Provider health checks** — pre-dispatch `ping()` per channel type before `Execution` records created; `CheckChannelHealth` job (maintenance, every 30 min) updates `ChannelCredentials.status`; circuit breaker in Redis (3 consecutive failures → 15-min defer) prevents burning retries during platform outages
+  11. **Failure handling** — `PublishingException` hierarchy with retryable/non-retryable subclasses; user-visible `userMessage()` per exception type; `NotifyPublishingFailure` listener; `ExecutionFailed` event; per-channel failure does not block other channels
+  12. **Audit logging** — `execution_attempts` append-only table (one row per attempt: attempt number, timestamp, status, error, raw response); `Execution.attempts` + `Execution.last_error` for summary; structured `publishing` log channel (JSON, separate from app logs)
+  13. **Rollback behavior** — `SupportsRollback` interface on rollable publishers (Instagram, Facebook, LinkedIn, X, Blog, LandingPage); email and SMS explicitly non-rollable; `RollbackService` checks `instanceof SupportsRollback`; `ContentAsset.status → archived` on rollback; rollback is always user-initiated, never automatic
+  14. **Multi-channel orchestration** — `PublishCampaign` (triggered by `RecommendationApproved`) dispatches one `PublishContent` per ContentAsset independently; `ExecutionService::checkCampaignCompletion()` called after each job; priority-ordered dispatch (5s × priority level delay) to avoid simultaneous rate limit hits
+  15. **Acceptance criteria** — all verifiable via `FakeChannelPublisher` (no live API in tests); covers Execution creation, publish flow, scheduling, retry, idempotency, audit, multi-channel, rollback
+  16. **Future extensibility** — per-company optimal send time, webhook-based delivery confirmation, multi-wave campaigns, paid media publisher, approval-to-publish delay setting, A/B timing tests, proactive credential rotation
+
+---
+
 ## [Milestone 5 — Campaign Engine] — 2026-06-26
 
 ### Added
