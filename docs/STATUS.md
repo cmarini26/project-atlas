@@ -28,16 +28,16 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
 
-**Overall:** Milestone 5 complete. Campaign Engine (Blueprint + Content Generation + Approval Workflow) fully implemented and tested. 164 tests passing (2 Redis skipped). PHPStan level 8 clean. Full pipeline: `DecisionCommitted → PrepareCampaign → CampaignBlueprint → GenerateContent × n → CampaignAssetsReady → CreateRecommendation → ApprovalService → RecommendationApproved/Rejected`.
+**Overall:** Milestone 6 complete. Publishing Infrastructure fully implemented and tested. 211 tests passing (2 Redis skipped). PHPStan level 8 clean. Full pipeline: `RecommendationApproved → PublishCampaign → PublishContent × n → LogChannelPublisher → Execution completed → CampaignPublished`. No real platform publishers in M6 — all channels use `LogChannelPublisher`.
 
 ---
 
 ## Current Milestone
 
-**Milestone 6 — Channel Publishing & Analytics**
-Corresponds to [Phase 6 of ROADMAP.md](../ROADMAP.md).
+**Milestone 7 — Email Publisher**
+Corresponds to [Phase 7 of ROADMAP.md](../ROADMAP.md).
 
-After a Recommendation is approved, publish ContentAssets to the appropriate channels and track campaign performance.
+Implement the first real platform publisher: `EmailPublisher`. Wire it into the existing publishing infrastructure established in M6. All the retry, idempotency, audit logging, and `CampaignPublished` event machinery is already in place.
 
 **Status:** Not yet started.  
 **Owner:** TBD
@@ -45,6 +45,43 @@ After a Recommendation is approved, publish ContentAssets to the appropriate cha
 ---
 
 ## Completed Milestones
+
+### Milestone 6 — Publishing Infrastructure ✅
+*Completed: 2026-06-26*
+
+**Delivered:**
+
+| Item | Description |
+|------|-------------|
+| 3 migrations | `channel_credentials`, `executions`, `execution_attempts` |
+| `ChannelCredentials` model | `BelongsToCompany`, `HasUlids`; encrypted JSON credentials; `isExpired()` |
+| `Execution` model | `BelongsToCompany`, `HasUlids`; status lifecycle; `isSettled()`; `attemptLogs()` HasMany |
+| `ExecutionAttempt` model | `HasUlids`; append-only audit log; no `updated_at` |
+| `ExecutionResult` VO | Readonly: `platformId`, `url`, `publishedAt`, `metadata` |
+| `PlatformPayload` VO | Readonly: `channelType`, `data` |
+| `PingResult` VO | Readonly: `reachable`, `error` |
+| `PublishingException` hierarchy | Base + 8 subclasses; `isRetryable()` + `userMessage()` |
+| `ChannelPublisher` interface | `publish()`, `supports()`, `ping()` |
+| `ChannelRenderer` interface | `render()`, `supports()` |
+| `SupportsRollback` interface | Opt-in; `rollback(): bool` |
+| `ChannelPublisherRegistry` | Resolves publisher by `supports(channelType)` |
+| `ChannelCredentialsRepository` | `for(companyId, channelType)` → throws `CredentialsNotFoundException` |
+| `FakeChannelPublisher` | Queue-based test double; `assertPublished()`, `assertNotPublished()` |
+| `LogChannelPublisher` | Writes to `publishing` log channel; supports all 8 channel types; no API calls |
+| `ExecutionService` | `queueForCampaign`, `markCompleted`, `markFailed`, `logAttempt`, `checkCampaignCompletion` |
+| `RollbackService` | Iterates completed Executions; dispatches rollback if `SupportsRollback`; reports unrollable |
+| `PublishCampaign` job | `high` queue; creates Executions; dispatches immediate `PublishContent` jobs |
+| `PublishContent` job | `high` queue; 4 tries; 60/300/900s backoff; non-retryable → `fail()`; retryable → re-throw |
+| `PublishScheduledContent` job | `maintenance` queue; every 5 min; dispatches due Executions |
+| `CheckChannelHealth` job | `maintenance` queue; every 30 min; pings all active credentials |
+| 3 events | `ExecutionCompleted`, `ExecutionFailed`, `CampaignPublished` |
+| `TriggerCampaignPublishing` listener | `RecommendationApproved → PublishCampaign` |
+| `PublisherServiceProvider` | Singleton registry; registers `LogChannelPublisher` for all 8 channel types |
+| Filament `ExecutionResource` | Read-only; status badge; attempts; last_error; company/campaign/channel columns |
+| `publishing` log channel | `storage/logs/publishing.log`; separate from `laravel.log` |
+| Campaign status `published` | Added to campaign status enum |
+| 47 new tests | All passing; no live API calls; `FakeChannelPublisher` throughout |
+| PHPStan level 8 | 0 errors |
 
 ### Milestone 4 — Opportunity & Decision Engine ✅
 *Completed: 2026-06-26*
@@ -230,7 +267,7 @@ All foundational documents written, reviewed, and committed.
 
 ## Recently Completed
 
-- **Milestone 6 — Publishing Engine spec (revised)** — `specs/core/publishing-engine.md` updated with explicit implementation scope: M6 implements publishing infrastructure and `FakeChannelPublisher` + `LogChannelPublisher` only — no real platform publishers. Deliverables: `Execution` + `ExecutionAttempt` + `ChannelCredentials` models/migrations, `ExecutionService`, `PublishCampaign` + `PublishContent` + `PublishScheduledContent` jobs, `ChannelPublisher` + `ChannelRenderer` interfaces, `ChannelPublisherRegistry`, `FakeChannelPublisher` (tests), `LogChannelPublisher` (local/demo), encrypted credential storage, health check structure, retry/idempotency/audit behavior, `ExecutionCompleted` + `ExecutionFailed` + `CampaignPublished` events, Filament `ExecutionResource`. First real publisher (`EmailPublisher`) is the follow-up milestone; social/SMS/blog/landing-page publishers follow after. Architecture covers all 16 spec sections; end-to-end flow uses `LogChannelPublisher` in M6
+- **Milestone 6 — Publishing Infrastructure** — Full pipeline implemented: `RecommendationApproved → PublishCampaign → PublishContent × n → LogChannelPublisher → Execution completed → CampaignPublished`. 47 new tests (211 total, 209 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. See [Milestone-6-Review.md](reviews/Milestone-6-Review.md).
 
 - **Milestone 5 — Campaign Engine** — Full Campaign Preparation + Content Generation + Approval Workflow implemented. `CampaignBlueprint` VO, `CampaignPreparationAnalyst`, `CampaignPreparationService`, 5 `ContentGenerationPrompt` variants, `ContentGenerationAnalyst`, `ContentGenerationService`, `RecommendationService`, `ApprovalService` (approve + reject with full status transitions). Jobs: `PrepareCampaign` (full), `GenerateContent`, `CreateRecommendation`. Events: `CampaignAssetsReady`, `RecommendationCreated`, `RecommendationApproved`, `RecommendationRejected`. Filament admin panel with 6 resources (Company, Opportunity, Decision, Campaign, ContentAsset, Recommendation) + approve/reject actions. 35 new tests (164 total, 162 passing, 2 Redis skipped). PHPStan level 8 — 0 errors.
 - **Milestone 5 — Campaign Blueprint spec** — `specs/core/campaign-blueprint.md` written; covers Blueprint definition, relationship to Decision, all 10 required fields with validation rules, versioning and immutability, `CampaignPreparationAnalyst` AI contract, `BlueprintGenerationFailedException`, full Blueprint→Asset→Renderer pipeline, `ChannelRenderer` interface contract, acceptance criteria, and future extensibility
@@ -246,20 +283,15 @@ All foundational documents written, reviewed, and committed.
 
 ---
 
-## Next Tasks (Milestone 6)
+## Next Tasks (Milestone 7 — Email Publisher)
 
-Milestone 6 implements publishing infrastructure and log/fake publishers. No real platform publishers in M6. See `specs/core/publishing-engine.md` for full scope.
+Milestone 7 wires the first real platform publisher into the M6 infrastructure.
 
-1. **`Execution` + `ExecutionAttempt` + `ChannelCredentials` models** — migrations, models, fillable, casts, relationships; `ExecutionService`
-2. **`PublishCampaign` job** — triggered by `RecommendationApproved`; creates `Execution` records; health check per channel type
-3. **`PublishContent` job** — resolves publisher from registry; calls `publish()`; retry/backoff; records result or failure; appends `ExecutionAttempt`
-4. **`PublishScheduledContent` job** — maintenance queue, every 5 min; dispatches due Executions
-5. **`ChannelPublisher` + `ChannelRenderer` interfaces + `ChannelPublisherRegistry`** — contracts and resolution logic
-6. **`FakeChannelPublisher`** — test double; `queueResult()`, `queueFailure()`, `assertPublished()`, `assertNotPublished()`
-7. **`LogChannelPublisher`** — local/demo publisher; writes rendered payload to `publishing` log channel; returns synthetic `ExecutionResult`; registered for all channel types in M6
-8. **Events** — `ExecutionCompleted`, `ExecutionFailed`, `CampaignPublished`
-9. **Filament `ExecutionResource`** — read-only inspection; status badge, attempts, last error, result JSON
-10. **Tests** — full pipeline test with `FakeChannelPublisher`; `AnthropicProvider` real AI binding (required before production use)
+1. **`EmailPublisher`** — implements `ChannelPublisher`; sends via Laravel `Mail` or a transactional provider (Mailgun, Postmark, SES); registered in `PublisherServiceProvider` for `email` channel type; replaces `LogChannelPublisher` for email
+2. **`EmailRenderer`** — implements `ChannelRenderer`; transforms `ContentAsset` body + metadata into a formatted email payload (`subject`, `body`, `preview_text`)
+3. **Credential management** — `ChannelCredentials` record for email; encrypted from/reply-to config; `CheckChannelHealth` pings the SMTP/API connection
+4. **Tests** — `FakeChannelPublisher` for unit tests; integration test asserting email is queued when `PublishContent` runs
+5. **Milestone 7 Review** — document what shipped
 
 ---
 
@@ -277,6 +309,6 @@ Milestone 6 implements publishing infrastructure and log/fake publishers. No rea
 
 ## Last Updated
 
-**2026-06-26** — Publishing Engine spec complete. `specs/core/publishing-engine.md` written covering all 16 architectural sections: publisher interface, renderer separation, execution model, status lifecycle, scheduling, retry, idempotency, provider abstraction, credentials, health checks, failure handling, audit logging, rollback, multi-channel orchestration, acceptance criteria, and extensibility.
+**2026-06-26** — Milestone 6 complete. Publishing Infrastructure fully implemented: `Execution` + `ExecutionAttempt` + `ChannelCredentials` models, `ExecutionService`, `RollbackService`, `PublishCampaign` + `PublishContent` + `PublishScheduledContent` + `CheckChannelHealth` jobs, `ChannelPublisher` + `ChannelRenderer` + `SupportsRollback` interfaces, `ChannelPublisherRegistry`, `FakeChannelPublisher`, `LogChannelPublisher`, `PublisherServiceProvider`, Filament `ExecutionResource`, 47 tests — 211 total passing. PHPStan level 8 — 0 errors.
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*

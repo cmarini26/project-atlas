@@ -6,6 +6,7 @@ use App\Domain\Shared\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ContentAsset extends Model
@@ -47,5 +48,11 @@ class ContentAsset extends Model
     public function channel(): BelongsTo
     {
         return $this->belongsTo(Channel::class);
+    }
+
+    /** @return HasOne<Execution, $this> */
+    public function execution(): HasOne
+    {
+        return $this->hasOne(Execution::class, 'content_asset_id');
     }
 }

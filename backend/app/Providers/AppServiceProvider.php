@@ -9,8 +9,10 @@ use App\Events\DecisionCommitted;
 use App\Events\DigitalTwinActivated;
 use App\Events\ObservationRecorded;
 use App\Events\OpportunityDetected;
+use App\Events\RecommendationApproved;
 use App\Listeners\DispatchCampaignPreparation;
 use App\Listeners\DispatchObservationProcessing;
+use App\Listeners\TriggerCampaignPublishing;
 use App\Listeners\TriggerDecisionEvaluation;
 use App\Listeners\TriggerOpportunityDetection;
 use App\Listeners\TriggerRecommendationCreation;
@@ -46,5 +48,6 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(OpportunityDetected::class, TriggerDecisionEvaluation::class);
         Event::listen(DecisionCommitted::class, DispatchCampaignPreparation::class);
         Event::listen(CampaignAssetsReady::class, TriggerRecommendationCreation::class);
+        Event::listen(RecommendationApproved::class, TriggerCampaignPublishing::class);
     }
 }

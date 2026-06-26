@@ -6,6 +6,115 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 6 — Publishing Infrastructure] — 2026-06-26
+
+### Added
+
+**Migrations**
+
+- `database/migrations/2026_06_26_002200_create_channel_credentials_table.php` — `channel_credentials` table: ULID PK, `company_id`, `channel_type`, `provider_type`, `credentials` (encrypted text), `status`, `expires_at`, `last_used_at`; `UNIQUE(company_id, channel_type)`
+- `database/migrations/2026_06_26_002300_create_executions_table.php` — `executions` table: ULID PK, `company_id`, `campaign_id`, `content_asset_id` (UNIQUE — one execution per asset), `channel_id`, `status`, `scheduled_at`, `executed_at`, `completed_at`, `attempts`, `last_error`, `idempotency_key` (UNIQUE), `result` JSON
+- `database/migrations/2026_06_26_002400_create_execution_attempts_table.php` — `execution_attempts` table: append-only; `attempt_number`, `attempted_at`, `status`, `error`, `response` JSON; no `updated_at`
+
+**Domain — Value Objects**
+
+- `app/Domain/Publishing/ValueObjects/ExecutionResult.php` — readonly: `platformId`, `url`, `publishedAt`, `metadata`; `toArray()`
+- `app/Domain/Publishing/ValueObjects/PlatformPayload.php` — readonly: `channelType`, `data`
+- `app/Domain/Publishing/ValueObjects/PingResult.php` — readonly: `reachable`, `error`
+
+**Domain — Exception Hierarchy**
+
+- `app/Services/Publishing/Exceptions/PublishingException.php` — base; `isRetryable(): bool`, `userMessage(): string`
+- Retryable subclasses: `RateLimitException`, `NetworkException`, `PlatformUnavailableException`
+- Non-retryable subclasses: `ContentPolicyViolationException`, `AuthenticationException`, `CredentialsNotFoundException`, `MalformedPayloadException`, `UnknownChannelException`
+
+**Domain — Interfaces**
+
+- `app/Services/Publishing/Contracts/ChannelPublisher.php` — `publish(Execution): ExecutionResult`, `supports(string): bool`, `ping(ChannelCredentials): PingResult`
+- `app/Services/Publishing/Contracts/ChannelRenderer.php` — `render(ContentAsset, Channel): PlatformPayload`, `supports(string): bool`
+- `app/Services/Publishing/Contracts/SupportsRollback.php` — `rollback(Execution): bool`; implemented only by channels that can undo a publication
+
+**Models**
+
+- `app/Models/ChannelCredentials.php` — `BelongsToCompany`, `HasUlids`; `credentials` cast as `encrypted`; `isExpired()`
+- `app/Models/Execution.php` — `BelongsToCompany`, `HasUlids`; `campaign()`, `contentAsset()`, `channel()`, `attemptLogs()` HasMany; `isSettled()`
+- `app/Models/ExecutionAttempt.php` — `HasUlids` only; `$timestamps = false`; `execution()` BelongsTo
+- `app/Models/Campaign.php` — added `executions()` HasMany; campaign status enum updated to include `published`
+- `app/Models/ContentAsset.php` — added `execution()` HasOne
+
+**Services**
+
+- `app/Services/Publishing/ChannelPublisherRegistry.php` — `register()`, `for(channelType)`, `all()`; throws `UnknownChannelException` when no publisher supports the type
+- `app/Services/Publishing/ChannelCredentialsRepository.php` — `for(companyId, channelType)` throws `CredentialsNotFoundException`; `update()`
+- `app/Services/Publishing/ExecutionService.php` — `queueForCampaign()`: creates Execution per approved ContentAsset, transitions assets `approved → scheduled`; `markCompleted()`: stores result, transitions asset `scheduled → published`, fires `ExecutionCompleted`, calls `checkCampaignCompletion`; `markFailed()`: idempotent guard, transitions asset `scheduled → approved`, fires `ExecutionFailed`; `logAttempt()`: appends `ExecutionAttempt`, increments counter; `checkCampaignCompletion()`: transitions Campaign to `published` (any completed) or `cancelled` (all failed), fires `CampaignPublished`
+- `app/Services/Publishing/RollbackService.php` — iterates completed Executions; checks `SupportsRollback`; reports `rolled_back`, `unrollable`, `failed`
+
+**Publishers**
+
+- `app/Services/Publishing/FakeChannelPublisher.php` — test double; `queueResult()`, `queueFailure()`; default synthetic result when queue empty; `assertPublished()`, `assertNotPublished()`, `publishedCount()`, `publishedExecutions()`; `supports()` returns `true` for all types
+- `app/Services/Publishing/LogChannelPublisher.php` — writes to `Log::channel('publishing')` with execution details + body preview (120 chars); returns synthetic `ExecutionResult(platformId: 'log-{ulid}')`; `supports()` lists all 8 channel types; `ping()` always returns `reachable: true`
+
+**Jobs**
+
+- `app/Jobs/PublishCampaign.php` — `high` queue; `$tries = 1`; guards `status == approved`; calls `ExecutionService::queueForCampaign()`; dispatches `PublishContent` only for `scheduled_at === null` (immediate) Executions
+- `app/Jobs/PublishContent.php` — `high` queue; `$tries = 4`; `backoff() = [60, 300, 900]`; idempotency check (skips if `completed`/`cancelled`); sets `executing` before publish; non-retryable → `markFailed()` + `$this->fail($e)`; retryable → reset to `queued`, re-throw; `failed()` hook catches unhandled failures
+- `app/Jobs/PublishScheduledContent.php` — `maintenance` queue; queries `status=queued AND scheduled_at IS NOT NULL AND scheduled_at <= now()`; dispatches `PublishContent` on `high` queue
+- `app/Jobs/CheckChannelHealth.php` — `maintenance` queue; iterates all non-revoked `ChannelCredentials`; calls `registry->for(type)->ping(credentials)`; updates status to `active` or `error`
+
+**Events**
+
+- `app/Events/ExecutionCompleted.php` — carries `Execution`
+- `app/Events/ExecutionFailed.php` — carries `Execution`
+- `app/Events/CampaignPublished.php` — carries `Campaign`; fired on both `published` and `cancelled` campaign outcomes
+
+**Listeners**
+
+- `app/Listeners/TriggerCampaignPublishing.php` — handles `RecommendationApproved`; dispatches `PublishCampaign::dispatch($campaign)->onQueue('high')`
+
+**Providers**
+
+- `app/Providers/PublisherServiceProvider.php` — `register()`: binds `ChannelPublisherRegistry` as singleton; `boot()`: registers `LogChannelPublisher` for all 8 channel types (M6 only)
+- `bootstrap/providers.php` — `PublisherServiceProvider` registered
+
+**Infrastructure**
+
+- `config/logging.php` — `publishing` channel: `driver: single`, `path: storage/logs/publishing.log`, `level: debug`
+- `routes/console.php` — `PublishScheduledContent` scheduled every 5 minutes; `CheckChannelHealth` every 30 minutes
+
+**Filament**
+
+- `app/Filament/Resources/ExecutionResource.php` — read-only; columns: company.name, campaign.title, contentAsset.type, channel.type, status badge, attempts, last_error, scheduled_at, completed_at, created_at; status filter
+- `app/Filament/Resources/ExecutionResource/Pages/ListExecutions.php`
+- `app/Filament/Resources/ExecutionResource/Pages/ViewExecution.php`
+
+**App Service Provider**
+
+- `app/Providers/AppServiceProvider.php` — `RecommendationApproved → TriggerCampaignPublishing` event wiring added
+
+**Tests** (47 new, 211 total)
+
+- `tests/Feature/Publishing/ExecutionServiceTest.php` — 19 tests: queueForCampaign (creates executions, status transitions, scheduled_at, skips non-approved), markCompleted (status, result, asset transition, event), markFailed (status, asset revert, idempotency, event), logAttempt (record created, counter increments), checkCampaignCompletion (published/cancelled/pending/mixed outcomes)
+- `tests/Feature/Publishing/PublishCampaignJobTest.php` — 6 tests: creates executions, dispatches immediate, skips scheduled, guards non-approved status, handles empty campaign, verifies high queue
+- `tests/Feature/Publishing/PublishContentJobTest.php` — 8 tests: success path (status, attempt, publisher called), non-retryable failure (marks failed immediately), retryable failure (resets to queued, re-throws, logs attempt), idempotency (skips completed/cancelled)
+- `tests/Feature/Publishing/PublishingPipelineTest.php` — 4 tests: `RecommendationApproved` dispatches `PublishCampaign`, full pipeline from queue to `CampaignPublished`, failed channel does not block others, all-failed settles campaign as cancelled
+- `tests/Feature/Publishing/LogChannelPublisherTest.php` — 7 tests: writes to publishing channel, `platformId` starts with `log-`, result has `publishedAt`, supports all 8 channel types, does not support unknown type, ping always reachable
+- `tests/Feature/Publishing/RollbackServiceTest.php` — 5 tests: LogChannelPublisher is not rollable in M6 (unrollable list), rollable publisher archives asset, failed rollback reported, only completed executions included, empty campaign returns empty lists
+
+### Changed
+
+- `database/migrations/2026_06_26_001600_create_campaigns_table.php` — added `published` to campaign status enum
+
+### Not Implemented in M6 (explicit exclusions)
+
+- `InstagramPublisher`, `FacebookPublisher`, `LinkedInPublisher`, `XPublisher` — require OAuth and platform approval
+- `SmsPublisher` — requires Twilio/Vonage credentials
+- `BlogPublisher`, `LandingPagePublisher` — require CMS API target
+- `EmailPublisher` — **first real publisher; targeted for Milestone 7**
+- Analytics retrieval (Milestone 7+)
+- Learning from execution outcomes (Milestone 8)
+
+---
+
 ## [Milestone 6 — Publishing Engine Spec] — 2026-06-26
 
 ### Added

@@ -57,6 +57,12 @@ class Campaign extends Model
         return $this->hasMany(ContentAsset::class);
     }
 
+    /** @return HasMany<Execution, $this> */
+    public function executions(): HasMany
+    {
+        return $this->hasMany(Execution::class);
+    }
+
     public function allAssetsGenerated(): bool
     {
         return $this->expected_asset_count > 0

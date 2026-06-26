@@ -19,7 +19,7 @@ return new class() extends Migration
             $table->text('target_audience')->nullable();
             $table->text('positioning')->nullable();
             $table->string('call_to_action')->nullable();
-            $table->enum('status', ['draft', 'approved', 'scheduled', 'executing', 'completed', 'cancelled', 'archived'])->default('draft');
+            $table->enum('status', ['draft', 'approved', 'scheduled', 'executing', 'published', 'completed', 'cancelled', 'archived'])->default('draft');
             $table->timestamp('scheduled_start_at')->nullable();
             $table->timestamp('scheduled_end_at')->nullable();
             $table->timestamp('completed_at')->nullable();
