@@ -28,7 +28,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
 
-**Overall:** Milestone 3 complete. Fact extraction, knowledge synthesis, and BusinessBrain assembly all implemented and tested. AI pipeline live (uses FakeAiProvider in tests; needs real provider for production). 82 tests, 80 passing, 2 Redis skipped. PHPStan level 8 clean. Ready for Milestone 4.
+**Overall:** Milestone 3 complete + cleanup. `Observation.facts()` relationship added, `DigitalTwin.last_enriched_at` updated on every synthesis run. 83 tests, 81 passing, 2 Redis skipped. PHPStan level 8 clean. Ready for Milestone 4.
 
 ---
 
@@ -68,7 +68,7 @@ Detect marketing opportunities from the BusinessBrain. Score them. Commit Decisi
 | Company model | Added `facts()` and `knowledge()` `hasMany` relationships |
 | `AiProvider` binding | Bound to `FakeAiProvider` in `testing` environment |
 | AI fixture | `tests/Fixtures/AI/website-facts.json` |
-| 34 new tests | 7 test classes covering all new services, AI layer, and end-to-end pipeline — 82 total (80 passing) |
+| 35 new tests | 7 test classes covering all new services, AI layer, and end-to-end pipeline — 83 total (81 passing) |
 | PHPStan level 8 | 0 errors |
 
 ### Milestone 2 — Discovery & Knowledge Platform ✅
@@ -197,7 +197,7 @@ All foundational documents written, reviewed, and committed.
 
 ## Recently Completed
 
-- **Milestone 3** — Fact extraction, knowledge synthesis, BusinessBrain assembly; 82 tests (80 passing); PHPStan level 8 clean
+- **Milestone 3 + cleanup** — Fact extraction, knowledge synthesis, BusinessBrain assembly; `Observation.facts()` + `last_enriched_at` fix; 83 tests (81 passing); PHPStan level 8 clean
 - **Milestone 2 + cleanup** — `IntegrationService::create()`, `SyncIntegration` uniqueness guard, catalog type fix; 48 tests (46 passing); PHPStan level 8 clean
 - **Milestone 1 hardening** — PHPStan raised to level 8 (0 errors); stack versions documented; technical debt items recorded; CHANGELOG updated
 - **Milestone 1** — Laravel 13 / PHP 8.3 application scaffolded with full tooling chain (Pint, PHPStan, PHPUnit, GitHub Actions)
@@ -231,6 +231,6 @@ All foundational documents written, reviewed, and committed.
 
 ## Last Updated
 
-**2026-06-26** — Milestone 3 complete. Fact extraction (`WebsiteAnalyst` + `FactExtractionPrompt`), knowledge synthesis (`KnowledgeService`), and BusinessBrain assembly all shipped. 82 tests (80 passing), PHPStan level 8 clean, Pint clean. Ready for Milestone 4.
+**2026-06-26** — Milestone 3 complete + cleanup. `Observation.facts()` relationship added. `KnowledgeService` now updates `last_enriched_at` on every synthesis run (not only on activation). 83 tests (81 passing), PHPStan level 8 clean, Pint clean. Ready for Milestone 4.
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*

@@ -134,4 +134,27 @@ class KnowledgeServiceTest extends TestCase
         $this->assertCount(0, $entries);
         $this->assertDatabaseCount('knowledge_entries', 0);
     }
+
+    public function test_updates_last_enriched_at_on_every_synthesis(): void
+    {
+        $this->seedFacts();
+
+        $this->service->synthesizeForCompany($this->company);
+
+        $twin = DigitalTwin::withoutGlobalScopes()
+            ->where('company_id', $this->company->id)
+            ->first();
+
+        $this->assertNotNull($twin->last_enriched_at);
+
+        $firstEnrichedAt = $twin->last_enriched_at;
+
+        $this->travel(1)->seconds();
+
+        $this->service->synthesizeForCompany($this->company);
+
+        $twin->refresh();
+
+        $this->assertTrue($twin->last_enriched_at->isAfter($firstEnrichedAt));
+    }
 }

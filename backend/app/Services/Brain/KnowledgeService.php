@@ -45,7 +45,7 @@ class KnowledgeService
             KnowledgeSynthesized::dispatch($entry);
         }
 
-        $this->activateTwinIfReady($company);
+        $this->updateTwin($company);
 
         return $entries;
     }
@@ -105,18 +105,25 @@ class KnowledgeService
         return ucfirst($domain).' — '.implode('; ', $lines);
     }
 
-    private function activateTwinIfReady(Company $company): void
+    private function updateTwin(Company $company): void
     {
         $twin = DigitalTwin::withoutGlobalScopes()
             ->where('company_id', $company->id)
-            ->where('status', 'initializing')
             ->first();
 
-        if ($twin) {
-            $twin->update([
-                'status' => 'active',
-                'last_enriched_at' => now(),
-            ]);
+        if (! $twin) {
+            return;
+        }
+
+        $updates = ['last_enriched_at' => now()];
+
+        if ($twin->status === 'initializing') {
+            $updates['status'] = 'active';
+        }
+
+        $twin->update($updates);
+
+        if (isset($updates['status'])) {
             DigitalTwinActivated::dispatch($twin);
         }
     }

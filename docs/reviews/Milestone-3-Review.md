@@ -4,6 +4,8 @@
 **Milestone:** Milestone 3 — Fact Extraction & Knowledge Synthesis
 **Reviewer:** Prepared for CTO review
 
+> **Cleanup pass applied post-review.** Two items resolved: `Observation.facts()` relationship added; `KnowledgeService` now updates `last_enriched_at` on every synthesis run. See CHANGELOG.md [Milestone 3 Cleanup] for details.
+
 ---
 
 ## Milestone Summary
@@ -175,7 +177,7 @@ Milestone 3 stopped at BusinessBrain assembly. Not implemented:
 |------|-------|
 | `AiProvider` has no production implementation | `AppServiceProvider` binds `FakeAiProvider` in `testing`; production requires an `AnthropicProvider` (or `OpenAiProvider`) before `ProcessObservation` can run in production. |
 | Knowledge synthesis is rule-based, not AI-powered | M3 synthesis groups facts by top-level domain key. AI-powered synthesis (e.g., pattern detection, cross-fact inference) is deferred to M4+. |
-| `DigitalTwin.last_enriched_at` is only set on activation | It should also update on every subsequent Knowledge synthesis. Currently only written when `initializing → active` transition fires. |
+| ~~`DigitalTwin.last_enriched_at` is only set on activation~~ | **Resolved in cleanup pass** — `KnowledgeService` now updates `last_enriched_at` on every synthesis run. |
 | `Fact.superseded_by_id` is not a formal FK | SQLite (used in tests) would require deferred FK constraints for self-referential tables. The column is written correctly but the FK is not declared in the migration to maintain SQLite compatibility. |
 | `FakeAiProvider` is the default in `testing` | Tests that don't need AI must call `assertNothingSent()` if they want to prove no AI call was made, or explicitly queue a response. The default singleton means any test can accidentally call AI without noticing. |
 | `ProcessObservation` only handles `website_crawl` observations | The `WebsiteAnalyst` will return empty if `raw_payload` is not a WebPageData JSON blob. Other observation types (RSS, API) need their own analysts. |
@@ -206,7 +208,7 @@ Milestone 3 stopped at BusinessBrain assembly. Not implemented:
 | `ProcessObservation` on `ai` queue | ✅ Compliant | Unchanged from M2 |
 | `Company hasMany Fact` | ✅ Compliant | Added in M3 |
 | `Company hasMany Knowledge` | ✅ Compliant | Added in M3 |
-| `Observation hasMany Fact` | ⚠️ Deferred | Relationship not added to `Observation` model yet — will be added when needed |
+| `Observation hasMany Fact` | ✅ Resolved | `facts()` relationship added to `Observation` model in cleanup pass |
 
 ### AI.md
 
