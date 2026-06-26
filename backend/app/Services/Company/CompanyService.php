@@ -30,7 +30,7 @@ class CompanyService
 
             Catalog::create([
                 'company_id' => $company->id,
-                'type' => $data['catalog_type'] ?? 'inventory',
+                'type' => $data['catalog_type'] ?? 'mixed',
             ]);
 
             DigitalTwin::create([

@@ -8,13 +8,14 @@ use App\Models\Integration;
 use App\Services\Observatory\Connectors\ConnectorRegistry;
 use App\Services\Observatory\ObservationService;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Throwable;
 
-class SyncIntegration implements ShouldQueue
+class SyncIntegration implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -25,6 +26,11 @@ class SyncIntegration implements ShouldQueue
     public function __construct(public readonly Integration $integration)
     {
         $this->onQueue('observations');
+    }
+
+    public function uniqueId(): string
+    {
+        return $this->integration->id;
     }
 
     public function handle(ConnectorRegistry $registry, ObservationService $observations): void

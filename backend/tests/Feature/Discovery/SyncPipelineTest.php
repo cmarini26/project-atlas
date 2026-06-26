@@ -7,6 +7,7 @@ use App\Jobs\SyncIntegration;
 use App\Models\Company;
 use App\Models\Integration;
 use App\Models\Observation;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -67,5 +68,26 @@ class SyncPipelineTest extends TestCase
         ProcessObservation::dispatch($observation);
 
         Queue::assertPushedOn('ai', ProcessObservation::class);
+    }
+
+    public function test_sync_integration_is_unique_per_integration(): void
+    {
+        $company = Company::withoutGlobalScopes()->create([
+            'name' => 'Test Co',
+            'slug' => 'test-co',
+        ]);
+
+        $integration = Integration::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'website_crawl',
+            'name' => 'Site',
+            'config' => ['url' => 'https://example.com'],
+            'status' => 'active',
+        ]);
+
+        $job = new SyncIntegration($integration);
+
+        $this->assertInstanceOf(ShouldBeUnique::class, $job);
+        $this->assertSame($integration->id, $job->uniqueId());
     }
 }

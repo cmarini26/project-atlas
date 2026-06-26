@@ -28,7 +28,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
 
-**Overall:** Milestone 2 complete. Discovery & Knowledge Platform shipped: multi-tenancy, BFS website crawler, connector framework, observation pipeline, and 40 passing tests. Ready for Milestone 3 (Fact Extraction & Knowledge Synthesis).
+**Overall:** Milestone 2 complete + cleanup pass applied. `IntegrationService::create()` implemented, `SyncIntegration` now uniqueness-guarded, default catalog type corrected to `mixed`. 48 tests, 46 passing (2 Redis skipped). PHPStan level 8 clean. Ready for Milestone 3.
 
 ---
 
@@ -57,14 +57,16 @@ Process raw Observations into structured Facts using AI analysts. Synthesise Fac
 | Multi-tenancy foundation | `CompanyScope` global scope; `BelongsToCompany` trait; scoping is no-op when no company bound (safe in CLI/tests) |
 | Domain migrations | `companies`, `company_memberships`, `catalogs`, `digital_twins`, `integrations`, `observations` — all with ULID PKs and FKs |
 | Eloquent models | Full implementations: `Company`, `CompanyMembership`, `Catalog`, `DigitalTwin`, `Integration`, `Observation` — with fillable, casts, relationships, and `HasUlids` |
-| `CompanyService` | Single DB transaction creates Company + Catalog (inventory) + DigitalTwin (initializing) + owner CompanyMembership |
+| `CompanyService` | Single DB transaction creates Company + Catalog (type: `mixed`) + DigitalTwin (initializing) + owner CompanyMembership |
 | Connector framework | `Connector` interface, `ConnectorRegistry`, `ConnectorResult` value object, `UnsupportedIntegrationException` |
 | `WebPageCrawler` | BFS crawler using Guzzle + DOMDocument; max 20 pages / depth 3; strips nav/footer/scripts; 5,000-char body cap |
 | `WebsiteConnector` | Maps crawled `WebPageData` → `ConnectorResult`; supports `website_crawl` integration type |
 | `ConnectorServiceProvider` | Registers `WebsiteConnector` in `ConnectorRegistry` as a singleton |
 | Observation pipeline | `ObservationService`, `SyncIntegration` job, `ProcessObservation` stub job, `ObservationRecorded` event, `DispatchObservationProcessing` listener |
 | Event wiring | `ObservationRecorded → DispatchObservationProcessing` registered in `AppServiceProvider` |
-| Feature tests | 15 new tests: company creation, tenant isolation, connector registry, observation service, queue dispatch — 40 total, all passing |
+| `IntegrationService` | `create(Company, type, config)` — provisions Integration, sets `name`, `status: active`, `next_run_at: +7 days`, dispatches `SyncIntegration` immediately |
+| `SyncIntegration` uniqueness | Implements `ShouldBeUnique`; `uniqueId()` keyed on `integration->id` — prevents duplicate syncs in queue |
+| Feature tests | 20 new tests: company creation, tenant isolation, connector registry, observation service, queue dispatch, integration service — 48 total, 46 passing (2 Redis skipped) |
 | PHPStan level 8 | 0 errors; full generic annotations on all Eloquent relationships |
 
 ### Milestone 1 — Platform Foundation ✅
@@ -170,7 +172,7 @@ All foundational documents written, reviewed, and committed.
 
 ## Recently Completed
 
-- **Milestone 2** — Discovery & Knowledge Platform: multi-tenancy, BFS website crawler, connector framework, observation pipeline; 40 tests passing; PHPStan level 8 clean
+- **Milestone 2 + cleanup** — `IntegrationService::create()`, `SyncIntegration` uniqueness guard, catalog type fix; 48 tests (46 passing); PHPStan level 8 clean
 - **Milestone 1 hardening** — PHPStan raised to level 8 (0 errors); stack versions documented; technical debt items recorded; CHANGELOG updated
 - **Milestone 1** — Laravel 13 / PHP 8.3 application scaffolded with full tooling chain (Pint, PHPStan, PHPUnit, GitHub Actions)
 - Core domain contracts: `AiProvider`, `Analyst`, `Connector`, `OpportunityDetector`, `ContentGenerator`
@@ -203,6 +205,6 @@ All foundational documents written, reviewed, and committed.
 
 ## Last Updated
 
-**2026-06-26** — Milestone 2 complete. Discovery & Knowledge Platform shipped. 40 tests passing, PHPStan level 8 clean, Pint clean. Ready for Milestone 3 (Fact Extraction & Knowledge Synthesis).
+**2026-06-26** — Milestone 2 cleanup pass complete. `IntegrationService::create()` implemented, `SyncIntegration` uniqueness-guarded, catalog default type corrected. 48 tests (46 passing), PHPStan level 8 clean, Pint clean. Ready for Milestone 3.
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*

@@ -2,8 +2,10 @@
 
 **Date:** 2026-06-26  
 **Milestone:** Milestone 2 — Discovery & Knowledge Platform  
-**Commit:** `dbc0668`  
+**Commit:** `dbc0668` + cleanup pass  
 **Reviewer:** Prepared for CTO review
+
+> **Cleanup pass applied post-review.** Three items from the review were addressed before Milestone 3: catalog type corrected to `mixed`, `IntegrationService::create()` implemented, and `SyncIntegration` made `ShouldBeUnique`. See CHANGELOG.md [Milestone 2 Cleanup] for full details.
 
 ---
 
@@ -207,12 +209,13 @@ All contracts carried over from Milestone 1. `Connector` interface was updated:
 
 | File | Tests | Covers |
 |------|-------|--------|
-| `CompanyServiceTest.php` | 5 | Company + Catalog + DigitalTwin + Membership created atomically; correct initial states |
+| `CompanyServiceTest.php` | 5 | Company + Catalog (type: `mixed`) + DigitalTwin + Membership created atomically; correct initial states |
 | `TenantIsolationTest.php` | 2 | `CompanyScope` filters by bound `company_id`; no-op when unbound |
 | `ConnectorRegistryTest.php` | 3 | Resolves `WebsiteConnector` for `website_crawl`; throws for `rss_feed`; registry is non-empty |
 | `WebsiteConnectorTest.php` | 2 | Maps `WebPageData` objects to `ConnectorResult` objects (Mockery mock of crawler); `supports()` type check |
-| `SyncPipelineTest.php` | 2 | `SyncIntegration` dispatched to `observations` queue; `ProcessObservation` dispatched to `ai` queue |
+| `SyncPipelineTest.php` | 3 | `SyncIntegration` dispatched to `observations` queue; `ProcessObservation` dispatched to `ai` queue; `SyncIntegration` implements `ShouldBeUnique` with integration id |
 | `ObservationServiceTest.php` | 3 | Persists Observation with correct fields; fires `ObservationRecorded`; `recordAll()` handles multiple results |
+| `IntegrationServiceTest.php` | 5 | Creates integration with correct attributes, encrypted config, 7-day `next_run_at`, immediate dispatch, default name |
 
 ### Milestone 1 Bootstrap Tests (carried forward)
 
@@ -229,10 +232,10 @@ All contracts carried over from Milestone 1. `Connector` interface was updated:
 
 | Status | Count |
 |--------|-------|
-| Passing | 40 |
+| Passing | 46 |
 | Skipped | 2 (Redis — requires live Redis instance) |
 | Failing | 0 |
-| Total | 42 |
+| Total | 48 |
 
 ### Coverage
 
@@ -254,10 +257,8 @@ No formal coverage report is configured. PHPUnit runs without `--coverage`. Cove
 | No `BusinessBrainService` yet | Milestone 2 | `BusinessBrain` value object exists (Milestone 1) but the assembly service is not implemented. Required before Milestone 3 AI calls. |
 | PostgreSQL RLS not configured | Milestone 2 | `Database.md` specifies RLS as a defense-in-depth layer. Not applied — `CompanyScope` is the only enforcement. RLS would require a PostgreSQL policy migration and application-layer session variable setting. |
 | No scheduler wiring | Milestone 2 | `SyncIntegration` must be dispatched by a scheduler for recurring syncs (via `next_run_at`). The `IntegrationService` and scheduler query are not yet built. |
-| No `IntegrationService` | Milestone 2 | `SyncIntegration` job exists but there is no `IntegrationService::create()` to provision an integration from user input (Step 3 of the MVP workflow). |
 | Queue tests use `Queue::fake()` | Milestone 1 | Dispatch mechanism proven; live Redis worker execution not tested. |
 | No test coverage metrics | Milestone 2 | No Xdebug/PCOV configured; coverage percentages unknown. |
-| `CompanyService` defaults to `inventory` catalog type | Milestone 2 | The MVP workflow spec says catalog type should be `mixed` for the initial provisioning. Implementation defaults to `inventory`. Low impact but spec-deviating. |
 
 ### Deferred Work
 
@@ -265,7 +266,6 @@ No formal coverage report is configured. PHPUnit runs without `--coverage`. Cove
 - `Knowledge` model and migration (Milestone 3)
 - `FactExtractionAnalyst` and `WebsiteAnalyst` (Milestone 3)
 - `BusinessBrainService::for(Company)` (Milestone 3)
-- `IntegrationService::create()` (Milestone 3 pre-requisite)
 - Scheduler command and `next_run_at` query (Milestone 3 pre-requisite)
 - `robots.txt` compliance in `WebPageCrawler` (pre-launch hardening)
 - PostgreSQL RLS policies (security hardening, post-MVP)
@@ -279,7 +279,7 @@ No formal coverage report is configured. PHPUnit runs without `--coverage`. Cove
 | CBB Auctions uses JS-rendered inventory pages | High | High | `WebPageCrawler` will see static HTML only. Spike a headless connector early in Milestone 3. |
 | `encrypted:array` cast may cause issues on production PostgreSQL if the `APP_KEY` rotates | Low | High | Any key rotation must migrate encrypted values. Document this constraint before moving to production. |
 | No rate limiting on `WebPageCrawler` | Medium | Medium | Could trigger IP blocks on aggressive crawl targets. Add per-domain request throttling before launching with real businesses. |
-| `SyncIntegration` does not guard against concurrent dispatches | Medium | Medium | If a scheduler dispatches the same integration twice concurrently, observations could be duplicated. Implement `ShouldBeUnique` keyed on `integration_id`. |
+| ~~`SyncIntegration` concurrent dispatch~~ | ~~Medium~~ | ~~Medium~~ | **Resolved in cleanup pass** — `ShouldBeUnique` implemented, keyed on `integration->id`. |
 
 ---
 
@@ -368,9 +368,9 @@ The `ConnectorResult` value object cleanly separates raw data collection (connec
 | Step | Status | Notes |
 |------|--------|-------|
 | Step 1: User signs up | 🔲 Not built | Model exists; no auth controller |
-| Step 2: User creates company | ✅ Service built | `CompanyService::create()` implements the exact sequence from the spec. Deviation: initial catalog type is `inventory`, not `mixed` as spec says. |
-| Step 3: URL entry → Integration created | 🔲 Not built | `IntegrationService` not yet implemented |
-| Step 4: `SyncIntegration` → `WebsiteCrawlConnector` → Observation | ✅ Infrastructure built | `SyncIntegration`, `ConnectorRegistry`, `WebsiteConnector`, `ObservationService`, `ObservationRecorded` — all wired. Missing: `IntegrationService::create()` to create the trigger. |
+| Step 2: User creates company | ✅ Service built | `CompanyService::create()` implements the exact sequence from the spec. Default catalog type is `mixed`. |
+| Step 3: URL entry → Integration created | ✅ Service built | `IntegrationService::create()` implemented in cleanup pass — creates Integration, dispatches `SyncIntegration` immediately, sets `next_run_at = +7 days`. No HTTP controller yet. |
+| Step 4: `SyncIntegration` → `WebsiteCrawlConnector` → Observation | ✅ Infrastructure built | `SyncIntegration`, `ConnectorRegistry`, `WebsiteConnector`, `ObservationService`, `ObservationRecorded` — all wired. `SyncIntegration` now uniqueness-guarded. |
 | Step 5: `ProcessObservation` → Facts | 🔲 Stub only | Job exists but does nothing |
 | Steps 6–13 | 🔲 Not built | Milestone 3+ |
 
@@ -397,7 +397,8 @@ The infrastructure required to receive raw observations is complete, tested, and
 4. `WebsiteAnalyst` implementing the full Analyst pattern
 5. Real `ProcessObservation` implementation calling `WebsiteAnalyst`
 
-**Two items that should be addressed early in Milestone 3 (not blockers, but should not slip):**
+**Cleanup pass completed before Milestone 3 started:**
 
-- `ShouldBeUnique` on `SyncIntegration` (keyed by `integration_id`) — prevents duplicate concurrent syncs
-- `IntegrationService::create()` — required before the HTTP layer (Step 3) can be built
+- ✅ `ShouldBeUnique` on `SyncIntegration` — implemented, keyed by `integration->id`
+- ✅ `IntegrationService::create()` — implemented; dispatches `SyncIntegration` immediately, sets `next_run_at = +7 days`
+- ✅ Catalog default type corrected to `mixed`

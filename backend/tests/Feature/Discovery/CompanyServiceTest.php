@@ -40,7 +40,10 @@ class CompanyServiceTest extends TestCase
         $owner = User::factory()->create();
         $company = $this->service->create($owner, ['name' => 'Test Co']);
 
-        $this->assertDatabaseHas('catalogs', ['company_id' => $company->id]);
+        $this->assertDatabaseHas('catalogs', [
+            'company_id' => $company->id,
+            'type' => 'mixed',
+        ]);
     }
 
     public function test_creates_digital_twin_with_initializing_status(): void
