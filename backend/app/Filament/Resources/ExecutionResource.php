@@ -4,6 +4,8 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ExecutionResource\Pages;
 use App\Models\Execution;
+use Filament\Infolists;
+use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -86,6 +88,68 @@ class ExecutionResource extends Resource
                 Tables\Actions\ViewAction::make(),
             ])
             ->bulkActions([]);
+    }
+
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist->schema([
+            Infolists\Components\Section::make('Execution Details')->schema([
+                Infolists\Components\TextEntry::make('status')->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'completed' => 'success',
+                        'failed' => 'danger',
+                        'executing' => 'warning',
+                        default => 'gray',
+                    }),
+                Infolists\Components\TextEntry::make('channel.type')->label('Channel')->badge(),
+                Infolists\Components\TextEntry::make('attempts')->numeric(),
+                Infolists\Components\TextEntry::make('completed_at')->label('Completed')->dateTime(),
+                Infolists\Components\TextEntry::make('last_error')->columnSpanFull()->placeholder('—'),
+            ])->columns(3),
+
+            Infolists\Components\Section::make('Metrics')
+                ->description('Analytics collected for this execution')
+                ->schema([
+                    Infolists\Components\TextEntry::make('metric.channel_type')
+                        ->label('Channel Type')
+                        ->badge()
+                        ->placeholder('—'),
+
+                    Infolists\Components\TextEntry::make('metric.provider_type')
+                        ->label('Provider')
+                        ->badge()
+                        ->placeholder('—'),
+
+                    Infolists\Components\TextEntry::make('metric.retrieved_at')
+                        ->label('Last Retrieved')
+                        ->dateTime()
+                        ->placeholder('—'),
+
+                    Infolists\Components\TextEntry::make('metric.window_closes_at')
+                        ->label('Window Closes')
+                        ->dateTime()
+                        ->placeholder('—'),
+
+                    Infolists\Components\IconEntry::make('metric.is_final')
+                        ->label('Final')
+                        ->boolean()
+                        ->placeholder('—'),
+
+                    Infolists\Components\TextEntry::make('normalised_reach')
+                        ->label('Reach')
+                        ->state(fn (Execution $record): string => (string) ($record->metric?->metrics['normalised_reach'] ?? '—')),
+
+                    Infolists\Components\TextEntry::make('normalised_engagement')
+                        ->label('Engagement')
+                        ->state(fn (Execution $record): string => (string) ($record->metric?->metrics['normalised_engagement'] ?? '—')),
+
+                    Infolists\Components\TextEntry::make('normalised_engagement_rate')
+                        ->label('Engagement Rate')
+                        ->state(fn (Execution $record): string => isset($record->metric?->metrics['normalised_engagement_rate'])
+                            ? number_format((float) $record->metric->metrics['normalised_engagement_rate'] * 100, 2).'%'
+                            : '—'),
+                ])->columns(3),
+        ]);
     }
 
     public static function getRelations(): array

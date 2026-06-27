@@ -63,6 +63,12 @@ class Campaign extends Model
         return $this->hasMany(Execution::class);
     }
 
+    /** @return HasMany<CampaignKpiSnapshot, $this> */
+    public function kpiSnapshots(): HasMany
+    {
+        return $this->hasMany(CampaignKpiSnapshot::class);
+    }
+
     public function allAssetsGenerated(): bool
     {
         return $this->expected_asset_count > 0

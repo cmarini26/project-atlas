@@ -22,27 +22,62 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 | Dimension         | Status | Notes |
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, and MVP workflow all defined |
-| Implementation    | 🟡 In progress | Milestone 2 complete: multi-tenancy, connector framework, website crawler, observation pipeline all in place |
-| Tests             | 🟡 Partial | 40 tests passing (2 Redis skipped); discovery feature tests cover company creation, tenant isolation, connector registry, observation service, and queue dispatch |
+| Implementation    | 🟡 In progress | Milestone 8 complete: full Analytics Engine in place — pull polling, webhook ingestion, KPI snapshots, LearningService feedback loop, Filament visibility panels |
+| Tests             | ✅ Strong | 365 tests (363 passing, 2 Redis skipped); PHPStan level 8 — 0 errors; Pint clean |
 | CI/CD             | 🟡 Defined | GitHub Actions workflow written; not yet triggered (no PR opened against remote) |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
 
-**Overall:** Milestone 7 complete. First real channel publisher shipped. 268 tests passing (2 Redis skipped). PHPStan level 8 clean. `EmailPublisher` + `EmailRenderer` + `EmailProviderRegistry` + `LogEmailProvider` + `FakeEmailProvider` all in place. Email executions use `EmailRenderer` (subject/from/body/preview_text) and route through `EmailProviderRegistry`. `FakeEmailProvider` used in all tests — no real SMTP/API calls in CI.
+**Overall:** Milestone 8 complete. Analytics Engine fully implemented: pull-polling metric retrieval, webhook ingestion (Postmark), campaign KPI snapshots, recommendation KPI analytics, decision effectiveness metrics, LearningService with 8 signal types, and Filament admin panels. 365 tests (363 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean.
 
 ---
 
 ## Current Milestone
 
-**Milestone 8 — Analytics Engine**
+**Milestone 9 — Real AI Provider + Postmark**
 
-Implementation plan at `docs/plans/Milestone-8-Implementation.md`. Spec at `specs/core/analytics-engine.md`.
+Bind `AnthropicProvider` for production; implement `PostmarkEmailProvider`; add credential rotation and end-to-end smoke tests.
 
-**Status:** Not yet started. Plan complete — ready to implement Phase 1 (domain models).
+**Status:** Not yet started.
 
 ---
 
 ## Completed Milestones
+
+### Milestone 8 — Analytics Engine ✅
+*Completed: 2026-06-26*
+
+**Delivered:**
+
+| Item | Description |
+|------|-------------|
+| 4 migrations | `execution_metrics`, `campaign_kpi_snapshots`, `metric_retrieval_logs`, `learnings` |
+| `ExecutionMetric` model | Per-execution platform metrics; normalised keys; `raw` payload; retrieval window tracking |
+| `CampaignKpiSnapshot` model | Campaign-level KPI rollup; `actual_kpis`, `performance_rating`, `snapshot_type`; immutable (`UPDATED_AT = null`) |
+| `MetricRetrievalLog` model | Append-only audit log per pull attempt; immutable |
+| `Learning` model | Idempotent signal records; `applied_at = null` until Learning Engine runs |
+| `AnalyticsProvider` interface | `pull`, `normalize`, `isWindowClosed`, `pollingDelayHours`, `repollingIntervalHours`, `supports` |
+| `AnalyticsProviderRegistry` | First-match registry; `register()`, `for()`, `all()` |
+| `FakeAnalyticsProvider` | Queue/assert test double; `queueMetrics()`, `queueFailure()`, `assertPulled()`, `assertNotPulled()`, `setWindowClosed()` |
+| `LogAnalyticsProvider` | No-op provider for blog/landing page channels |
+| `WebhookEvent` VO | Immutable: `providerType`, `platformMessageId`, `eventType`, `occurredAt` |
+| `AnalyticsWebhookHandler` interface | `verify()`, `parse()`, `supports()` |
+| `WebhookHandlerRegistry` | First-match registry for webhook handlers |
+| `PostmarkWebhookHandler` | HMAC-SHA256 verification; maps RecordType → Open/Click/Bounce/Delivery/SpamComplaint |
+| `AnalyticsServiceProvider` | Registers all analytics singletons; boots providers and handlers |
+| `ScheduleMetricRetrieval` listener | `ExecutionCompleted` → delayed `RetrieveExecutionMetrics` dispatch |
+| `RetrieveExecutionMetrics` job | Self-rescheduling pull polling; `updateOrCreate` ExecutionMetric; `snapshotIfReady` on window close |
+| `PruneRawMetrics` job | Monthly maintenance; nulls `raw` on records older than 1 year |
+| `AnalyticsWebhookController` | `POST /api/analytics/webhooks/{provider}`; HMAC verified; dispatches `ProcessAnalyticsWebhookEvent` |
+| `ProcessAnalyticsWebhookEvent` job | Idempotent counter merging by `platform_id`; silent no-op if not found |
+| `CampaignKpiService` | `aggregate()`, `snapshotIfReady()`, `ratePerformance()`, `bestChannel()`; interim/final snapshot lifecycle |
+| `RecommendationKpiService` | Approval/rejection/edit rates; median time-to-decision (driver-aware SQL); 30-day trend |
+| `DecisionEffectivenessService` | Accuracy rate by detector, by campaign type; score-band correlation |
+| `LearningService` | `recordFromMetrics()` with 8 signal types; idempotency guard; `applied_at = null` |
+| Filament panels | Campaign performance infolist; ExecutionMetric sub-panel; Company approval rate |
+| `api.php` routes | `POST /api/analytics/webhooks/{provider}` registered via `bootstrap/app.php` |
+| 97 new tests | 16 test files; all use `FakeAnalyticsProvider`; no live API calls; 365 total (363 passing) |
+| PHPStan level 8 | 0 errors |
 
 ### Milestone 7.5 — Analytics Engine Specification ✅
 *Completed: 2026-06-26*
@@ -312,24 +347,18 @@ All foundational documents written, reviewed, and committed.
 
 ---
 
-## Next Tasks (Milestone 8 — Analytics Engine)
+## Next Tasks (Milestone 9 — Real AI Provider + Postmark)
 
-Full implementation plan: `docs/plans/Milestone-8-Implementation.md`
-
-1. **Phase 1** — Migrations + models: `ExecutionMetric`, `CampaignKpiSnapshot`, `MetricRetrievalLog`
-2. **Phase 2** — `AnalyticsProvider` interface, `AnalyticsProviderRegistry`, `FakeAnalyticsProvider`, `LogAnalyticsProvider`, `WebhookEvent` VO, `AnalyticsServiceProvider`
-3. **Phase 3** — `ScheduleMetricRetrieval` listener, `RetrieveExecutionMetrics` job, `PruneRawMetrics` job
-4. **Phase 4** — `AnalyticsWebhookHandler` interface, `WebhookHandlerRegistry`, `AnalyticsWebhookController`, `PostmarkWebhookHandler`, `ProcessAnalyticsWebhookEvent` job
-5. **Phase 5** — `normalize()` implementations, cross-channel normalised keys, `isWindowClosed()` logic
-6. **Phase 6** — `CampaignKpiService` (aggregate, snapshotIfReady, ratePerformance, bestChannel)
-7. **Phase 7** — `RecommendationKpiService`, `DecisionEffectivenessService`
-8. **Phase 8** — `LearningService::recordFromMetrics()`, 8 signal types
-9. **Phase 9** — Filament campaign KPI panel, ExecutionMetric visibility, company approval rate
-10. **Phase 10** — ≥ 40 new tests across 16 test files
+1. **`AnthropicProvider`** — real `AiProvider` using Anthropic Claude API; tool-use for structured output; bind in `AppServiceProvider` for non-testing environments
+2. **`PostmarkEmailProvider`** — implements `EmailProvider`; sends via Postmark API; registered in `EmailProviderRegistry` for `'postmark'` provider type
+3. **Credential rotation** — `CheckChannelHealth` pings Postmark credentials; marks `status=error` on failure
+4. **End-to-end smoke test** — `ProcessObservation → FactExtraction → KnowledgeSynthesis` with a real AnthropicProvider fixture or recorded response
 
 ---
 
 ## Recently Completed
+
+- **Milestone 8 — Analytics Engine** — Full analytics pipeline implemented. Pull polling + webhook ingestion; `CampaignKpiSnapshot` (interim/final); `RecommendationKpiService`; `DecisionEffectivenessService`; `LearningService` with 8 signal types; Filament panels. 97 new tests (365 total, 363 passing). PHPStan level 8 — 0 errors. See [Milestone-8-Review.md](reviews/Milestone-8-Review.md).
 
 - **Milestone 7.5 — Analytics Engine Specification** — `specs/core/analytics-engine.md` written. Covers domain model (`ExecutionMetric`, `CampaignKpiSnapshot`, `MetricRetrievalLog`), pull polling + webhook push ingestion, `AnalyticsProvider` interface and registry, normalised metric keys, campaign KPIs, recommendation KPIs, decision effectiveness metrics, BusinessBrain feedback loop, learning inputs, privacy constraints, acceptance criteria, and future extensibility. `ROADMAP.md` Phase 7 updated with concrete deliverables.
 
@@ -353,12 +382,6 @@ Full implementation plan: `docs/plans/Milestone-8-Implementation.md`
 
 ---
 
-## Next Tasks (Milestone 8 — Real AI Provider + Postmark)
-
-1. **`AnthropicProvider`** — real `AiProvider` implementation using Anthropic Claude API; versioned prompts; tool-use for structured output; bind in `AppServiceProvider` for non-testing environments
-2. **`PostmarkEmailProvider`** — implements `EmailProvider`; sends via Postmark API; registered in `EmailProviderRegistry` for `'postmark'` provider type; credential validation pings `/server` endpoint
-3. **Credential rotation** — `CheckChannelHealth` job pings Postmark credentials and marks `status=error` on failure
-4. **End-to-end smoke test** — `ProcessObservation → FactExtraction → KnowledgeSynthesis` with a real AnthropicProvider fixture or recorded response
 
 ---
 
@@ -376,6 +399,6 @@ Full implementation plan: `docs/plans/Milestone-8-Implementation.md`
 
 ## Last Updated
 
-**2026-06-26** — Milestone 8 implementation plan written (`docs/plans/Milestone-8-Implementation.md`). 10 implementation phases covering domain models, provider infrastructure, retrieval jobs, webhook ingestion, metric normalisation, KPI aggregation, recommendation/decision KPIs, BusinessBrain feedback, Filament UI, and ≥ 40 tests. Previously: Milestone 7.5 spec complete. `EmailPublisher` + `EmailRenderer` + `EmailProviderRegistry` + `LogEmailProvider` + `FakeEmailProvider` all wired into M6 infrastructure. `EmailRenderer` resolves `metadata.subject_line → title → throw`; registered first in `ChannelRendererRegistry`. `EmailPublisher` resolves credentials, renders via `ChannelRendererRegistry`, creates `EmailPayload`, resolves provider from `EmailProviderRegistry`, sends. 29 new tests — 268 total passing (2 Redis skipped). PHPStan level 8 — 0 errors.
+**2026-06-26** — Milestone 8 complete. Analytics Engine fully implemented across 10 phases: domain models (`ExecutionMetric`, `CampaignKpiSnapshot`, `MetricRetrievalLog`, `Learning`); provider infrastructure (`AnalyticsProvider`, `AnalyticsProviderRegistry`, `FakeAnalyticsProvider`, `LogAnalyticsProvider`); retrieval jobs (`ScheduleMetricRetrieval`, `RetrieveExecutionMetrics`, `PruneRawMetrics`); webhook ingestion (`PostmarkWebhookHandler`, `AnalyticsWebhookController`, `ProcessAnalyticsWebhookEvent`); KPI services (`CampaignKpiService`, `RecommendationKpiService`, `DecisionEffectivenessService`); `LearningService` with 8 signal types; Filament infolists on Campaign, Execution, and Company resources. 97 new tests — 365 total (363 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean.
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*

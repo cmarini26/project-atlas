@@ -1,0 +1,22 @@
+{
+    "RecordType": "Open",
+    "MessageID": "fake-message-id-abc123",
+    "Recipient": "subscriber@example.com",
+    "Tag": "newsletter",
+    "DeliveredAt": "2026-06-26T10:00:00Z",
+    "FirstOpen": true,
+    "Client": {
+        "Name": "Gmail",
+        "Company": "Google",
+        "Family": "Gmail"
+    },
+    "OS": {
+        "Name": "Android",
+        "Company": "Google",
+        "Family": "Android"
+    },
+    "Platform": "Mobile",
+    "ReadSeconds": 4,
+    "Geo": {},
+    "MessageStream": "outbound"
+}

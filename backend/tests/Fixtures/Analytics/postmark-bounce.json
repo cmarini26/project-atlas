@@ -1,0 +1,11 @@
+{
+    "RecordType": "Bounce",
+    "MessageID": "fake-message-id-bounce456",
+    "BounceType": "HardBounce",
+    "Description": "The server was unable to deliver your message",
+    "BouncedAt": "2026-06-26T10:05:00Z",
+    "Recipient": "bad@example.com",
+    "Tag": "newsletter",
+    "TypeCode": 1,
+    "MessageStream": "outbound"
+}

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Execution extends Model
 {
@@ -58,6 +59,12 @@ class Execution extends Model
     public function attemptLogs(): HasMany
     {
         return $this->hasMany(ExecutionAttempt::class);
+    }
+
+    /** @return HasOne<ExecutionMetric, $this> */
+    public function metric(): HasOne
+    {
+        return $this->hasOne(ExecutionMetric::class);
     }
 
     public function isSettled(): bool

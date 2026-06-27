@@ -6,6 +6,118 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 8 — Analytics Engine] — 2026-06-26
+
+### Added
+
+**Migrations**
+
+- `database/migrations/*_create_execution_metrics_table.php` — `execution_metrics` table: ULID PK, `company_id`, `execution_id`, `campaign_id`, `channel_type`, `provider_type`, `platform_id` (indexed), `is_final`, `metrics` JSON, `raw` JSON (nullable), `retrieved_at`, `window_closes_at`, `normalised_reach`, `normalised_engagement`, `normalised_engagement_rate`; no `updated_at` (immutable per retrieval)
+- `database/migrations/*_create_campaign_kpi_snapshots_table.php` — `campaign_kpi_snapshots` table: ULID PK, `company_id`, `campaign_id`, `snapshot_type` enum (interim/final), `snapshotted_at`, `channels_included` JSON, `actual_kpis` JSON, `performance_rating` enum (exceeded/met/below/insufficient_data); immutable (`UPDATED_AT = null`)
+- `database/migrations/*_create_metric_retrieval_logs_table.php` — `metric_retrieval_logs` table: append-only audit; `status` enum (success/failed/skipped), `error`, `provider_type`, `attempted_at`; immutable
+- `database/migrations/*_create_learnings_table.php` — `learnings` table: ULID PK, `company_id`, `signal` (string), `source_type`, `source_id`, `payload` JSON, `applied_at` (nullable); unique `(company_id, source_id, signal)`
+
+**Domain Models**
+
+- `app/Models/ExecutionMetric.php` — `BelongsToCompany`, `HasUlids`; `metrics`/`raw` JSON casts; `UPDATED_AT = null`
+- `app/Models/CampaignKpiSnapshot.php` — `BelongsToCompany`, `HasUlids`; `UPDATED_AT = null`; `kpiSnapshots()` HasMany on Campaign
+- `app/Models/MetricRetrievalLog.php` — `HasUlids`; `UPDATED_AT = null`; append-only
+- `app/Models/Learning.php` — `BelongsToCompany`, `HasUlids`; `payload` JSON cast; `applied_at` datetime cast
+- `app/Models/Execution.php` — updated: `metrics()` HasMany added
+- `app/Models/Campaign.php` — updated: `kpiSnapshots()` HasMany added
+
+**Provider Infrastructure**
+
+- `app/Services/Analytics/Contracts/AnalyticsProvider.php` — interface: `pull(platformId, ChannelCredentials): array`, `normalize(array): array`, `isWindowClosed(Execution): bool`, `pollingDelayHours(): int`, `repollingIntervalHours(): int`, `supports(string): bool`
+- `app/Services/Analytics/AnalyticsProviderRegistry.php` — first-match registry; `register()`, `for()`, `all()`; throws `UnknownAnalyticsProviderException`
+- `app/Services/Analytics/FakeAnalyticsProvider.php` — queue/assert test double; `queueMetrics()`, `queueFailure()`, `setWindowClosed()`, `assertPulled()`, `assertNotPulled()`; `supports()` returns `true` for all types
+- `app/Services/Analytics/LogAnalyticsProvider.php` — no-op provider; `normalize()` returns `[]`; `isWindowClosed()` always `true`; supports `'log'`
+- `app/Domain/Analytics/ValueObjects/WebhookEvent.php` — readonly VO: `providerType`, `platformMessageId`, `eventType`, `occurredAt`
+- `app/Services/Analytics/Contracts/AnalyticsWebhookHandler.php` — interface: `verify(Request)`, `parse(Request): array`, `supports(string): bool`
+- `app/Services/Analytics/WebhookHandlerRegistry.php` — first-match registry for webhook handlers
+
+**Service Provider**
+
+- `app/Providers/AnalyticsServiceProvider.php` — singletons for `AnalyticsProviderRegistry` and `WebhookHandlerRegistry`; boots `LogAnalyticsProvider` and `PostmarkWebhookHandler`
+- `backend/bootstrap/providers.php` — `AnalyticsServiceProvider` registered before `ConnectorServiceProvider`
+- `backend/bootstrap/app.php` — `api: __DIR__.'/../routes/api.php'` added to `withRouting()`
+
+**Retrieval Jobs**
+
+- `app/Listeners/ScheduleMetricRetrieval.php` — handles `ExecutionCompleted`; checks `platform_id`; resolves credentials + provider; dispatches `RetrieveExecutionMetrics` with optional delay
+- `app/Jobs/RetrieveExecutionMetrics.php` — `observations` queue; polls provider via `pull()`/`normalize()`/`isWindowClosed()`; `updateOrCreate` ExecutionMetric; appends `MetricRetrievalLog`; calls `snapshotIfReady()` on window close; self-reschedules if window open; logs failure and re-throws on error
+- `app/Jobs/PruneRawMetrics.php` — `maintenance` queue; monthly; nulls `raw` on ExecutionMetrics older than 1 year
+
+**Webhook Infrastructure**
+
+- `app/Services/Analytics/Webhooks/PostmarkWebhookHandler.php` — HMAC-SHA256 verification; maps RecordType → `open`/`click`/`bounce`/`delivery`/`spam_complaint`; `supports('postmark')`
+- `app/Jobs/ProcessAnalyticsWebhookEvent.php` — `observations` queue; looks up ExecutionMetric by `platform_id`; increments `webhook_{eventType}s` counter; silent no-op if not found
+- `app/Http/Controllers/Api/AnalyticsWebhookController.php` — 422 for unknown provider; 401 for invalid HMAC; 200 `{'accepted': N}` on success
+- `backend/routes/api.php` — `POST /api/analytics/webhooks/{provider}` → `AnalyticsWebhookController@receive`
+
+**KPI Services**
+
+- `app/Services/Analytics/CampaignKpiService.php` — `aggregate()`: sums reach/engagement, builds `channel_breakdown`, computes rates; `snapshotIfReady()`: creates interim or final snapshot, idempotent, calls `LearningService::recordFromMetrics()` on final; `ratePerformance()`: ≥125% → exceeded, 75–125% → met, <75% → below, no data → insufficient_data; `bestChannel()`: returns channel type with highest engagement_rate
+- `app/Services/Analytics/RecommendationKpiService.php` — approval/rejection/edit rates; median time-to-decision (driver-aware: `EXTRACT(EPOCH FROM ...)` on PostgreSQL, `julianday()` on SQLite); breakdowns by opportunity type and channel; 30-day approval rate trend
+- `app/Services/Analytics/DecisionEffectivenessService.php` — accuracy rate (exceeded + met / total); breakdowns by detector and campaign type; avg composite score for exceeded vs. below bands
+
+**Learning Service**
+
+- `app/Services/Learning/LearningService.php` — `recordFromMetrics(Campaign, CampaignKpiSnapshot)`: 8 signal types — `channel_outperformed` (best ≥1.5× second-best), `channel_underperformed` (<50% of campaign avg), `campaign_type_succeeded` (exceeded), `campaign_type_underperformed` (2+ consecutive final below for same type), `email_deliverability_issue` (hard bounces or spam rate >0.1%), `high_unsubscribe_rate` (>1% of delivered), `content_angle_engaged` (exceeded + blueprint angle), `optimal_timing_signal` (email open rate top quartile, ≥4 prior records required); idempotency via `createIfAbsent(source_id + signal)`; all records have `applied_at = null`
+
+**Filament Updates**
+
+- `app/Filament/Resources/CampaignResource.php` — `infolist()` with Performance section: `performance_rating` badge, `snapshot_type`, `snapshotted_at`, `total_reach`, `total_engagement`, `best_channel`
+- `app/Filament/Resources/ExecutionResource.php` — `infolist()` with Metrics section: `channel_type`, `provider_type`, `retrieved_at`, `window_closes_at`, `is_final`, normalised reach/engagement/rate
+- `app/Filament/Resources/CompanyResource.php` — `infolist()` with Recommendation Analytics section: approval rate, rejection rate, edit rate, median time-to-decision
+- `app/Filament/Resources/CompanyResource/Pages/ViewCompany.php` — created (extends ViewRecord)
+
+**App Service Provider**
+
+- `app/Providers/AppServiceProvider.php` — `ExecutionCompleted → ScheduleMetricRetrieval` event wiring; `FakeAnalyticsProvider` singleton binding in testing via `afterResolving(AnalyticsProviderRegistry::class, ...)` (fires before `LogAnalyticsProvider` — first-match wins in tests)
+
+**Console**
+
+- `routes/console.php` — `PruneRawMetrics` scheduled monthly
+
+**Tests** (97 new, 365 total)
+
+- `AnalyticsTestCase.php` — shared base class with `makeOpportunity()`, `makeExecution()` (with ContentAsset), `makeCredentials()` helpers; eliminates NOT NULL constraint failures across all analytics tests
+- `ExecutionMetricTest.php` — 6 tests: create, scopes, normalised keys, immutability, raw nullability
+- `CampaignKpiSnapshotTest.php` — 5 tests: create, types, performance ratings, immutability
+- `MetricRetrievalLogTest.php` — 4 tests: create, status values, immutability, failure logging
+- `AnalyticsProviderRegistryTest.php` — 5 tests: register, resolve, first-match, all(), unknown throws
+- `FakeAnalyticsProviderTest.php` — 10 tests: queueMetrics, queueFailure, assertPulled, assertNotPulled, supports all, isWindowClosed default, setWindowClosed, normalize passthrough, pollingDelay zero
+- `LogAnalyticsProviderTest.php` — 6 tests: pull empty, normalize empty, isWindowClosed always true, supports log only, delay zero, repolling zero
+- `ScheduleMetricRetrievalTest.php` — 3 tests: dispatches with platform_id, skips null platform_id, skips empty result
+- `RetrieveExecutionMetricsTest.php` — 6 tests: creates metric, logs success, re-dispatches when open, no duplicate metric, logs failure, skips non-completed
+- `PruneRawMetricsTest.php` — 3 tests: nulls old raw, preserves metrics column, skips recent records
+- `PostmarkWebhookHandlerTest.php` — covers HMAC verify, parse open/bounce/click, supports postmark
+- `AnalyticsWebhookControllerTest.php` — covers 422 unknown provider, 401 invalid HMAC, 200 accepted
+- `ProcessAnalyticsWebhookEventTest.php` — 5 tests: merges open, increments counter, tracks types independently, no-op on unknown, preserves is_final
+- `CampaignKpiServiceTest.php` — 10 tests: aggregate sums, engagement rate, best channel, snapshot types, idempotency, ratePerformance all four bands
+- `RecommendationKpiServiceTest.php` — 5 tests: zero baseline, approval rate, edit rate, total count, trend delta
+- `DecisionEffectivenessServiceTest.php` — 4 tests: empty baseline, all-exceeded, all-below, mixed, accuracy by type
+- `LearningServiceMetricsTest.php` — 10 tests: channel_outperformed (15×), one-channel skip, campaign_type_succeeded, deliverability issue (bounces), deliverability issue (spam), high_unsubscribe_rate, content_angle_engaged, no angle when not exceeded, idempotency, all null applied_at
+
+### Changed
+
+- `app/Models/ChannelCredentials.php` — added PHPDoc `@property` annotations for `provider_type`, `channel_type`, etc. to resolve PHPStan `string|null` inference
+- `app/Services/Analytics/RecommendationKpiService.php` — median time-to-decision SQL is now driver-aware (PostgreSQL `EXTRACT(EPOCH FROM ...)` vs. SQLite `julianday()`); wrapped in try-catch returning `null` on failure
+- `app/Services/Analytics/DecisionEffectivenessService.php` — `avg()` result extracted to intermediate variable before `round()` to resolve PHPStan nullable argument error
+
+### Not Implemented in M8 (explicit exclusions)
+
+- `ApplyLearnings` — Learning records are written but not applied; applying learnings is Milestone 9+ scope
+- Scoring weight recalibration — `confidence_score` weights remain static
+- Cross-company analytics — all queries are company-scoped
+- Real social/SMS analytics providers — only Postmark webhook handler implemented
+- Paid media analytics — out of scope
+- Individual subscriber/contact tracking — no PII in `metrics` column
+- Customer-facing frontend — analytics are internal (Filament only)
+
+---
+
 ## [Milestone 8 — Analytics Engine Implementation Plan] — 2026-06-26
 
 ### Added

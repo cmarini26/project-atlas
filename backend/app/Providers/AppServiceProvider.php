@@ -7,11 +7,13 @@ use App\AI\Testing\FakeAiProvider;
 use App\Events\CampaignAssetsReady;
 use App\Events\DecisionCommitted;
 use App\Events\DigitalTwinActivated;
+use App\Events\ExecutionCompleted;
 use App\Events\ObservationRecorded;
 use App\Events\OpportunityDetected;
 use App\Events\RecommendationApproved;
 use App\Listeners\DispatchCampaignPreparation;
 use App\Listeners\DispatchObservationProcessing;
+use App\Listeners\ScheduleMetricRetrieval;
 use App\Listeners\TriggerCampaignPublishing;
 use App\Listeners\TriggerDecisionEvaluation;
 use App\Listeners\TriggerOpportunityDetection;
@@ -19,6 +21,8 @@ use App\Listeners\TriggerRecommendationCreation;
 use App\Models\Catalog;
 use App\Models\CatalogItem;
 use App\Models\Company;
+use App\Services\Analytics\AnalyticsProviderRegistry;
+use App\Services\Analytics\FakeAnalyticsProvider;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -32,6 +36,16 @@ class AppServiceProvider extends ServiceProvider
         // provider (AnthropicProvider) must be bound before AI jobs are dispatched.
         if ($this->app->environment('testing')) {
             $this->app->singleton(AiProvider::class, FakeAiProvider::class);
+            // FakeAnalyticsProvider is registered as the catch-all in testing.
+            // Register it AFTER the registry is booted via AnalyticsServiceProvider,
+            // using afterResolving so it is prepended before LogAnalyticsProvider.
+            $this->app->singleton(FakeAnalyticsProvider::class, FakeAnalyticsProvider::class);
+            $this->app->afterResolving(
+                AnalyticsProviderRegistry::class,
+                function (AnalyticsProviderRegistry $registry): void {
+                    $registry->register($this->app->make(FakeAnalyticsProvider::class));
+                },
+            );
         }
     }
 
@@ -49,5 +63,6 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(DecisionCommitted::class, DispatchCampaignPreparation::class);
         Event::listen(CampaignAssetsReady::class, TriggerRecommendationCreation::class);
         Event::listen(RecommendationApproved::class, TriggerCampaignPublishing::class);
+        Event::listen(ExecutionCompleted::class, ScheduleMetricRetrieval::class);
     }
 }

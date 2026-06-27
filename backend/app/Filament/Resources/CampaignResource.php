@@ -6,6 +6,8 @@ use App\Filament\Resources\CampaignResource\Pages;
 use App\Models\Campaign;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Infolists;
+use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -74,6 +76,77 @@ class CampaignResource extends Resource
                 Tables\Actions\ViewAction::make(),
             ])
             ->bulkActions([]);
+    }
+
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist->schema([
+            Infolists\Components\Section::make('Campaign Details')->schema([
+                Infolists\Components\TextEntry::make('title'),
+                Infolists\Components\TextEntry::make('campaign_type')->badge(),
+                Infolists\Components\TextEntry::make('status')->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'approved' => 'success',
+                        'cancelled', 'failed' => 'danger',
+                        'published' => 'primary',
+                        'completed' => 'success',
+                        default => 'gray',
+                    }),
+                Infolists\Components\TextEntry::make('target_audience')->columnSpanFull(),
+                Infolists\Components\TextEntry::make('positioning')->label('Core Message')->columnSpanFull(),
+                Infolists\Components\TextEntry::make('call_to_action'),
+            ])->columns(3),
+
+            Infolists\Components\Section::make('Performance')
+                ->description('Actual vs. expected campaign performance')
+                ->schema([
+                    Infolists\Components\TextEntry::make('performance_rating')
+                        ->label('Rating')
+                        ->badge()
+                        ->state(fn (Campaign $record): string => $record->kpiSnapshots()
+                            ->where('snapshot_type', 'final')
+                            ->orderBy('snapshotted_at', 'desc')
+                            ->first()?->performance_rating ?? 'awaiting metrics')
+                        ->color(fn (string $state): string => match ($state) {
+                            'exceeded' => 'success',
+                            'met' => 'primary',
+                            'below' => 'warning',
+                            default => 'gray',
+                        }),
+
+                    Infolists\Components\TextEntry::make('snapshot_type')
+                        ->label('Snapshot')
+                        ->badge()
+                        ->state(fn (Campaign $record): string => $record->kpiSnapshots()
+                            ->orderBy('snapshotted_at', 'desc')
+                            ->first()?->snapshot_type ?? '—'),
+
+                    Infolists\Components\TextEntry::make('snapshotted_at')
+                        ->label('Measured At')
+                        ->state(fn (Campaign $record): string => $record->kpiSnapshots()
+                            ->orderBy('snapshotted_at', 'desc')
+                            ->first()?->snapshotted_at?->toDateTimeString() ?? '—'),
+
+                    Infolists\Components\TextEntry::make('total_reach')
+                        ->label('Total Reach')
+                        ->state(fn (Campaign $record): string => (string) ($record->kpiSnapshots()
+                            ->orderBy('snapshotted_at', 'desc')
+                            ->first()?->actual_kpis['total_reach'] ?? '—')),
+
+                    Infolists\Components\TextEntry::make('total_engagement')
+                        ->label('Total Engagement')
+                        ->state(fn (Campaign $record): string => (string) ($record->kpiSnapshots()
+                            ->orderBy('snapshotted_at', 'desc')
+                            ->first()?->actual_kpis['total_engagement'] ?? '—')),
+
+                    Infolists\Components\TextEntry::make('best_channel')
+                        ->label('Best Channel')
+                        ->badge()
+                        ->state(fn (Campaign $record): string => (string) ($record->kpiSnapshots()
+                            ->orderBy('snapshotted_at', 'desc')
+                            ->first()?->actual_kpis['best_channel'] ?? '—')),
+                ])->columns(3),
+        ]);
     }
 
     public static function getRelations(): array
