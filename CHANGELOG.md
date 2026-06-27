@@ -6,6 +6,50 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 9 Plan — Learning Engine Implementation Plan] — 2026-06-26
+
+### Added
+
+- `docs/plans/Milestone-9-Implementation.md` — engineering implementation plan for the Learning Engine (Phase 8 of the roadmap). Breaks implementation into 10 ordered phases:
+
+  **Phase 1 — Migrations, Models, Prerequisite Fixes:** `learning_applications` and `company_scoring_weights` tables; `LearningApplication` and `CompanyScoringWeights` Eloquent models; conditional migrations for `facts.superseded_by_id` and `knowledge_entries.type` if absent; `ApprovalService` audit and wire-up for `recommendation_approved`, `recommendation_rejected`, and `recommendation_edited_and_approved` Learning signals.
+
+  **Phase 2 — LearningEngine Skeleton + ApplyLearnings Job:** `LearningServiceProvider`; `LearningEngine` service (skeleton with injected dependencies); `ApplyLearnings` job (`ShouldQueue`, `ShouldBeUnique`, 3 retries with 60/300/900s backoff); `routes/console.php` daily 02:00 schedule dispatching one job per active-twin company.
+
+  **Phase 3 — Evidence Threshold Evaluation:** `SignalTier` class (signal → tier mapping, threshold lookup); `EvidenceEvaluator` service (90-day rolling window evidence count by `(company_id, signal, discriminator)`; upward-bias asymmetric thresholds: Tier 1 = 1, `campaign_type_succeeded` = 1, performance signals = 2, preference signals = 3–4).
+
+  **Phase 4 — Conflict Resolution:** `ConflictResolver` service; 4-rule ordered resolution: safety override → recency when count within 1 → majority when diff ≥ 2 → no-action tie; all resolutions logged at Info on dedicated `learning` log channel.
+
+  **Phase 5 — Fact and Knowledge Mutation:** `FactMutator` service (new Fact row, old `is_current = false`, `superseded_by_id` set; effect descriptor with `previous_entity_id`); `KnowledgeMutator` service (Knowledge `type = 'learning'`, 90-day expiry, old `is_active = false`); complete signal → key/body mapping table for all 11 signal types; Tier 1 Filament notification.
+
+  **Phase 6 — CompanyScoringWeights Versioning + OpportunityScorer Integration:** `WeightCalibrator` service (type_modifier ±0.05 per `campaign_type_succeeded/underperformed`; floor 0.50, ceiling 1.50; base weights renormalized to 1.00 with floor 0.05 / ceiling 0.60; 14-day cooling period via `LearningApplication.applied_at` lookup; versioned row creation in DB transaction); `OpportunityScorer` updated to call `weightsFor(companyId)` and apply company-specific weights with `defaultWeights()` fallback.
+
+  **Phase 7 — LearningRollbackService:** `LearningRollbackService::rollback(LearningApplication, reason)` — iterates effect descriptors; creates compensating records for Fact, Knowledge, and Weight effects; sets `rolled_back_at` and `rollback_reason` on `LearningApplication`; resets `Learning.applied_at = null`; all in single DB transaction; double-rollback throws; Tier 1 rollback logged at Warning.
+
+  **Phase 8 — Prompt Context + BusinessBrain Integration:** `EditPatternDetector` service (heuristic pattern detection for hashtag removal, length reduction, price inclusion from `recommendation_edited_and_approved` signals — all keyword-based, no ML); `BusinessBrainService::for()` update to include `type = 'learning'` Knowledge entries; `LearningEngine` Tier 3 wiring to call `EditPatternDetector` and pass detected preferences to `KnowledgeMutator`; prompt version tracking computes approval rates by `prompt_version` and writes `prompt_underperformed` Knowledge for engineering visibility.
+
+  **Phase 9 — Filament Visibility:** Three new tabs on `CompanyResource` ViewCompany page: Learning Log (all `Learning` records grouped by tier, applied/pending badge), Applied Effects (all `LearningApplication` records with expanded `effects`, rollback action modal for admin), BusinessBrain Mutations (current vs. default weights comparison, weight history, Learning-derived Knowledge entries, pending signal counts).
+
+  **Phase 10 — Tests:** 10 test files (~57 tests total) covering all 47 acceptance criteria from `specs/core/learning-engine.md` §13; `LearningTestCase` base class with `makeApprovalLearning()` and `makeMetricLearning()` helpers; PHPStan level 8 — 0 errors; Pint clean; target ≥ 420 total tests.
+
+- **Prerequisite verification checklist** — four items to check before writing any engine code: `facts.superseded_by_id`, `knowledge_entries.type`, `ApprovalService` signal wiring, `Learning::UPDATED_AT = null`.
+
+- **Risk table** — 7 risks with likelihood, impact, and mitigation: `superseded_by_id` absent; approval signal payload mismatch; `CompanyScoringWeights.is_current` race condition; renormalization float drift; `EditPatternDetector` false positives; BusinessBrain Knowledge query excluding `type = 'learning'`; `OpportunityScorer` signature change breaking callers.
+
+- **Milestone exit criteria** — checklist: ≥ 420 tests passing, 0 failing, PHPStan clean, Pint clean, migrations run, schedule dispatches, `LearningApplication` created after job run, `OpportunityScorer` returns different scores with and without company weights, docs updated, CI passes.
+
+### Explicit Out-of-Scope for M9
+
+- Cross-company pattern aggregation
+- ML-trained scoring models
+- Real-time (sub-batch) learning
+- User-facing "Teach Atlas" UI
+- Auto-publishing based on learnings
+- Prompt template mutation at runtime
+- Deleting historical records
+
+---
+
 ## [Milestone 8.5 — Learning Engine Specification] — 2026-06-26
 
 ### Added

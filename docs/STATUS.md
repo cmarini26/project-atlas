@@ -34,11 +34,13 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
-**Milestone 9 — Real AI Provider + Postmark**
+**Milestone 9 — Learning Engine**
 
-Bind `AnthropicProvider` for production; implement `PostmarkEmailProvider`; add credential rotation and end-to-end smoke tests.
+Implement the full Learning Engine: `LearningApplication` and `CompanyScoringWeights` models; `LearningEngine` service; `ApplyLearnings` job (daily schedule); evidence evaluation; conflict resolution; Fact/Knowledge mutation; scoring weight calibration; rollback service; prompt context integration; Filament visibility.
 
-**Status:** Not yet started.
+**Status:** Pre-implementation. Plan written at `docs/plans/Milestone-9-Implementation.md`.
+
+**Target:** ≥ 420 tests passing. PHPStan level 8 — 0 errors. All 47 acceptance criteria from `specs/core/learning-engine.md` §13 covered.
 
 ---
 
@@ -372,16 +374,41 @@ All foundational documents written, reviewed, and committed.
 
 ---
 
-## Next Tasks (Milestone 9 — Real AI Provider + Postmark)
+## Next Tasks (Milestone 9 — Learning Engine)
 
-1. **`AnthropicProvider`** — real `AiProvider` using Anthropic Claude API; tool-use for structured output; bind in `AppServiceProvider` for non-testing environments
-2. **`PostmarkEmailProvider`** — implements `EmailProvider`; sends via Postmark API; registered in `EmailProviderRegistry` for `'postmark'` provider type
-3. **Credential rotation** — `CheckChannelHealth` pings Postmark credentials; marks `status=error` on failure
-4. **End-to-end smoke test** — `ProcessObservation → FactExtraction → KnowledgeSynthesis` with a real AnthropicProvider fixture or recorded response
+**Phase 1 — Migrations and prerequisite fixes** (start here)
+1. Verify `facts.superseded_by_id` exists; add migration if absent
+2. Verify `knowledge_entries.type` column exists; add migration if absent
+3. Create `learning_applications` migration + `LearningApplication` model
+4. Create `company_scoring_weights` migration + `CompanyScoringWeights` model
+5. Audit `ApprovalService` for approval-side Learning signals; wire if absent
+
+**Phase 2 — LearningEngine skeleton + ApplyLearnings job**
+6. Create `LearningServiceProvider`, `LearningEngine` (skeleton), `ApplyLearnings` job
+7. Add daily 02:00 schedule in `routes/console.php`
+
+**Phases 3–7 — Engine logic** (complete in order; can parallelize 5 and 6)
+8. `SignalTier` + `EvidenceEvaluator`
+9. `ConflictResolver`
+10. `FactMutator` + `KnowledgeMutator`
+11. `WeightCalibrator` + `OpportunityScorer` update
+12. `LearningRollbackService`
+
+**Phase 8 — Prompt context integration**
+13. `EditPatternDetector` + `LearningEngine` Tier 3 wiring
+14. `BusinessBrainService` update to include `type = 'learning'` Knowledge
+
+**Phase 9 — Filament visibility**
+15. Learning Log, Applied Effects, BusinessBrain Mutations tabs on CompanyResource
+
+**Phase 10 — Tests + PHPStan + Pint**
+16. ≥ 55 new tests covering all 47 acceptance criteria; PHPStan clean; Pint clean
 
 ---
 
 ## Recently Completed
+
+- **Milestone 9 implementation plan** — `docs/plans/Milestone-9-Implementation.md` written. 10 implementation phases: migrations/models, engine skeleton + job, evidence evaluation, conflict resolution, Fact/Knowledge mutation, scoring weight calibration + OpportunityScorer update, rollback service, prompt context/BusinessBrain integration, Filament visibility, and full test suite. Includes prerequisite verification checklist, concrete file lists per phase, risk table, and milestone exit criteria.
 
 - **Milestone 8.5 — Learning Engine Specification** — `specs/core/learning-engine.md` written. 14 sections: domain model (`LearningApplication`, `CompanyScoringWeights`), learning lifecycle, `ApplyLearnings` job design, prioritization tiers (Tier 1 safety/immediate, Tier 2 performance/2+, Tier 3 preference/3+), conflict resolution (4-rule ordered), confidence recalibration (upward bias, 14-day cooling), BusinessBrain mutation rules, prompt adaptation (indirect via context enrichment), safety constraints (hard limits, company scoping, no-auto-publish), explainability (`effects` descriptor + Filament admin views), rollback (compensating records only), versioning, 47 acceptance criteria, and future extensibility. `ROADMAP.md` Phase 8 updated with concrete deliverables and safety invariants.
 
@@ -426,6 +453,6 @@ All foundational documents written, reviewed, and committed.
 
 ## Last Updated
 
-**2026-06-26** — Milestone 8.5 complete. `specs/core/learning-engine.md` written — full Phase 8 Learning Engine implementation blueprint. `ROADMAP.md` Phase 8 updated with concrete deliverables, safety invariants, and spec reference. Milestone 8 also complete: Analytics Engine fully implemented across 10 phases; 365 tests (363 passing, 2 Redis skipped); PHPStan level 8 — 0 errors; Pint clean.
+**2026-06-26** — Milestone 9 implementation plan written (`docs/plans/Milestone-9-Implementation.md`). 10 phases defined with concrete file lists, prerequisite verification checklist, risk table, and exit criteria. Current milestone: M9 Learning Engine — pre-implementation. M8.5 (Learning Engine Specification) also complete this session.
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*
