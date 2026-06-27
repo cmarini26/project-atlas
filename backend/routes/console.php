@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ApplyLearnings;
 use App\Jobs\CheckChannelHealth;
 use App\Jobs\PruneRawMetrics;
 use App\Jobs\PublishScheduledContent;
@@ -14,3 +15,4 @@ Artisan::command('inspire', function () {
 Schedule::job(new PublishScheduledContent())->everyFiveMinutes();
 Schedule::job(new CheckChannelHealth())->everyThirtyMinutes();
 Schedule::job(new PruneRawMetrics())->monthly();
+Schedule::job(new ApplyLearnings())->dailyAt('02:00');

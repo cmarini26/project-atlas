@@ -23,24 +23,23 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined |
 | Implementation    | 🟡 In progress | Milestone 8 complete: full Analytics Engine in place — pull polling, webhook ingestion, KPI snapshots, LearningService feedback loop, Filament visibility panels |
-| Tests             | ✅ Strong | 365 tests (363 passing, 2 Redis skipped); PHPStan level 8 — 0 errors; Pint clean |
+| Tests             | ✅ Strong | 449 tests (447 passing, 2 Redis skipped); PHPStan level 8 — 0 errors; Pint clean |
 | CI/CD             | 🟡 Defined | GitHub Actions workflow written; not yet triggered (no PR opened against remote) |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
 
-**Overall:** Milestone 8 complete. Analytics Engine fully implemented: pull-polling metric retrieval, webhook ingestion (Postmark), campaign KPI snapshots, recommendation KPI analytics, decision effectiveness metrics, LearningService with 8 signal types, and Filament admin panels. 365 tests (363 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean. Milestone 8.5 complete: Learning Engine specification written — `specs/core/learning-engine.md` defines the full Phase 8 implementation blueprint including domain model, job design, prioritization tiers, conflict resolution, confidence recalibration, BusinessBrain mutation rules, prompt adaptation strategy, safety constraints, explainability, rollback, versioning, and acceptance criteria.
+**Overall:** Milestone 9 complete. Full Learning Engine implemented: `LearningApplication` + `CompanyScoringWeights` models and migrations; `LearningEngine` with 3-tier signal prioritization, evidence evaluation, conflict resolution (4 rules), Fact and Knowledge mutation, and WeightCalibrator; `ApplyLearnings` job (daily schedule, idempotent, ShouldBeUnique); `LearningRollbackService` (compensating records, no deletes); `EditPatternDetector`; `OpportunityScorer` extended with per-company type_modifiers; `ApprovalService` wired for recommendation_approved, recommendation_rejected, and recommendation_edited_and_approved Learning signals; Filament Learning Log + Applied Effects visibility. 449 tests (447 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean.
 
 ---
 
 ## Current Milestone
 
-**Milestone 9 — Learning Engine**
+**Milestone 9 — Learning Engine ✅ Complete**
+*Completed: 2026-06-26*
 
-Implement the full Learning Engine: `LearningApplication` and `CompanyScoringWeights` models; `LearningEngine` service; `ApplyLearnings` job (daily schedule); evidence evaluation; conflict resolution; Fact/Knowledge mutation; scoring weight calibration; rollback service; prompt context integration; Filament visibility.
+Full Learning Engine implemented and verified. 449 tests passing. PHPStan level 8 — 0 errors. Pint clean.
 
-**Status:** Pre-implementation. Plan written at `docs/plans/Milestone-9-Implementation.md`.
-
-**Target:** ≥ 420 tests passing. PHPStan level 8 — 0 errors. All 47 acceptance criteria from `specs/core/learning-engine.md` §13 covered.
+**Next:** Milestone 10 (TBD — vertical-specific tuning or production infrastructure)
 
 ---
 

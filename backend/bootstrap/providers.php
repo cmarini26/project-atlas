@@ -4,6 +4,7 @@ use App\Providers\AnalyticsServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\ConnectorServiceProvider;
 use App\Providers\Filament\AdminPanelProvider;
+use App\Providers\LearningServiceProvider;
 use App\Providers\PublisherServiceProvider;
 
 return [
@@ -12,4 +13,5 @@ return [
     ConnectorServiceProvider::class,
     AdminPanelProvider::class,
     PublisherServiceProvider::class,
+    LearningServiceProvider::class,
 ];

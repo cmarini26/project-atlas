@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\CompanyResource\Pages;
 use App\Models\Company;
+use App\Models\LearningApplication;
 use App\Services\Analytics\RecommendationKpiService;
 use Filament\Forms\Form;
 use Filament\Infolists;
@@ -89,6 +90,61 @@ class CompanyResource extends Resource
                         ->label('Total Recommendations')
                         ->state(fn (Company $record): string => (string) app(RecommendationKpiService::class)->forCompany($record->id)['total_recommendations']),
                 ])->columns(3),
+
+            Infolists\Components\Section::make('Learning Log')
+                ->description('Applied learnings and their effects on this company\'s Business Brain')
+                ->schema([
+                    Infolists\Components\TextEntry::make('total_applied_learnings')
+                        ->label('Total Applied Learnings')
+                        ->state(fn (Company $record): string => (string) LearningApplication::withoutGlobalScopes()
+                            ->where('company_id', $record->id)
+                            ->count()),
+
+                    Infolists\Components\TextEntry::make('rolled_back_learnings')
+                        ->label('Rolled Back')
+                        ->state(fn (Company $record): string => (string) LearningApplication::withoutGlobalScopes()
+                            ->where('company_id', $record->id)
+                            ->whereNotNull('rolled_back_at')
+                            ->count()),
+
+                    Infolists\Components\TextEntry::make('last_learning_applied_at')
+                        ->label('Last Applied')
+                        ->state(function (Company $record): string {
+                            $latest = LearningApplication::withoutGlobalScopes()
+                                ->where('company_id', $record->id)
+                                ->latest('created_at')
+                                ->first();
+
+                            return $latest?->created_at?->diffForHumans() ?? 'Never';
+                        }),
+                ])->columns(3),
+
+            Infolists\Components\Section::make('Applied Learning Effects')
+                ->description('Most recent Learning applications and their Business Brain mutations')
+                ->schema([
+                    Infolists\Components\RepeatableEntry::make('recent_learning_applications')
+                        ->label('')
+                        ->state(fn (Company $record): array => LearningApplication::withoutGlobalScopes()
+                            ->where('company_id', $record->id)
+                            ->latest('created_at')
+                            ->limit(10)
+                            ->get()
+                            ->map(fn (LearningApplication $app): array => [
+                                'applied_at' => $app->created_at?->format('Y-m-d H:i'),
+                                'signal' => optional($app->learning)->signal ?? '—',
+                                'effects_count' => count($app->effects ?? []),
+                                'rolled_back' => $app->isRolledBack() ? 'Yes' : 'No',
+                                'summary' => collect($app->effects ?? [])->pluck('description')->implode('; '),
+                            ])
+                            ->toArray())
+                        ->schema([
+                            Infolists\Components\TextEntry::make('applied_at')->label('Applied At'),
+                            Infolists\Components\TextEntry::make('signal')->label('Signal'),
+                            Infolists\Components\TextEntry::make('effects_count')->label('Effects'),
+                            Infolists\Components\TextEntry::make('rolled_back')->label('Rolled Back'),
+                            Infolists\Components\TextEntry::make('summary')->label('Summary')->columnSpanFull(),
+                        ])->columns(4),
+                ]),
         ]);
     }
 

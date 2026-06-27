@@ -6,6 +6,76 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 9 — Learning Engine Implementation] — 2026-06-26
+
+### Added
+
+**Migrations**
+
+- `2026_06_26_002900_add_learning_type_to_knowledge_entries_table` — adds `'learning'` to the `knowledge_entries.type` enum via driver-aware migration (PostgreSQL CHECK constraint rebuild; SQLite no-op via updated original migration)
+- `2026_06_26_003000_create_learning_applications_table` — `learning_applications`: stores applied effects, rollback state, and audit trail per applied Learning record
+- `2026_06_26_003100_create_company_scoring_weights_table` — `company_scoring_weights`: versioned, append-only scoring weight rows per company; `is_current` flag for point-in-time lookups
+
+**Models**
+
+- `app/Models/LearningApplication.php` — append-only audit record of an applied Learning; stores `effects` JSON array; `rolled_back_at` + `rollback_reason` for compensating rollback
+- `app/Models/CompanyScoringWeights.php` — versioned per-company scoring weight rows; `typeModifiers()` helper; `defaultWeights()` factory; `scopeCurrent()` for active row lookup
+
+**Services — Learning Engine**
+
+- `app/Services/Learning/SignalTier.php` — classifies signals into Tier 1 (safety, threshold 1), Tier 2 (performance, threshold 2), Tier 3 (preference, threshold 3); `prioritise()` sorts batches for processing order
+- `app/Services/Learning/EvidenceEvaluator.php` — counts corroborating Learning records within the 90-day rolling window; per-signal discriminator extraction (channel, campaign_type, channel_type)
+- `app/Services/Learning/ConflictResolver.php` — 4-rule ordered conflict resolution across opposing signal pairs (channel_outperformed ↔ channel_underperformed; campaign_type_succeeded ↔ campaign_type_underperformed); returns apply/consume/skip decisions
+- `app/Services/Learning/FactMutator.php` — supersedes existing Facts and creates new ones from Learning signals; stores `previous_fact_id` in effect descriptor for rollback; covers 5 signal types
+- `app/Services/Learning/KnowledgeMutator.php` — creates `type='learning'` Knowledge entries (90-day TTL) from Learning signals; supersedes existing entries; covers all 11 signal types
+- `app/Services/Learning/WeightCalibrator.php` — adjusts `type_modifiers` ±0.05 per campaign performance signal; bounds [0.50, 1.50]; 14-day cooling period; versioned `CompanyScoringWeights` rows
+- `app/Services/Learning/EditPatternDetector.php` — heuristic detection of content edit patterns (length, hashtag, price) from `recommendation_edited_and_approved` payloads
+- `app/Services/Learning/LearningRollbackService.php` — compensating-record rollback for Fact, Knowledge, and Weight effects; never deletes rows; resets `Learning.applied_at = null`; throws on double-rollback
+- `app/Services/Learning/LearningEngine.php` — orchestrates the full apply cycle: prioritisation → conflict resolution → evidence check → effect application → LearningApplication creation; fully idempotent
+
+**Jobs and Scheduling**
+
+- `app/Jobs/ApplyLearnings.php` — `ShouldQueue`, `ShouldBeUnique` (24-hour uniqueness), 3 retries; iterates all companies; dispatches on `ai` queue
+- `routes/console.php` — `ApplyLearnings` scheduled daily at 02:00
+
+**Providers**
+
+- `app/Providers/LearningServiceProvider.php` — registers all Learning services as singletons
+- `bootstrap/providers.php` — registers `LearningServiceProvider`
+
+**Tests (84 new tests, 449 total)**
+
+- `tests/Feature/Learning/LearningTestCase.php` — base class with `makeLearning()` helper; raw-DB timestamp override for time-sensitive tests
+- `tests/Feature/Learning/SignalTierTest.php` — 7 tests
+- `tests/Feature/Learning/EvidenceEvaluatorTest.php` — 8 tests
+- `tests/Feature/Learning/ConflictResolverTest.php` — 6 tests
+- `tests/Feature/Learning/FactMutatorTest.php` — 7 tests
+- `tests/Feature/Learning/KnowledgeMutatorTest.php` — 8 tests
+- `tests/Feature/Learning/WeightCalibratorTest.php` — 8 tests
+- `tests/Feature/Learning/LearningRollbackServiceTest.php` — 5 tests
+- `tests/Feature/Learning/LearningEngineTest.php` — 10 tests
+- `tests/Feature/Learning/EditPatternDetectorTest.php` — 8 tests
+- `tests/Feature/Learning/ApprovalServiceLearningTest.php` — 7 tests
+- `tests/Unit/Opportunity/OpportunityScorerWeightTest.php` — 7 tests
+
+### Modified
+
+- `app/Services/Opportunity/OpportunityScorer.php` — `score()` now accepts optional `?array $typeModifiers`; applies type-specific composite score multiplier; existing callers unaffected (optional parameter)
+- `app/Services/Opportunity/OpportunityEngine.php` — loads current `CompanyScoringWeights` for the company and passes `typeModifiers` to `OpportunityScorer::score()`
+- `app/Services/Recommendation/ApprovalService.php` — added `editAndApprove()` method; all three approval actions (`approve`, `reject`, `editAndApprove`) now create `Learning` records with the appropriate signal; `EditPatternDetector` wired for edit pattern extraction; duplicate-safe via `source_id + signal` existence check
+- `app/Filament/Resources/CompanyResource.php` — added Learning Log and Applied Effects sections to the company infolist; shows applied count, rolled-back count, last applied timestamp, and a 10-record expandable effects list
+- `database/migrations/2026_06_26_001100_create_knowledge_entries_table.php` — added `'learning'` to the `type` enum (dev migration; no data loss)
+
+### Safety Invariants — All Honored
+
+- Learning records immutable: `applied_at` set once per normal flow; rollback is an explicit compensating action
+- Applying learning creates new state: Fact supersession and Knowledge supersession are always append-only
+- All applied learnings explainable: `LearningApplication.effects` contains human-readable descriptors
+- Learning never reduces confidence without evidence: downward adjustments require 2+ Tier 2 signals
+- Learning is always company-scoped: `EvidenceEvaluator`, `ConflictResolver`, and `LearningEngine` all filter by `company_id`
+
+---
+
 ## [Milestone 9 Plan — Learning Engine Implementation Plan] — 2026-06-26
 
 ### Added

@@ -11,7 +11,7 @@ return new class() extends Migration
         Schema::create('knowledge_entries', function (Blueprint $table): void {
             $table->char('id', 26)->primary();
             $table->char('company_id', 26)->index();
-            $table->enum('type', ['pattern', 'insight', 'preference', 'performance', 'context']);
+            $table->enum('type', ['pattern', 'insight', 'preference', 'performance', 'context', 'learning']);
             $table->string('subject');
             $table->text('body');
             $table->json('structured')->nullable();

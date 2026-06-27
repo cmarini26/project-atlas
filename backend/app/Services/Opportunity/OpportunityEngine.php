@@ -5,6 +5,7 @@ namespace App\Services\Opportunity;
 use App\Domain\BusinessBrain\BusinessBrain;
 use App\Events\OpportunityDetected;
 use App\Models\Company;
+use App\Models\CompanyScoringWeights;
 use App\Models\Opportunity;
 use App\Services\Analyst\OpportunityDetectionAnalyst;
 use App\Services\Opportunity\Detectors\Contracts\OpportunityDetector;
@@ -54,6 +55,13 @@ class OpportunityEngine
         /** @var Collection<int, Opportunity> $persisted */
         $persisted = collect();
 
+        $weights = CompanyScoringWeights::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->where('is_current', true)
+            ->first();
+
+        $typeModifiers = $weights?->typeModifiers();
+
         foreach ($candidates as $candidate) {
             if ($this->repository->hasDuplicate(
                 $company->id,
@@ -64,7 +72,7 @@ class OpportunityEngine
                 continue;
             }
 
-            $scores = $this->scorer->score($candidate);
+            $scores = $this->scorer->score($candidate, $typeModifiers);
 
             if ($scores === null) {
                 continue;
