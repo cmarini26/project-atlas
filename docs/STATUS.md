@@ -22,7 +22,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 | Dimension         | Status | Notes |
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined |
-| Implementation    | 🟡 In progress | Milestone 8 complete: full Analytics Engine in place — pull polling, webhook ingestion, KPI snapshots, LearningService feedback loop, Filament visibility panels |
+| Implementation    | ✅ Core loop complete | All 9 milestones delivered. 5 blocking production gaps identified in V0.1 Audit (see Current Milestone). |
 | Tests             | ✅ Strong | 449 tests (447 passing, 2 Redis skipped); PHPStan level 8 — 0 errors; Pint clean |
 | CI/CD             | 🟡 Defined | GitHub Actions workflow written; not yet triggered (no PR opened against remote) |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
@@ -34,12 +34,26 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
-**Milestone 9 — Learning Engine ✅ Complete**
+**Version 0.1 Architecture Audit ✅ Complete**
 *Completed: 2026-06-26*
 
-Full Learning Engine implemented and verified. 449 tests passing. PHPStan level 8 — 0 errors. Pint clean.
+Pre-customer-dashboard readiness review complete. `docs/plans/Version-0.1-Architecture-Audit.md` written. 15 audit areas assessed. See audit plan for full findings.
 
-**Next:** Milestone 10 (TBD — vertical-specific tuning or production infrastructure)
+**Blocking for production (must resolve before any customer data):**
+1. Implement `AnthropicProvider` (or equivalent) — Atlas cannot run any AI pipeline without it
+2. Add Filament superadmin gate — currently all company data is accessible to any registered user
+3. SSRF protection on `WebPageCrawler` — user-supplied URLs not validated to public IPs
+4. Health check endpoint (`GET /api/health`) — required before hosting is provisioned
+5. Confirm PostgreSQL RLS strategy
+
+**Blocking for customer dashboard (must resolve before building customer-facing UI):**
+6. `BusinessBrainService` Redis caching (5-min TTL per company)
+7. Rate limiting on `/api/analytics/webhooks/{provider}`
+8. End-to-end pipeline smoke test
+9. Spec/code column drift cleanup (`Learning.value` vs spec `payload`; `LearningApplication` applied_at)
+10. `docs/STATUS.md` stale sections cleanup
+
+**Next:** Begin resolving blocking items in priority order. See `docs/plans/Version-0.1-Architecture-Audit.md`.
 
 ---
 
@@ -320,13 +334,14 @@ All foundational documents written, reviewed, and committed.
 
 ## Current Objectives
 
-1. **Bind real `AiProvider` for production.** `AppServiceProvider` currently binds `FakeAiProvider` in testing only. A real `AnthropicProvider` (or `OpenAiProvider`) must be implemented and bound before `ProcessObservation` can run in production.
+See `docs/plans/Version-0.1-Architecture-Audit.md` for the full pre-customer-dashboard readiness checklist.
 
-2. **Implement `Opportunity` model and migration.** Spec defined in `domain-model.md`. Polymorphic `subject` (CatalogItem, Catalog, Company).
-
-3. **Implement `OpportunityDetector` contract.** Rule-based detectors run first; AI analyst supplements for non-obvious opportunities.
-
-4. **Implement `Decision` model and migration.** One Decision per Opportunity; required `rationale` JSON (`why_now`, `why_this`, `why_channel`, `why_works`); enforced in `DecisionService`.
+**Immediate priorities (blocking for production):**
+1. Implement `AnthropicProvider` — the AI pipeline does not function without it
+2. Add Filament superadmin gate — all company data is currently exposed to any registered user
+3. SSRF protection on `WebPageCrawler` — user-supplied URLs must be validated to public IPs before outbound requests
+4. Add health check endpoint (`GET /api/health`)
+5. Confirm PostgreSQL RLS rollout plan
 
 ---
 
@@ -334,10 +349,13 @@ All foundational documents written, reviewed, and committed.
 
 | Item | Introduced | Notes |
 |------|------------|-------|
-| `Campaign` and `ContentAsset` are still stubs | 2026-06-26 | These models exist solely for PHPStan to resolve types in contracts. They have no migrations and no implemented domain persistence. Required for Milestone 4+. |
-| Queue tests use `Queue::fake()` — no live worker execution | 2026-06-25 | `QueueDispatchTest` proves the dispatch mechanism and queue configuration, but does not prove that a real Redis worker picks up and executes a job. Add an integration test or smoke test for real Redis queue processing before Phase 2 is considered complete. |
-| Queue tests use `Queue::fake` only | 2026-06-25 | Current queue tests verify dispatch/configuration but do not prove Redis worker execution. Add an integration test or smoke test for real Redis queue processing before Phase 2 is considered complete. |
-| `User` model uses integer PK | 2026-06-25 | Laravel default. Must be migrated to `char(26)` ULID before `company_memberships` (or any table with a `user_id` FK) is created. First task in Milestone 2. |
+| No real AI provider implemented | 2026-06-26 | `AnthropicProvider.php` does not exist. `FakeAiProvider` is used in all environments. Atlas cannot run the observation → fact → campaign pipeline in production. |
+| `BusinessBrainService` has no caching | 2026-06-26 | Spec requires 5-minute Redis TTL per company. Currently assembles fresh on every call. Will degrade at moderate scale. |
+| `EvidenceEvaluator` PHP-side filtering | 2026-06-26 | Loads all Learning records for a company+signal then filters discriminator in PHP. Correct for cross-DB compat in tests; inefficient at production scale. Replace with SQL JSON extraction on PostgreSQL. |
+| No PostgreSQL RLS | 2026-06-25 | `docs/technical/Database.md` specifies RLS as defense-in-depth. Not yet applied to any table. Required before production. |
+| Queue tests use `Queue::fake()` — no live Redis execution | 2026-06-25 | Dispatch mechanism is tested; real Redis worker execution is not. Add integration test or smoke test before production. |
+| Spec/code column drift | 2026-06-26 | `learning-engine.md` spec uses `payload`; implementation uses `value`. Spec defines `LearningApplication.applied_at`; implementation uses `created_at`. Update spec or add migration. |
+| `ApplyLearnings` on `ai` queue instead of `maintenance` | 2026-06-26 | Architecture.md assigns this job to `maintenance`. Implementation uses `ai`. Align with spec. |
 
 ---
 
@@ -345,12 +363,12 @@ All foundational documents written, reviewed, and committed.
 
 | Question | Context | Priority |
 |----------|---------|----------|
-| Frontend: Inertia.js + Vue 3 or API-first SPA? | CLAUDE.md lists both as options. Inertia is faster to start; API-first allows a separate frontend later. Decision needed before Phase 5 UI work begins. | Medium |
-| AI provider for initial development: Anthropic or OpenAI? | Both providers are spec'd. Anthropic (Claude) is preferred per architecture; OpenAI is a fallback. The `FakeAiProvider` abstracts this in tests. Pick one for production before Phase 3. | High |
-| Hosting and deployment target? | No infrastructure is provisioned. Options: Laravel Forge + DigitalOcean, Laravel Vapor (serverless), bare VPS. Decision affects queue worker configuration. | High |
-| CBB Auctions inventory format? | Does CBB have an RSS feed, a structured API, or HTML only? Determines whether Phase 2 uses `WebsiteCrawlConnector` or `RssFeedConnector` as the primary data source. | High |
-| JavaScript-rendered inventory pages? | Some dealership and auction sites render inventory via JS. If `WebsiteCrawlConnector` uses simple HTTP, it won't see this content. May require a headless browser connector. | Medium |
-| Image handling for catalog items? | `catalog_items.media` stores URLs. Are images crawled and re-hosted in Atlas's object storage, or do they link to the source? Affects Phase 5 content generation. | Medium |
+| Frontend: Inertia.js + Vue 3 or API-first SPA? | CLAUDE.md lists both. Decision needed before customer dashboard work begins. | High |
+| AI provider: Anthropic or OpenAI? | Anthropic preferred per Architecture.md. Implement before any production run. | Critical |
+| Hosting and deployment target? | No infrastructure provisioned. Options: Laravel Forge + DigitalOcean, Vapor, bare VPS. Decision affects queue worker config and environment secrets strategy. | High |
+| CBB Auctions inventory format? | RSS feed, structured API, or HTML-only? Determines which Connector is primary. | High |
+| JavaScript-rendered inventory pages? | WebsiteCrawlConnector uses simple HTTP. Headless browser connector may be required. | Medium |
+| Image handling for catalog items? | `catalog_items.media` stores URLs. Re-host vs. link-to-source decision needed before content generation goes live. | Medium |
 
 ---
 
@@ -373,43 +391,33 @@ All foundational documents written, reviewed, and committed.
 
 ---
 
-## Next Tasks (Milestone 9 — Learning Engine)
+## Next Tasks (Post-M9 — Production Readiness)
 
-**Phase 1 — Migrations and prerequisite fixes** (start here)
-1. Verify `facts.superseded_by_id` exists; add migration if absent
-2. Verify `knowledge_entries.type` column exists; add migration if absent
-3. Create `learning_applications` migration + `LearningApplication` model
-4. Create `company_scoring_weights` migration + `CompanyScoringWeights` model
-5. Audit `ApprovalService` for approval-side Learning signals; wire if absent
+See `docs/plans/Version-0.1-Architecture-Audit.md` for the full ordered checklist.
 
-**Phase 2 — LearningEngine skeleton + ApplyLearnings job**
-6. Create `LearningServiceProvider`, `LearningEngine` (skeleton), `ApplyLearnings` job
-7. Add daily 02:00 schedule in `routes/console.php`
+**Blocking for production (resolve in order):**
+1. Implement `AnthropicProvider` (or `OpenAiProvider`) and bind in `AppServiceProvider`
+2. Add Filament superadmin gate — `AdminPanelProvider` `authMiddleware` or `canAccess()` policy
+3. SSRF protection on `WebPageCrawler` — validate URL resolves to public IP before Guzzle request
+4. Add `GET /api/health` endpoint
+5. Plan PostgreSQL RLS rollout (first 5 tables)
 
-**Phases 3–7 — Engine logic** (complete in order; can parallelize 5 and 6)
-8. `SignalTier` + `EvidenceEvaluator`
-9. `ConflictResolver`
-10. `FactMutator` + `KnowledgeMutator`
-11. `WeightCalibrator` + `OpportunityScorer` update
-12. `LearningRollbackService`
-
-**Phase 8 — Prompt context integration**
-13. `EditPatternDetector` + `LearningEngine` Tier 3 wiring
-14. `BusinessBrainService` update to include `type = 'learning'` Knowledge
-
-**Phase 9 — Filament visibility**
-15. Learning Log, Applied Effects, BusinessBrain Mutations tabs on CompanyResource
-
-**Phase 10 — Tests + PHPStan + Pint**
-16. ≥ 55 new tests covering all 47 acceptance criteria; PHPStan clean; Pint clean
+**Blocking for customer dashboard (resolve before building customer-facing UI):**
+6. `BusinessBrainService` Redis caching (5-minute TTL per `company_id`)
+7. Rate limiting on `/api/analytics/webhooks/{provider}`
+8. End-to-end pipeline smoke test (Observation → Recommendation, all fakes)
+9. Resolve spec/code drift (`Learning.value` vs `payload`; `LearningApplication` columns)
+10. Align `ApplyLearnings` to `maintenance` queue per Architecture.md
 
 ---
 
 ## Recently Completed
 
-- **Milestone 9 implementation plan** — `docs/plans/Milestone-9-Implementation.md` written. 10 implementation phases: migrations/models, engine skeleton + job, evidence evaluation, conflict resolution, Fact/Knowledge mutation, scoring weight calibration + OpportunityScorer update, rollback service, prompt context/BusinessBrain integration, Filament visibility, and full test suite. Includes prerequisite verification checklist, concrete file lists per phase, risk table, and milestone exit criteria.
+- **Version 0.1 Architecture Audit** — `docs/plans/Version-0.1-Architecture-Audit.md` written. 15 audit areas reviewed. 5 critical/production-blocking items identified. 5 customer-dashboard-blocking items identified. 12 recommended refactors prioritized.
 
-- **Milestone 8.5 — Learning Engine Specification** — `specs/core/learning-engine.md` written. 14 sections: domain model (`LearningApplication`, `CompanyScoringWeights`), learning lifecycle, `ApplyLearnings` job design, prioritization tiers (Tier 1 safety/immediate, Tier 2 performance/2+, Tier 3 preference/3+), conflict resolution (4-rule ordered), confidence recalibration (upward bias, 14-day cooling), BusinessBrain mutation rules, prompt adaptation (indirect via context enrichment), safety constraints (hard limits, company scoping, no-auto-publish), explainability (`effects` descriptor + Filament admin views), rollback (compensating records only), versioning, 47 acceptance criteria, and future extensibility. `ROADMAP.md` Phase 8 updated with concrete deliverables and safety invariants.
+- **Milestone 9 — Learning Engine** — Full Learning Engine implemented and verified. 449 tests (447 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean. See [Milestone-9-Review.md](reviews/Milestone-9-Review.md).
+
+- **Milestone 8.5 — Learning Engine Specification** — `specs/core/learning-engine.md` written. 14 sections: domain model, learning lifecycle, `ApplyLearnings` job design, 3-tier prioritization, 4-rule conflict resolution, confidence recalibration, BusinessBrain mutation rules, prompt adaptation, safety constraints, explainability, rollback, versioning, 47 acceptance criteria, and future extensibility.
 
 - **Milestone 8 — Analytics Engine** — Full analytics pipeline implemented. Pull polling + webhook ingestion; `CampaignKpiSnapshot` (interim/final); `RecommendationKpiService`; `DecisionEffectivenessService`; `LearningService` with 8 signal types; Filament panels. 97 new tests (365 total, 363 passing). PHPStan level 8 — 0 errors. See [Milestone-8-Review.md](reviews/Milestone-8-Review.md).
 
@@ -435,23 +443,22 @@ All foundational documents written, reviewed, and committed.
 
 ---
 
-
----
-
 ## Risks
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|------------|
-| Auction/dealer sites render inventory via JavaScript, blocking simple HTTP crawl | High | High | Spike a headless browser connector (Puppeteer or Playwright via Node sidecar) early in Phase 2 |
+| Auction/dealer sites render inventory via JavaScript, blocking simple HTTP crawl | High | High | Spike a headless browser connector (Puppeteer or Playwright via Node sidecar) before Phase 2 goes live |
 | AI provider rate limits during parallel processing (crawl → extract → synthesize) | Medium | Medium | All AI jobs run on dedicated `ai` queue; implement per-provider rate limiting in `AnthropicProvider` |
-| Frontend framework decision delayed, blocking Phase 5 UI | Medium | Medium | Decide Inertia vs. API-first before Phase 3 ends; Phase 5 UI work cannot start without it |
-| CBB Auctions engagement becomes informal, reducing design partner feedback | Low | Medium | Formalize the design partner relationship; schedule regular demos starting Phase 3 |
+| No real AI provider — all AI paths use `FakeAiProvider` | High | Critical | Implement `AnthropicProvider` before any customer data is processed |
+| SSRF in `WebPageCrawler` — user URLs not validated to public IPs | High | Critical | Add IP range validation before outbound Guzzle requests |
+| Filament panel has no superadmin gate | High | Critical | Add `canAccess()` policy or `authMiddleware` before Filament is accessible in production |
+| CBB Auctions engagement becomes informal, reducing design partner feedback | Low | Medium | Formalize the design partner relationship; schedule regular demos |
 | Scope creep into CRM, billing, or ads integrations before core loop is proven | Low | High | ROADMAP.md exclusions list is authoritative; defer any out-of-scope request explicitly |
 
 ---
 
 ## Last Updated
 
-**2026-06-26** — Milestone 9 implementation plan written (`docs/plans/Milestone-9-Implementation.md`). 10 phases defined with concrete file lists, prerequisite verification checklist, risk table, and exit criteria. Current milestone: M9 Learning Engine — pre-implementation. M8.5 (Learning Engine Specification) also complete this session.
+**2026-06-26** — Version 0.1 Architecture Audit complete (`docs/plans/Version-0.1-Architecture-Audit.md`). 15 audit areas reviewed. 5 critical production blockers identified. Next step: resolve blocking items before customer dashboard work begins.
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*

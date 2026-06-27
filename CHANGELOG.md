@@ -6,6 +6,43 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Version 0.1 Architecture Audit Plan] — 2026-06-26
+
+### Added
+
+- `docs/plans/Version-0.1-Architecture-Audit.md` — comprehensive pre-customer-dashboard readiness review covering 15 audit areas:
+  1. Domain model consistency (spec/code drift, column name mismatches)
+  2. Event chain integrity (missing events, orphaned listeners, SynthesizeKnowledge ambiguity)
+  3. Queue topology and async reliability (ApplyLearnings queue mismatch, ShouldBeUnique coverage)
+  4. Multi-tenancy safety (withoutGlobalScopes audit, Filament company scoping, PostgreSQL RLS)
+  5. AI/provider abstraction (AnthropicProvider missing, prompt injection, structured output coverage)
+  6. Publishing abstraction (circuit breaker, credential encryption, no real social publishers)
+  7. Analytics and learning loop (BusinessBrain learning Knowledge inclusion, signal idempotency)
+  8. Rollback and auditability (delete-free rollback verification, applied_at reset atomicity)
+  9. Filament/admin exposure risks (superadmin gate, read-only models, credential exposure)
+  10. Test coverage gaps (no E2E pipeline test, webhook adversarial tests, rollback-then-reapply)
+  11. Production readiness gaps (AnthropicProvider, email provider, health check endpoint, CI)
+  12. Security/privacy risks (SSRF on WebPageCrawler, prompt injection, webhook rate limiting)
+  13. Performance risks (BusinessBrainService no caching, PHP-side EvidenceEvaluator filtering)
+  14. Documentation cleanup (STATUS.md stale sections, spec/code column drift, duplicate roadmap entries)
+  15. Recommended refactors (12 items; 5 blocking for production, 5 blocking for customer dashboard)
+
+### Audit Findings
+
+| Priority | Finding |
+|----------|---------|
+| 🔴 Critical | `AnthropicProvider` not implemented — Atlas cannot run AI pipeline in production |
+| 🔴 Critical | No Filament superadmin gate — all company data exposed to any registered user |
+| 🔴 Critical | SSRF risk on `WebPageCrawler` — user-supplied URLs not validated against public IP |
+| 🟠 High | No health check endpoint — required before any hosting is provisioned |
+| 🟠 High | `ApplyLearnings` on `ai` queue instead of `maintenance` (Architecture.md spec) |
+| 🟠 High | `Learning.value` vs `Learning.payload` spec/code drift |
+| 🟡 Medium | `BusinessBrainService` assembles without Redis caching (spec requires 5-min TTL) |
+| 🟡 Medium | `EvidenceEvaluator` PHP-side filtering will degrade at production Learning volumes |
+| 🟡 Medium | No end-to-end pipeline smoke test — cross-milestone regressions undetected |
+
+---
+
 ## [Milestone 9 — Learning Engine Implementation] — 2026-06-26
 
 ### Added
