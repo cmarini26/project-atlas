@@ -21,14 +21,14 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 | Dimension         | Status | Notes |
 |-------------------|--------|-------|
-| Specifications    | ✅ Complete | Domain model, architecture, database, AI, and MVP workflow all defined |
+| Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined |
 | Implementation    | 🟡 In progress | Milestone 8 complete: full Analytics Engine in place — pull polling, webhook ingestion, KPI snapshots, LearningService feedback loop, Filament visibility panels |
 | Tests             | ✅ Strong | 365 tests (363 passing, 2 Redis skipped); PHPStan level 8 — 0 errors; Pint clean |
 | CI/CD             | 🟡 Defined | GitHub Actions workflow written; not yet triggered (no PR opened against remote) |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
 
-**Overall:** Milestone 8 complete. Analytics Engine fully implemented: pull-polling metric retrieval, webhook ingestion (Postmark), campaign KPI snapshots, recommendation KPI analytics, decision effectiveness metrics, LearningService with 8 signal types, and Filament admin panels. 365 tests (363 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean.
+**Overall:** Milestone 8 complete. Analytics Engine fully implemented: pull-polling metric retrieval, webhook ingestion (Postmark), campaign KPI snapshots, recommendation KPI analytics, decision effectiveness metrics, LearningService with 8 signal types, and Filament admin panels. 365 tests (363 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean. Milestone 8.5 complete: Learning Engine specification written — `specs/core/learning-engine.md` defines the full Phase 8 implementation blueprint including domain model, job design, prioritization tiers, conflict resolution, confidence recalibration, BusinessBrain mutation rules, prompt adaptation strategy, safety constraints, explainability, rollback, versioning, and acceptance criteria.
 
 ---
 
@@ -43,6 +43,31 @@ Bind `AnthropicProvider` for production; implement `PostmarkEmailProvider`; add 
 ---
 
 ## Completed Milestones
+
+### Milestone 8.5 — Learning Engine Specification ✅
+*Completed: 2026-06-26*
+
+**Delivered:**
+
+| Item | Description |
+|------|-------------|
+| `specs/core/learning-engine.md` | Full Phase 8 implementation blueprint — 14 sections covering every design decision for the Learning Engine |
+| Learning domain model | `Learning` (existing, Phase 7); `LearningApplication` (new — tracks applied effects + rollback); `CompanyScoringWeights` (new — versioned per-company scoring weights) |
+| Learning lifecycle | Created → Unapplied → Applied → (optional Rollback); `applied_at` set once and never changed |
+| `ApplyLearnings` job design | `ShouldBeUnique`; company-scoped; scheduled daily at 02:00 UTC; delegates to `LearningEngine` service |
+| Learning prioritization | Tier 1 (safety: immediate), Tier 2 (performance: 2+ signals), Tier 3 (preference: 3+ signals); 90-day rolling evidence window |
+| Conflict resolution | 4-rule ordered resolution: safety override → recency → majority → no-action tie |
+| Confidence recalibration | Upward bias: 1 positive signal sufficient; 2+ negative signals required for downward adjustment; ±5% max per run; 14-day cooling |
+| `CompanyScoringWeights` design | Versioned rows; `is_current` flag; floor 0.05, ceiling 0.60, sum always 1.00; `type_modifiers` (0.50–1.50) |
+| BusinessBrain mutation rules | Fact supersession (new row, old `is_current = false`); Knowledge `type = 'learning'` with 90-day expiry; weight versioning; `OpportunityScorer` integration pattern |
+| Prompt adaptation strategy | Indirect: learning enriches BusinessBrain context, never modifies prompt templates; edit-pattern detection (length, hashtags, price, CTAs) |
+| Safety constraints | Hard limits table; company scoping enforcement pattern; no-auto-publish; notification requirements for Tier 1 signals |
+| Explainability | `LearningApplication.effects` descriptor shape; Filament admin views (Learning Log, Applied Effects, BusinessBrain Mutations) |
+| Rollback strategy | Compensating records only — no deletes; `rolled_back_at` + `rollback_reason`; Learning `applied_at` reset to null for re-evaluation |
+| Versioning | Weight version history; Knowledge supersession; prompt version linkage; full audit trail via SQL queries documented |
+| 47 acceptance criteria | All verifiable by automated tests; no live API or provider calls |
+| Future extensibility | Cross-company aggregation; ML-trained scoring; preference cascade to brief; user-initiated overrides; real-time Tier 1 path |
+| `ROADMAP.md` updated | Phase 8 now references `specs/core/learning-engine.md`; deliverables expanded with concrete models, jobs, and safety invariants |
 
 ### Milestone 8 — Analytics Engine ✅
 *Completed: 2026-06-26*
@@ -358,6 +383,8 @@ All foundational documents written, reviewed, and committed.
 
 ## Recently Completed
 
+- **Milestone 8.5 — Learning Engine Specification** — `specs/core/learning-engine.md` written. 14 sections: domain model (`LearningApplication`, `CompanyScoringWeights`), learning lifecycle, `ApplyLearnings` job design, prioritization tiers (Tier 1 safety/immediate, Tier 2 performance/2+, Tier 3 preference/3+), conflict resolution (4-rule ordered), confidence recalibration (upward bias, 14-day cooling), BusinessBrain mutation rules, prompt adaptation (indirect via context enrichment), safety constraints (hard limits, company scoping, no-auto-publish), explainability (`effects` descriptor + Filament admin views), rollback (compensating records only), versioning, 47 acceptance criteria, and future extensibility. `ROADMAP.md` Phase 8 updated with concrete deliverables and safety invariants.
+
 - **Milestone 8 — Analytics Engine** — Full analytics pipeline implemented. Pull polling + webhook ingestion; `CampaignKpiSnapshot` (interim/final); `RecommendationKpiService`; `DecisionEffectivenessService`; `LearningService` with 8 signal types; Filament panels. 97 new tests (365 total, 363 passing). PHPStan level 8 — 0 errors. See [Milestone-8-Review.md](reviews/Milestone-8-Review.md).
 
 - **Milestone 7.5 — Analytics Engine Specification** — `specs/core/analytics-engine.md` written. Covers domain model (`ExecutionMetric`, `CampaignKpiSnapshot`, `MetricRetrievalLog`), pull polling + webhook push ingestion, `AnalyticsProvider` interface and registry, normalised metric keys, campaign KPIs, recommendation KPIs, decision effectiveness metrics, BusinessBrain feedback loop, learning inputs, privacy constraints, acceptance criteria, and future extensibility. `ROADMAP.md` Phase 7 updated with concrete deliverables.
@@ -399,6 +426,6 @@ All foundational documents written, reviewed, and committed.
 
 ## Last Updated
 
-**2026-06-26** — Milestone 8 complete. Analytics Engine fully implemented across 10 phases: domain models (`ExecutionMetric`, `CampaignKpiSnapshot`, `MetricRetrievalLog`, `Learning`); provider infrastructure (`AnalyticsProvider`, `AnalyticsProviderRegistry`, `FakeAnalyticsProvider`, `LogAnalyticsProvider`); retrieval jobs (`ScheduleMetricRetrieval`, `RetrieveExecutionMetrics`, `PruneRawMetrics`); webhook ingestion (`PostmarkWebhookHandler`, `AnalyticsWebhookController`, `ProcessAnalyticsWebhookEvent`); KPI services (`CampaignKpiService`, `RecommendationKpiService`, `DecisionEffectivenessService`); `LearningService` with 8 signal types; Filament infolists on Campaign, Execution, and Company resources. 97 new tests — 365 total (363 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean.
+**2026-06-26** — Milestone 8.5 complete. `specs/core/learning-engine.md` written — full Phase 8 Learning Engine implementation blueprint. `ROADMAP.md` Phase 8 updated with concrete deliverables, safety invariants, and spec reference. Milestone 8 also complete: Analytics Engine fully implemented across 10 phases; 365 tests (363 passing, 2 Redis skipped); PHPStan level 8 — 0 errors; Pint clean.
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*

@@ -6,6 +6,61 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 8.5 — Learning Engine Specification] — 2026-06-26
+
+### Added
+
+**Specification**
+
+- `specs/core/learning-engine.md` — Full Phase 8 Learning Engine implementation blueprint. 14 sections:
+
+  1. **Learning Domain Model** — reviews existing `Learning` table; introduces `LearningApplication` (tracks applied effects + rollback; stores `effects` JSON descriptor per change); introduces `CompanyScoringWeights` (versioned per-company scoring adjustments; `is_current` flag; append-only). Defines all 11 signal types with payload schemas, evidence thresholds, and what each adjusts in the BusinessBrain.
+
+  2. **Learning Lifecycle** — three states: `[applied_at = null]` → `[applied_at = timestamp]` → `[rolled_back_at = timestamp]`. Learning records are immutable. `applied_at` is set once. Rollback creates compensating records, never mutates history.
+
+  3. **ApplyLearnings Job** — `ShouldBeUnique` per company; scheduled daily at 02:00 UTC; delegates to `LearningEngine` service; idempotent (reads only `applied_at IS NULL`; unique constraint on `(company_id, learning_id)` prevents double-application at DB level); 3-retry failure handling with exponential backoff.
+
+  4. **Learning Prioritization** — three tiers: Tier 1 (safety: `email_deliverability_issue`, `high_unsubscribe_rate` — applied immediately, threshold = 1); Tier 2 (performance: `channel_outperformed/underperformed`, `campaign_type_succeeded/underperformed`, `recommendation_rejected` — threshold = 2); Tier 3 (preference: `recommendation_edited_and_approved`, `content_angle_engaged`, `optimal_timing_signal` — threshold = 3–4). Evidence counted via 90-day rolling window per `(company_id, signal, discriminator)`.
+
+  5. **Conflict Resolution** — four ordered rules: (1) safety overrides everything; (2) recency wins when evidence counts within 1; (3) majority wins when counts differ by 2+; (4) no-action tie. All resolutions logged at Info level.
+
+  6. **Confidence Recalibration** — upward bias rule: 1 positive signal can increase; 2+ negative signals required to decrease. Hard bounds per application: ±5% per weight component; ±20% total deviation from defaults; floor 0.05; ceiling 0.60; sum always 1.00. `type_modifiers` (0.50–1.50). 14-day cooling period per signal category.
+
+  7. **BusinessBrain Mutation Rules** — what can change: Facts (new row, old `is_current = false`, `superseded_by_id` set); Knowledge (new row `type = 'learning'`, 90-day expiry, old `is_active = false`); CompanyScoringWeights (new version row, old `is_current = false`). What cannot change: Learning records, Approval/Rejection records, KPI snapshots, executions, other companies' data. Fact namespaces owned by LearningEngine: `channel_performance.*`, `campaign_type.*`, `content_preferences.*`, `audience.*`, `timing.*`. `OpportunityScorer` integration pattern documented.
+
+  8. **Prompt Adaptation Strategy** — learning never modifies prompt templates; enriches BusinessBrain context instead. Edit-pattern detection for content preferences (length, hashtag use, price inclusion, CTA style) after 3+ edits with detectable pattern. Knowledge entries with `type = 'learning'` surfaced in `ContentGenerationAnalyst` context. `prompt_performance` signal type (Phase 8 only) for engineering visibility.
+
+  9. **Safety Constraints** — explicit company scoping (`withoutGlobalScopes()` + `company_id` filter on every query); hard limits table (weight floor, ceiling, sum, modifier range, max shift, cooling period, evidence window); no-auto-publish constraint; Tier 1 notification requirements; immutability guards (`UPDATED_AT = null`, `applied_at` set once).
+
+  10. **Explainability** — `LearningApplication.effects` JSON schema (5 effect types: `fact_created`, `knowledge_created`, `knowledge_updated`, `weight_version_created`, `preference_updated`); each descriptor includes `type`, `entity_type`, `entity_id`, `key`, `previous_entity_id`, `description`. Filament admin views: Learning Log, Applied Effects, BusinessBrain Mutations. Decision rationale traceability via Knowledge context.
+
+  11. **Rollback Strategy** — admin-initiated only. For each effect: Fact — old row restored to `is_current = true`; Knowledge — old row restored to `is_active = true`; Weight — previous version restored to `is_current = true`. `LearningApplication.rolled_back_at` and `rollback_reason` set. `Learning.applied_at` reset to null for re-evaluation. Nothing deleted.
+
+  12. **Versioning** — `CompanyScoringWeights` monotonically versioned per company (version 0 = implicit global defaults); BusinessBrain assembled on demand from current rows (no stale cache); prompt version linkage via `Campaign.prompt_version`; full audit trail SQL documented.
+
+  13. **Acceptance Criteria** — 47 verifiable criteria organized by category: application idempotency, evidence thresholds, conflict resolution, weight calibration, cooling period, BusinessBrain mutation, company scoping, rollback, explainability, and prompt adaptation. No live API or provider calls required in any test.
+
+  14. **Future Extensibility** — cross-company aggregate learning (separate `AggregateSignal` table; consent-gated); ML-trained scoring (existing schema compatible); preference cascade to campaign brief (prompt engineering, no structural changes); user-initiated overrides (`source_type = 'user_override'`, bypasses evidence threshold); real-time Tier 1 path (new event + high-priority queue; same mutation rules).
+
+**Updated documents**
+
+- `ROADMAP.md` Phase 8 — added `specs/core/learning-engine.md` reference; expanded deliverables to match spec (`LearningApplication`, `CompanyScoringWeights`, `LearningEngine` service, evidence tiers, conflict resolution, scoring bounds, preference accumulation, rollback); added Safety Invariants section with all 5 non-negotiable constraints; updated success criteria
+
+### Explicit Out-of-Scope for M8.5 (specification only)
+
+- No application code written — all implementation deferred to Milestone 8
+- `LearningApplication` model and migration — Phase 8
+- `CompanyScoringWeights` model and migration — Phase 8
+- `ApplyLearnings` job — Phase 8
+- `LearningEngine` service — Phase 8
+- `OpportunityScorer` weight integration — Phase 8
+- Filament Learning admin views — Phase 8
+- Cross-company pattern aggregation — future phase (post-Phase 8)
+- ML-trained scoring models — future phase
+- User-initiated learning overrides — future phase
+
+---
+
 ## [Milestone 8 — Analytics Engine] — 2026-06-26
 
 ### Added

@@ -253,25 +253,41 @@ Design partner for all phases: **CBB Auctions**. Second validation vertical: exo
 
 *Atlas gets smarter. Every outcome feeds back into the Business Brain and improves future decisions.*
 
+**Specification:** `specs/core/learning-engine.md` — authoritative implementation spec for this phase.
+
 ### Goals
 - Every approval, rejection, edit, and campaign outcome is systematically incorporated into the Business Brain
 - The Opportunity Engine and Decision Engine use accumulated Learning to make better choices over time
 - Atlas is measurably better after 90 days than it was at setup — and users feel the difference
 
 ### Major Deliverables
-- `ApplyLearnings` job: reads unapplied `Learning` records and updates Facts, Knowledge, and scoring weights
-- Preference accumulation: user edits to ContentAssets produce preference signals that influence future content generation (channel voice, formatting, length, hashtag use)
+- `LearningApplication` and `CompanyScoringWeights` domain models and migrations — track applied effects and per-company weight versions
+- `ApplyLearnings` job: company-scoped daily batch; reads unapplied `Learning` records in priority order; applies tiered evidence thresholds (Tier 1: safety signals = immediate; Tier 2: performance = 2+; Tier 3: preference = 3+)
+- `LearningEngine` service: orchestrates prioritization, conflict resolution, evidence counting, and BusinessBrain mutation
+- Per-company scoring weight calibration: `CompanyScoringWeights` versioned rows; `OpportunityScorer` reads company-specific weights before scoring; hard bounds (±5% per run; ±20% total deviation; 14-day cooling period)
+- Preference accumulation: user edits to ContentAssets produce pattern-detected preference Knowledge entries (length, hashtag use, CTAs, price inclusion) that influence future content generation
 - Rejection analysis: repeated rejections of a campaign type or channel produce Knowledge entries that the Opportunity Engine acts on
-- Scoring weight calibration: per-company scoring weights adjust based on historical approval rates per opportunity type
-- Prompt performance tracking: approval rates per `prompt_version` surfaced as an internal metric; underperforming prompt versions flagged for review
-- Cross-company pattern aggregation (anonymized): aggregate Learning signals improve default scoring weights for new companies
-- Learning dashboard (internal): visibility into what Atlas has learned per company and when
+- Prompt performance tracking: approval rates per `prompt_version` surfaced as an internal Filament metric; underperforming prompt versions flagged for review
+- Full explainability: every `LearningApplication` stores a human-readable `effects` descriptor; Filament admin shows Learning Log, Applied Effects, and BusinessBrain Mutations views
+- Rollback mechanism: admin-initiated; creates compensating records; never deletes rows; rolled-back Learning re-enters the queue for next daily run
+
+### Safety Invariants (non-negotiable)
+- Learning records are immutable — `applied_at` is set once and never changed
+- Applying a Learning creates new state; it never mutates history — Fact supersession and weight versioning are always append-only
+- All applied learnings must be explainable and reversible — `LearningApplication.effects` is the audit trail
+- Learning must never reduce confidence without supporting evidence — downward adjustments require 2+ corroborating signals
+- Learning is always company-scoped — no signal from Company A influences Company B
 
 ### Success Criteria
 - After 30 days, the approval rate for a company's Recommendations is measurably higher than in week one
 - Repeated rejection of a channel type results in that channel being deprioritized in future Decisions for that company
 - User edits to content are detectably reflected in content generated for subsequent campaigns (same company)
-- A new company benefits from aggregate patterns learned across all companies — its first Recommendation is better than a company onboarded before Phase 8
+- `ApplyLearnings` is idempotent: running it twice on the same day processes nothing on the second run
+- Every applied Learning has a `LearningApplication` record with a non-empty `effects` array that a non-engineer can read and understand
+
+### Dependencies
+- Phase 5 (Learning records from approvals and rejections)
+- Phase 7 (performance data from published campaigns)
 
 ### Dependencies
 - Phase 5 (Learning records from approvals and rejections)
