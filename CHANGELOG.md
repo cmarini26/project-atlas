@@ -6,6 +6,30 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [P0 — Onboarding Analysis Pipeline Does Not Start] — 2026-06-28
+
+### Fixed
+
+- `IntegrationService::create()` no longer auto-dispatches `SyncIntegration`. Callers control the dispatch so the onboarding path can run it synchronously and other callers (e.g. Settings) keep their existing async dispatch.
+- `OnboardingController::createIntegration()` now calls `SyncIntegration::dispatchSync()` immediately after creating the integration. The website crawl runs inline in the same HTTP request — no queue worker is required for the first onboarding sync. If the crawl throws, the integration is marked `status=error` and the user is sent to the status page which shows the failure state.
+- `OnboardingStatusController` now returns `integration_status` (the integration's `status` column) and `sync_started` (`last_run_at !== null`) so the frontend can distinguish "queued but not started", "running", and "error" states.
+- `Status.vue` shows a dedicated error card ("Atlas couldn't reach your website") when `integration_status === 'error'`. Polling stops immediately on error. Progress list gained a new first step "Website scanned" driven by `sync_started`.
+- `ConnectorServiceProvider` wires `WebPageCrawler` with `maxPages` from `config/crawler.php` (env: `CRAWLER_MAX_PAGES`, default: 20).
+
+### Added
+
+- `config/crawler.php` — new config file for website crawler settings
+- `tests/Feature/Api/OnboardingStatusControllerTest.php` — 4 tests covering the status API: no membership, active integration before sync, active after sync, error state
+- `test_integration_step_marks_error_when_sync_fails` — verifies that a crawl failure marks the integration as `error` and still redirects to status page
+- `test_does_not_auto_dispatch_sync_job` in `IntegrationServiceTest` — documents the new contract
+- `docs/reviews/P0-New-Customer-Onboarding-Fix.md` — full root-cause analysis and fix documentation
+
+### Changed
+
+- `test_integration_step_dispatches_sync_job` renamed `test_integration_step_dispatches_sync_job_synchronously`; uses `Bus::fake()` + `Bus::assertDispatched()` instead of `Queue::fake()` + `Queue::assertPushed()` (sync dispatch bypasses the queue driver)
+
+---
+
 ## [New Company Onboarding Happy Path Fix] — 2026-06-28
 
 ### Fixed

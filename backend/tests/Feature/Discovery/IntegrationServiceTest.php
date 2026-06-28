@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Discovery;
 
-use App\Jobs\SyncIntegration;
 use App\Models\Company;
 use App\Models\Integration;
 use App\Models\User;
@@ -67,13 +66,15 @@ class IntegrationServiceTest extends TestCase
         $this->assertTrue($integration->next_run_at->between($before, $after));
     }
 
-    public function test_dispatches_sync_integration_immediately(): void
+    public function test_does_not_auto_dispatch_sync_job(): void
     {
+        // Callers (e.g. OnboardingController) own the dispatch decision —
+        // IntegrationService::create() only persists the record.
         Queue::fake();
 
         $this->service->create($this->company, 'website_crawl', ['url' => 'https://example.com']);
 
-        Queue::assertPushedOn('observations', SyncIntegration::class);
+        Queue::assertNothingPushed();
     }
 
     public function test_uses_default_name_for_website_crawl(): void

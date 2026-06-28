@@ -2,7 +2,6 @@
 
 namespace App\Services\Observatory;
 
-use App\Jobs\SyncIntegration;
 use App\Models\Company;
 use App\Models\Integration;
 
@@ -11,7 +10,7 @@ class IntegrationService
     /** @param array<string, mixed> $config */
     public function create(Company $company, string $type, array $config): Integration
     {
-        $integration = Integration::create([
+        return Integration::create([
             'company_id' => $company->id,
             'type' => $type,
             'name' => $this->defaultName($type),
@@ -19,10 +18,6 @@ class IntegrationService
             'status' => 'active',
             'next_run_at' => now()->addDays(7),
         ]);
-
-        SyncIntegration::dispatch($integration);
-
-        return $integration;
     }
 
     private function defaultName(string $type): string

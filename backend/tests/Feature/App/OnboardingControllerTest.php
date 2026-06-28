@@ -7,8 +7,10 @@ use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\Integration;
 use App\Models\User;
+use App\Services\Observatory\Connectors\ConnectorRegistry;
+use App\Services\Observatory\Connectors\Contracts\Connector;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Bus;
 use Tests\TestCase;
 
 class OnboardingControllerTest extends TestCase
@@ -102,7 +104,7 @@ class OnboardingControllerTest extends TestCase
         $company = Company::withoutGlobalScopes()->create(['name' => 'My Co', 'slug' => 'my-co']);
         CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => 'owner']);
 
-        Queue::fake();
+        Bus::fake();
 
         $this->actingAs($user)
             ->post('/onboarding/integration', [
@@ -116,22 +118,57 @@ class OnboardingControllerTest extends TestCase
         ]);
     }
 
-    public function test_integration_step_dispatches_sync_job(): void
+    public function test_integration_step_dispatches_sync_job_synchronously(): void
     {
         $user = User::factory()->create();
         $company = Company::withoutGlobalScopes()->create(['name' => 'My Co', 'slug' => 'my-co']);
         CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => 'owner']);
 
-        Queue::fake();
+        Bus::fake();
 
         $this->actingAs($user)
             ->post('/onboarding/integration', [
                 'website_url' => 'https://example.com',
             ]);
 
-        Queue::assertPushed(SyncIntegration::class, function (SyncIntegration $job) use ($company): bool {
+        Bus::assertDispatched(SyncIntegration::class, function (SyncIntegration $job) use ($company): bool {
             return $job->integration->company_id === $company->id;
         });
+    }
+
+    public function test_integration_step_marks_error_when_sync_fails(): void
+    {
+        $user = User::factory()->create();
+        $company = Company::withoutGlobalScopes()->create(['name' => 'My Co', 'slug' => 'my-co']);
+        CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => 'owner']);
+
+        // SyncIntegration throws when the connector is unavailable; simulate this
+        // by binding a ConnectorRegistry that always throws for the resolving step.
+        // We achieve this without touching real HTTP by making Bus NOT fake so the
+        // job runs, but swapping ConnectorRegistry to throw.
+        $this->app->bind(
+            ConnectorRegistry::class,
+            fn () => new class() extends ConnectorRegistry
+            {
+                public function __construct() {}
+
+                public function resolve(Integration $integration): Connector
+                {
+                    throw new \RuntimeException('Connector unavailable');
+                }
+            }
+        );
+
+        $this->actingAs($user)
+            ->post('/onboarding/integration', [
+                'website_url' => 'https://example.com',
+            ])
+            ->assertRedirect(route('onboarding.status'));
+
+        $this->assertDatabaseHas('integrations', [
+            'company_id' => $company->id,
+            'status' => 'error',
+        ]);
     }
 
     public function test_integration_step_requires_valid_url(): void

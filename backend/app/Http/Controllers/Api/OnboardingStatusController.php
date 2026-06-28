@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CompanyMembership;
 use App\Models\DigitalTwin;
 use App\Models\Fact;
+use App\Models\Integration;
 use App\Models\Opportunity;
 use App\Models\Recommendation;
 use App\Models\User;
@@ -26,13 +27,21 @@ class OnboardingStatusController extends Controller
         if (! $membership) {
             return response()->json([
                 'twin_status' => null,
+                'integration_status' => null,
+                'sync_started' => false,
                 'fact_count' => 0,
                 'opportunity_count' => 0,
                 'recommendation_count' => 0,
+                'first_recommendation_id' => null,
             ]);
         }
 
         $companyId = $membership->company_id;
+
+        $integration = Integration::withoutGlobalScopes()
+            ->where('company_id', $companyId)
+            ->latest()
+            ->first();
 
         $twin = DigitalTwin::where('company_id', $companyId)->first();
 
@@ -43,6 +52,8 @@ class OnboardingStatusController extends Controller
 
         return response()->json([
             'twin_status' => $twin?->status,
+            'integration_status' => $integration?->status,
+            'sync_started' => $integration?->last_run_at !== null,
             'fact_count' => Fact::where('company_id', $companyId)->where('is_current', true)->count(),
             'opportunity_count' => Opportunity::where('company_id', $companyId)->where('status', 'open')->count(),
             'recommendation_count' => Recommendation::where('company_id', $companyId)->where('status', 'pending')->count(),

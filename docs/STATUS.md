@@ -23,12 +23,12 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. |
-| Tests             | ✅ Strong | 587 tests (585 passing, 2 Redis skipped); PHPStan level 8 — 0 errors; Pint clean |
+| Tests             | ✅ Strong | 593 tests (591 passing, 2 Redis skipped); PHPStan level 8 — 0 errors; Pint clean |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
 
-**Overall:** Milestone 10 complete + new-company onboarding happy path fixed. Users now flow correctly from registration → company creation → website connection → analysis status → first recommendation. 587 tests (585 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean.
+**Overall:** Milestone 10 complete + onboarding P0 fixed. Users now flow correctly from registration → company creation → website connection (crawl runs inline on submit) → analysis status → first recommendation. Clear error state shown if crawl fails. 593 tests (591 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean.
 
 ---
 
@@ -405,7 +405,7 @@ All 5 production-blocking gaps resolved. Two systemic pipeline defects fixed. Se
 | `ConnectorServiceProvider` | Registers `WebsiteConnector` in `ConnectorRegistry` as a singleton |
 | Observation pipeline | `ObservationService`, `SyncIntegration` job, `ProcessObservation` stub job, `ObservationRecorded` event, `DispatchObservationProcessing` listener |
 | Event wiring | `ObservationRecorded → DispatchObservationProcessing` registered in `AppServiceProvider` |
-| `IntegrationService` | `create(Company, type, config)` — provisions Integration, sets `name`, `status: active`, `next_run_at: +7 days`, dispatches `SyncIntegration` immediately |
+| `IntegrationService` | `create(Company, type, config)` — provisions Integration, sets `name`, `status: active`, `next_run_at: +7 days`; callers own dispatch |
 | `SyncIntegration` uniqueness | Implements `ShouldBeUnique`; `uniqueId()` keyed on `integration->id` — prevents duplicate syncs in queue |
 | Feature tests | 20 new tests: company creation, tenant isolation, connector registry, observation service, queue dispatch, integration service — 48 total, 46 passing (2 Redis skipped) |
 | PHPStan level 8 | 0 errors; full generic annotations on all Eloquent relationships |
@@ -576,6 +576,8 @@ All production-blocking items resolved. Remaining pre-production items:
 ---
 
 ## Last Updated
+
+**2026-06-28** — P0 onboarding pipeline fix. Website crawl now runs synchronously on form submit (`dispatchSync`) — no queue worker needed for first sync. Integration error state exposed on the status API (`integration_status`, `sync_started`). Status page shows clear failure UI when crawl fails. 593 tests (591 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. See [P0-New-Customer-Onboarding-Fix.md](reviews/P0-New-Customer-Onboarding-Fix.md).
 
 **2026-06-27** — Landing Page Design & Content Specification complete. Full marketing spec for Atlas: hero through footer, 16 content sections, recommendation showcase mockup, industry cards, mobile layout, animation spec, accessibility requirements, CTA strategy, and copy principles. See `docs/marketing/Landing-Page.md`.
 

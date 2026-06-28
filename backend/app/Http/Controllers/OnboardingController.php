@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SyncIntegration;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\Integration;
@@ -12,6 +13,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 class OnboardingController extends Controller
 {
@@ -90,11 +92,21 @@ class OnboardingController extends Controller
 
         $company->update(['website_url' => $validated['website_url']]);
 
-        $this->integrationService->create(
+        $integration = $this->integrationService->create(
             $company,
             'website_crawl',
             ['url' => $validated['website_url']]
         );
+
+        // Run the first sync inline so observations are recorded immediately,
+        // before the user reaches the status page. Subsequent scheduled syncs
+        // are dispatched via the queue and processed by workers.
+        try {
+            SyncIntegration::dispatchSync($integration);
+        } catch (Throwable $e) {
+            $integration->markAsError($e->getMessage());
+            report($e);
+        }
 
         $request->session()->forget('onboarding_company_id');
 
