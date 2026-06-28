@@ -6,6 +6,49 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 10.1 — Customer Design System] — 2026-06-27
+
+### Added
+
+- `docs/design/System.md` — comprehensive customer dashboard design system document; 21 sections + 2 appendices
+
+**Design system contents:**
+
+| Section | Summary |
+|---------|---------|
+| Design philosophy | "A quiet, capable presence" — calm, clear, low cognitive load, built for business owners not marketers |
+| Typography | Instrument Sans 400/500/600; 9-size scale from 11px label-sm to 30px display; 26px line height on rationale text |
+| Color palette | Warm stone/slate neutrals; single indigo accent; full semantic `@theme` token table; rejection rendered in stone (never red) |
+| Spacing scale | 4px base unit; 14 tokens (4px → 96px); per-component padding tables; sidebar fixed measurements |
+| Layout grid | 12-column; 1140px max-width; 240px fixed sidebar; page header pattern |
+| Responsive breakpoints | 5 breakpoints; sidebar appears at `lg` (1024px); mobile-first; hamburger drawer for `< lg` |
+| Icons | Heroicons v2 outline/solid; 5 sizes (16px–48px); standard icon mapping for all Atlas domain concepts |
+| Card components | 4 variants: default, highlighted (pending recommendation), subtle, ghost; anatomy + padding rules |
+| Buttons | 3-level hierarchy: Primary (Approve), Secondary (Edit & Approve), Tertiary (Reject); destructive style reserved for technical failures only |
+| Form controls | Inputs, textarea, labels, helper text, error text, selects, checkboxes — all states documented |
+| Tables | Anatomy, column patterns, row styles, pagination strip |
+| Recommendation cards | Compact (dashboard) and expanded (detail page); rationale quadrant layout at `text-body-lg` (16px/26px) |
+| Opportunity cards | Score bar color scale by value; 6-state expiry treatment with amber/rose urgency |
+| Campaign cards | Progress trail through full campaign lifecycle |
+| Metric cards | Single-metric and expected-vs-actual KPI comparison variants |
+| Timeline components | Vertical event trail with status-colored dots |
+| Empty states | 3 categories: Atlas is working (reassuring), action needed (single CTA), genuinely empty (matter-of-fact) |
+| Loading skeletons | Pulse animation; card/metric/table variants; 300ms minimum display rule |
+| Animations | Conservative: no bounce, no confetti; 5 duration tokens (100ms–300ms); Inertia page fade only |
+| Accessibility | WCAG 2.1 AA minimum; full ARIA requirements table; keyboard nav; heading structure; `prefers-reduced-motion` |
+| Dark mode strategy | Light only for MVP; semantic token architecture supports future dark mode via `@media` overrides only |
+| Appendix A | Full Tailwind v4 `@theme {}` CSS block for all custom tokens |
+| Appendix B | Component implementation checklist (10 items per component) |
+
+**Key design decisions:**
+- Rejection is never red — stone/neutral throughout to avoid creating anxiety around a valid, learning-generating user action
+- Rationale quadrant text uses `text-body-lg` (16px / 26px) — the most important reading on the platform, deserves editorial treatment
+- Button hierarchy maps directly to approval actions: Primary → Approve; Secondary → Edit & Approve; Tertiary/ghost → Reject
+- Score bars use value-based color scale (red → orange → yellow → green → emerald) with numeric score, never a percentage
+- Empty states have three distinct tones — never blank, never over-apologetic
+
+---
+
 ## [Milestone 10 — Customer Dashboard & UX — Implementation Plan] — 2026-06-27
 
 ### Added

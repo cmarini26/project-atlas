@@ -34,6 +34,34 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
+**Milestone 10.1 — Customer Design System ✅ Complete**
+*Completed: 2026-06-27*
+
+Design system document written: `docs/design/System.md`. No code yet.
+
+**Covers all 21 required topics:**
+- Design philosophy: calm, clear, low cognitive load — built for business owners, not marketers
+- Typography: Instrument Sans (400/500/600), 9-size scale from 11px label to 30px display
+- Color palette: warm stone neutrals + single indigo accent; semantic `@theme` tokens; rejection is never red
+- Spacing scale: 4px base unit, 14 tokens from 4px to 96px
+- Layout grid: 12-column, 1140px max-width, 240px fixed sidebar
+- Responsive breakpoints: 5 breakpoints; sidebar appears at `lg` (1024px); mobile-first
+- Icons: Heroicons v2 — 5 sizes, outline/solid rules, standard icon mapping for all Atlas concepts
+- Card components: 4 variants (default, highlighted, subtle, ghost); anatomy and padding rules
+- Buttons: 3-level hierarchy (Primary = Approve, Secondary = Edit & Approve, Tertiary = Reject); never red for rejection
+- Form controls: inputs, labels, helper/error text, checkboxes — all with focus/error/disabled states
+- Tables: column patterns, row styles, pagination strip
+- Recommendation cards: compact (dashboard) and expanded (detail page) forms; rationale quadrant layout
+- Opportunity cards: score bar styles, 6-state expiry treatment
+- Campaign cards: progress trail for full lifecycle
+- Metric cards: single-metric and expected-vs-actual KPI variants
+- Timeline components: vertical event trail
+- Empty states: 3 categories by tone (working, action needed, genuinely empty)
+- Loading skeletons: pulse animation, card/metric/table variants
+- Animations: conservative — no bounce, no confetti; 5 duration tokens
+- Accessibility: WCAG 2.1 AA, ARIA requirements, keyboard nav, `prefers-reduced-motion`
+- Dark mode strategy: light only for MVP; token architecture designed for future addition
+
 **Milestone 10 — Customer Dashboard & UX 🔵 In Planning**
 *Plan authored: 2026-06-27*
 
@@ -473,6 +501,6 @@ All production-blocking items resolved. Remaining pre-production items:
 
 ## Last Updated
 
-**2026-06-27** — Milestone 10 implementation plan written (`docs/plans/Milestone-10-Implementation.md`). 10 implementation phases defined. Inertia.js + Vue 3 + TypeScript chosen for customer dashboard. Personas and user flows authored. Implementation begins next.
+**2026-06-27** — Milestone 10.1 complete. Customer design system written (`docs/design/System.md`). 21 design topics covered: typography, color palette, spacing, layout grid, responsive breakpoints, icons, all 8 component types, animations, accessibility, and dark mode strategy. Implementation of the customer dashboard begins next.
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*
