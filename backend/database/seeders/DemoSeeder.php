@@ -30,23 +30,36 @@ class DemoSeeder extends Seeder
 {
     public function run(): void
     {
-        // ── Admin user ────────────────────────────────────────────────────────
-        $user = User::withoutGlobalScopes()->updateOrCreate(
+        // ── Superadmin ────────────────────────────────────────────────────────
+        $admin = User::withoutGlobalScopes()->updateOrCreate(
             ['email' => 'admin@atlas.test'],
             [
                 'name' => 'Atlas Admin',
                 'password' => Hash::make('password'),
                 'email_verified_at' => now(),
+                'is_superadmin' => true,
             ]
         );
 
-        $this->command->info('User: admin@atlas.test / password');
+        // ── CBB Auctions owner ────────────────────────────────────────────────
+        $user = User::withoutGlobalScopes()->updateOrCreate(
+            ['email' => 'user@atlas.test'],
+            [
+                'name' => 'Atlas User',
+                'password' => Hash::make('password'),
+                'email_verified_at' => now(),
+                'is_superadmin' => false,
+            ]
+        );
+
+        $this->command->info('Admin:  admin@atlas.test / password  (Filament superadmin)');
+        $this->command->info('Owner:  user@atlas.test  / password  (CBB Auctions owner)');
 
         // ── CBB Auctions ──────────────────────────────────────────────────────
-        $cbb = $this->seedCbbAuctions($user);
+        $this->seedCbbAuctions($user);
 
         // ── Luxe Motor Group ──────────────────────────────────────────────────
-        $this->seedLuxeMotorGroup($user);
+        $this->seedLuxeMotorGroup($admin);
 
         $this->command->info('CBB Auctions: full pipeline (opportunity → decision → campaign → execution).');
         $this->command->info('Luxe Motor Group: open opportunity only.');
