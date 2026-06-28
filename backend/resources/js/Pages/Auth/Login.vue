@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useForm } from '@inertiajs/vue3'
+import { Head, useForm } from '@inertiajs/vue3'
 import AuthLayout from '@/Layouts/AuthLayout.vue'
 
 const form = useForm({
@@ -16,12 +16,13 @@ function submit(): void {
 </script>
 
 <template>
+  <Head><title>Sign in — Atlas</title></Head>
   <AuthLayout>
     <h1 class="text-base font-semibold text-[var(--color-text-primary)] mb-5">Sign in</h1>
 
     <form class="space-y-4" @submit.prevent="submit">
       <div>
-        <label for="email" class="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5">Email</label>
+        <label for="email" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Email</label>
         <input
           id="email"
           v-model="form.email"
@@ -40,7 +41,7 @@ function submit(): void {
       </div>
 
       <div>
-        <label for="password" class="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5">Password</label>
+        <label for="password" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Password</label>
         <input
           id="password"
           v-model="form.password"

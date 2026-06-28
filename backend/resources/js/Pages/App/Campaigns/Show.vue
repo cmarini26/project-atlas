@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Head } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
@@ -23,12 +24,32 @@ const statusVariants: Record<string, 'accent' | 'success' | 'muted' | 'default'>
   cancelled: 'muted',
 }
 
+const statusLabels: Record<string, string> = {
+  draft: 'Draft',
+  approved: 'Approved',
+  active: 'Active',
+  published: 'Published',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+}
+
 const executionStatusVariants: Record<string, 'success' | 'warning' | 'muted' | 'default'> = {
   published: 'success',
   completed: 'success',
   failed: 'warning',
   pending: 'muted',
   scheduled: 'default',
+  executing: 'default',
+}
+
+const executionStatusLabels: Record<string, string> = {
+  pending: 'Pending',
+  scheduled: 'Scheduled',
+  executing: 'Executing',
+  completed: 'Completed',
+  published: 'Published',
+  failed: 'Failed',
+  cancelled: 'Cancelled',
 }
 
 function formatDate(date: string | null): string {
@@ -38,6 +59,7 @@ function formatDate(date: string | null): string {
 </script>
 
 <template>
+  <Head><title>{{ campaign.title }} — Atlas</title></Head>
   <AppLayout>
     <div class="max-w-3xl">
       <!-- Header -->
@@ -47,7 +69,7 @@ function formatDate(date: string | null): string {
         </a>
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1">
-            <Badge :variant="statusVariants[campaign.status] ?? 'muted'">{{ campaign.status }}</Badge>
+            <Badge :variant="statusVariants[campaign.status] ?? 'muted'">{{ statusLabels[campaign.status] ?? campaign.status }}</Badge>
           </div>
           <h1 class="text-xl font-semibold text-[var(--color-text-primary)]">{{ campaign.title }}</h1>
           <p class="text-sm text-[var(--color-text-muted)] mt-1">Started {{ formatDate(campaign.created_at) }}</p>
@@ -105,7 +127,7 @@ function formatDate(date: string | null): string {
               <p class="text-xs text-[var(--color-text-muted)]">{{ formatDate(execution.scheduled_at) }}</p>
             </div>
             <Badge :variant="executionStatusVariants[execution.status] ?? 'muted'">
-              {{ execution.status }}
+              {{ executionStatusLabels[execution.status] ?? execution.status }}
             </Badge>
           </div>
         </div>

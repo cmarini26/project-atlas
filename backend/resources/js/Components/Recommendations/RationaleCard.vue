@@ -23,7 +23,7 @@ const labels: Record<string, string> = {
       <h3 class="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide mb-2">
         {{ labels[key] ?? String(key).replace(/_/g, ' ') }}
       </h3>
-      <p class="text-sm text-[var(--color-text-secondary)]">{{ value }}</p>
+      <p class="text-base leading-relaxed text-[var(--color-text-secondary)]">{{ value }}</p>
     </div>
   </div>
 </template>

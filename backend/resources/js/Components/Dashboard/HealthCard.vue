@@ -1,28 +1,43 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+
 interface Health {
   twin_status: string
+  twin_health_score?: number | null
   fact_count: number
   knowledge_count: number
   integration_count: number
 }
 
-defineProps<{ health: Health }>()
+const props = defineProps<{ health: Health }>()
 
 const statusLabels: Record<string, string> = {
-  initializing: 'Getting started',
-  crawling: 'Learning',
-  analyzing: 'Analyzing',
-  ready: 'Ready',
+  initializing: 'Setting up',
+  active: 'Active',
   error: 'Needs attention',
 }
 
 const statusColors: Record<string, string> = {
-  ready: 'text-emerald-600',
-  analyzing: 'text-[var(--color-accent-600)]',
-  crawling: 'text-[var(--color-accent-600)]',
+  active: 'text-emerald-600',
   initializing: 'text-[var(--color-text-muted)]',
   error: 'text-rose-600',
 }
+
+const score = computed(() => props.health.twin_health_score ?? null)
+
+const healthLabel = computed(() => {
+  if (score.value === null) return null
+  if (score.value >= 80) return 'Healthy'
+  if (score.value >= 50) return 'Building'
+  return 'Learning'
+})
+
+const healthLabelColor = computed(() => {
+  if (score.value === null) return ''
+  if (score.value >= 80) return 'text-emerald-600'
+  if (score.value >= 50) return 'text-amber-600'
+  return 'text-[var(--color-text-muted)]'
+})
 </script>
 
 <template>
@@ -32,10 +47,14 @@ const statusColors: Record<string, string> = {
       <a href="/app/brain" class="text-xs text-[var(--color-text-link)] hover:underline">View all</a>
     </div>
 
-    <div class="flex items-center gap-2 mb-4">
+    <div class="flex items-center justify-between mb-4">
       <span :class="['text-sm font-medium', statusColors[health.twin_status] ?? 'text-[var(--color-text-muted)]']">
         {{ statusLabels[health.twin_status] ?? health.twin_status }}
       </span>
+      <div v-if="score !== null" class="flex items-center gap-1.5">
+        <span class="text-sm font-semibold text-[var(--color-text-primary)] tabular-nums">{{ score }}</span>
+        <span :class="['text-xs font-medium', healthLabelColor]">{{ healthLabel }}</span>
+      </div>
     </div>
 
     <dl class="grid grid-cols-3 gap-3">

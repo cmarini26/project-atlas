@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Head } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
 import type { CampaignKpiSnapshot } from '@/types'
@@ -28,6 +29,7 @@ function pct(value: number | undefined): string {
 </script>
 
 <template>
+  <Head><title>Analytics — Atlas</title></Head>
   <AppLayout>
     <div class="max-w-4xl">
       <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-6">Analytics</h1>

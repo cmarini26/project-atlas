@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Head } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
@@ -16,6 +17,26 @@ defineProps<{
   applied_effects: AppliedEffect[]
 }>()
 
+const signalLabels: Record<string, string> = {
+  channel_outperformed: 'Channel exceeded expectations',
+  channel_underperformed: 'Channel underperformed',
+  campaign_type_succeeded: 'Campaign type succeeded',
+  campaign_type_underperformed: 'Campaign type underperformed',
+  recommendation_approved: 'Recommendation approved',
+  recommendation_rejected: 'Recommendation rejected — wrong fit',
+  recommendation_edited_and_approved: 'Recommendation edited before approval',
+  email_deliverability_issue: 'Email deliverability issue detected',
+  high_unsubscribe_rate: 'High unsubscribe rate detected',
+  content_angle_engaged: 'Content angle resonated with audience',
+  optimal_timing_signal: 'Optimal send time detected',
+}
+
+const sourceTypeLabels: Record<string, string> = {
+  campaign_metric: 'Campaign metric',
+  approval: 'Approval decision',
+  user_override: 'Manual override',
+}
+
 function formatDate(date: string | null): string {
   if (!date) return '—'
   return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -23,6 +44,7 @@ function formatDate(date: string | null): string {
 </script>
 
 <template>
+  <Head><title>Learning — Atlas</title></Head>
   <AppLayout>
     <div class="max-w-3xl">
       <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-2">Learning</h1>
@@ -69,13 +91,13 @@ function formatDate(date: string | null): string {
           >
             <div class="flex items-start justify-between gap-3 mb-2">
               <div class="flex items-center gap-2 flex-wrap">
-                <Badge variant="default">{{ learning.source_type }}</Badge>
+                <Badge variant="default">{{ sourceTypeLabels[learning.source_type] ?? learning.source_type }}</Badge>
                 <span v-if="learning.applied_at" class="text-xs text-emerald-600 font-medium">Applied</span>
               </div>
               <p class="text-xs text-[var(--color-text-muted)] shrink-0">{{ formatDate(learning.created_at) }}</p>
             </div>
 
-            <p class="text-sm text-[var(--color-text-primary)] font-medium">{{ learning.signal }}</p>
+            <p class="text-sm text-[var(--color-text-primary)] font-medium">{{ signalLabels[learning.signal] ?? learning.signal }}</p>
 
             <dl v-if="Object.keys(learning.value ?? {}).length > 0" class="mt-2 grid grid-cols-2 gap-2">
               <div v-for="(val, key) in learning.value" :key="key">

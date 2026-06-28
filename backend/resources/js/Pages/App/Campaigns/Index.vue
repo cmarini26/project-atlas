@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Head } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
@@ -20,6 +21,7 @@ defineProps<{
 
 const statusVariants: Record<string, 'accent' | 'success' | 'muted' | 'default'> = {
   active: 'accent',
+  published: 'accent',
   completed: 'success',
   draft: 'muted',
   approved: 'default',
@@ -27,10 +29,11 @@ const statusVariants: Record<string, 'accent' | 'success' | 'muted' | 'default'>
 }
 
 const statusLabels: Record<string, string> = {
-  active: 'Active',
-  completed: 'Completed',
   draft: 'Draft',
   approved: 'Approved',
+  active: 'Active',
+  published: 'Published',
+  completed: 'Completed',
   cancelled: 'Cancelled',
 }
 
@@ -41,6 +44,7 @@ function formatDate(date: string | null): string {
 </script>
 
 <template>
+  <Head><title>Campaigns — Atlas</title></Head>
   <AppLayout>
     <div class="max-w-3xl">
       <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-6">Campaigns</h1>

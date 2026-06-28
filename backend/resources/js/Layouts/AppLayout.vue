@@ -14,7 +14,7 @@ const navLinks = [
   { name: 'Dashboard', href: '/app', icon: 'home' },
   { name: 'Recommendations', href: '/app/recommendations', icon: 'sparkles' },
   { name: 'Opportunities', href: '/app/opportunities', icon: 'lightbulb' },
-  { name: 'Brain', href: '/app/brain', icon: 'cpu' },
+  { name: 'Business Brain', href: '/app/brain', icon: 'cpu' },
   { name: 'Campaigns', href: '/app/campaigns', icon: 'megaphone' },
   { name: 'Publishing', href: '/app/publishing', icon: 'paper-airplane' },
   { name: 'Analytics', href: '/app/analytics', icon: 'chart-bar' },
@@ -140,7 +140,7 @@ function logout(): void {
     <!-- Main content -->
     <div class="lg:pl-60 min-h-screen flex flex-col">
       <!-- Flash messages -->
-      <div v-if="flash.success || flash.error" class="px-8 pt-4">
+      <div v-if="flash.success || flash.error" class="px-4 lg:px-8 pt-4">
         <div
           v-if="flash.success"
           class="flex items-start gap-3 p-4 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm"
@@ -159,7 +159,7 @@ function logout(): void {
         </div>
       </div>
 
-      <main class="flex-1 px-8 py-6">
+      <main class="flex-1 px-4 py-6 lg:px-8">
         <slot />
       </main>
     </div>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useForm } from '@inertiajs/vue3'
+import { Head, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 
@@ -62,6 +62,7 @@ function formatDate(date: string | null): string {
 </script>
 
 <template>
+  <Head><title>Settings — Atlas</title></Head>
   <AppLayout>
     <div class="max-w-2xl">
       <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-6">Settings</h1>
@@ -72,7 +73,7 @@ function formatDate(date: string | null): string {
 
         <form class="space-y-4" @submit.prevent="save">
           <div>
-            <label for="company-name" class="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5">Business name</label>
+            <label for="company-name" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Business name</label>
             <input
               id="company-name"
               v-model="form.name"
@@ -89,7 +90,7 @@ function formatDate(date: string | null): string {
           </div>
 
           <div>
-            <label for="industry" class="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5">Industry</label>
+            <label for="industry" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Industry</label>
             <input
               id="industry"
               v-model="form.industry"

@@ -36,11 +36,17 @@ class OnboardingStatusController extends Controller
 
         $twin = DigitalTwin::where('company_id', $companyId)->first();
 
+        $pendingRecommendation = Recommendation::where('company_id', $companyId)
+            ->where('status', 'pending')
+            ->oldest()
+            ->first();
+
         return response()->json([
             'twin_status' => $twin?->status,
             'fact_count' => Fact::where('company_id', $companyId)->where('is_current', true)->count(),
             'opportunity_count' => Opportunity::where('company_id', $companyId)->where('status', 'open')->count(),
             'recommendation_count' => Recommendation::where('company_id', $companyId)->where('status', 'pending')->count(),
+            'first_recommendation_id' => $pendingRecommendation?->id,
         ]);
     }
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useForm } from '@inertiajs/vue3'
+import { Head, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import RationaleCard from '@/Components/Recommendations/RationaleCard.vue'
 import ImpactCard from '@/Components/Recommendations/ImpactCard.vue'
@@ -68,6 +68,7 @@ function saveEdit(payload: { title: string; body: string }): void {
 </script>
 
 <template>
+  <Head><title>Recommendation — Atlas</title></Head>
   <AppLayout>
     <div class="max-w-3xl">
       <!-- Header -->
@@ -127,7 +128,10 @@ function saveEdit(payload: { title: string; body: string }): void {
       <!-- Approve actions (pending only) -->
       <section v-if="isPending && !editingAsset" class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-4">
         <h2 class="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide mb-3">Your decision</h2>
-        <ApproveActions :recommendation-id="recommendation.id" />
+        <ApproveActions
+          :recommendation-id="recommendation.id"
+          @edit-and-approve="content_assets[0] && startEdit(content_assets[0])"
+        />
       </section>
     </div>
   </AppLayout>

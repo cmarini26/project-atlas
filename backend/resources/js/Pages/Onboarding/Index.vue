@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useForm } from '@inertiajs/vue3'
+import { Head, useForm } from '@inertiajs/vue3'
 import AuthLayout from '@/Layouts/AuthLayout.vue'
 
 const step = ref<1 | 2 | 3>(1)
@@ -42,6 +42,7 @@ function goToDashboard(): void {
 </script>
 
 <template>
+  <Head><title>Set up your business — Atlas</title></Head>
   <AuthLayout>
     <!-- Step indicator -->
     <div class="flex items-center gap-2 mb-6">
@@ -62,7 +63,7 @@ function goToDashboard(): void {
 
       <form class="space-y-4" @submit.prevent="submitCompany">
         <div>
-          <label for="company-name" class="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5">Business name</label>
+          <label for="company-name" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Business name</label>
           <input
             id="company-name"
             v-model="companyForm.name"
@@ -80,7 +81,7 @@ function goToDashboard(): void {
         </div>
 
         <div>
-          <label for="industry" class="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5">Industry <span class="text-[var(--color-text-muted)]">(optional)</span></label>
+          <label for="industry" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Industry <span class="text-[var(--color-text-muted)]">(optional)</span></label>
           <input
             id="industry"
             v-model="companyForm.industry"
@@ -110,7 +111,7 @@ function goToDashboard(): void {
 
       <form class="space-y-4" @submit.prevent="submitIntegration">
         <div>
-          <label for="url" class="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5">Website URL</label>
+          <label for="url" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Website URL</label>
           <input
             id="url"
             v-model="integrationForm.url"

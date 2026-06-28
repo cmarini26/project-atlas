@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Head } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
@@ -49,6 +50,7 @@ function formatDate(date: string | null): string {
 </script>
 
 <template>
+  <Head><title>Publishing — Atlas</title></Head>
   <AppLayout>
     <div class="max-w-3xl">
       <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-6">Publishing Activity</h1>

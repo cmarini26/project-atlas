@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Head } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import SummaryCard from '@/Components/Dashboard/SummaryCard.vue'
 import HealthCard from '@/Components/Dashboard/HealthCard.vue'
@@ -72,6 +73,7 @@ function formatDate(date: string | null): string {
 </script>
 
 <template>
+  <Head><title>Overview — Atlas</title></Head>
   <AppLayout>
     <div class="max-w-4xl">
       <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-6">Overview</h1>
@@ -112,6 +114,7 @@ function formatDate(date: string | null): string {
         <HealthCard
           :health="{
             twin_status: health.twin_status,
+            twin_health_score: health.twin_health_score,
             fact_count: health.fact_count,
             knowledge_count: health.knowledge_count,
             integration_count: health.integration_count,

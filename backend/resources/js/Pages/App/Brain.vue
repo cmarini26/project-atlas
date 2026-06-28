@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Head } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
@@ -13,16 +14,12 @@ defineProps<{
 
 const twinStatusLabels: Record<string, string> = {
   initializing: 'Getting started',
-  crawling: 'Learning from your website',
-  analyzing: 'Building your profile',
-  ready: 'Up to date',
+  active: 'Active',
   error: 'Needs attention',
 }
 
 const twinStatusVariants: Record<string, 'accent' | 'success' | 'muted' | 'warning'> = {
-  ready: 'success',
-  analyzing: 'accent',
-  crawling: 'accent',
+  active: 'success',
   initializing: 'muted',
   error: 'warning',
 }
@@ -34,6 +31,7 @@ function formatDate(date: string | null): string {
 </script>
 
 <template>
+  <Head><title>Business Brain — Atlas</title></Head>
   <AppLayout>
     <div class="max-w-4xl">
       <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-6">Business Brain</h1>

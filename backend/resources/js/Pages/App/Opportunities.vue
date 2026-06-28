@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Head } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import ScoreBar from '@/Components/UI/ScoreBar.vue'
@@ -9,18 +10,53 @@ defineProps<{
   opportunities: Opportunity[]
 }>()
 
-function formatDate(date: string | null): string {
-  if (!date) return ''
-  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+const typeLabels: Record<string, string> = {
+  featured_item: 'Featured Item',
+  urgency_promotion: 'Urgency Promotion',
+  new_arrival: 'New Arrival',
+  re_engagement: 'Re-engagement',
 }
 
-function isExpiringSoon(expiresAt: string | null): boolean {
-  if (!expiresAt) return false
-  return (new Date(expiresAt).getTime() - Date.now()) < 7 * 24 * 60 * 60 * 1000
+function formatTimeRemaining(expiresAt: string | null): { text: string; urgency: 'none' | 'amber' | 'rose' } {
+  if (!expiresAt) return { text: '', urgency: 'none' }
+
+  const ms = new Date(expiresAt).getTime() - Date.now()
+  if (ms <= 0) return { text: 'Expired', urgency: 'rose' }
+
+  const hours = ms / (1000 * 60 * 60)
+
+  if (hours < 24) {
+    const h = Math.floor(hours)
+    const m = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60))
+    return { text: `Expires in ${h}h ${m}m`, urgency: 'rose' }
+  }
+
+  if (hours < 48) {
+    const h = Math.floor(hours)
+    const m = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60))
+    return { text: `Expires in ${h}h ${m}m`, urgency: 'amber' }
+  }
+
+  const days = Math.floor(hours / 24)
+  if (days <= 7) {
+    return { text: `Expires in ${days} day${days !== 1 ? 's' : ''}`, urgency: 'none' }
+  }
+
+  return {
+    text: `Expires ${new Date(expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+    urgency: 'none',
+  }
+}
+
+const urgencyClass: Record<string, string> = {
+  none: 'text-[var(--color-text-muted)]',
+  amber: 'text-amber-700 font-medium',
+  rose: 'text-rose-700 font-medium',
 }
 </script>
 
 <template>
+  <Head><title>Opportunities — Atlas</title></Head>
   <AppLayout>
     <div class="max-w-3xl">
       <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-6">Opportunities</h1>
@@ -40,12 +76,12 @@ function isExpiringSoon(expiresAt: string | null): boolean {
           <div class="flex items-start justify-between gap-3 mb-3">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-1">
-                <Badge variant="default">{{ opp.type }}</Badge>
+                <Badge variant="default">{{ typeLabels[opp.type] ?? opp.type }}</Badge>
                 <span
-                  v-if="opp.expires_at && isExpiringSoon(opp.expires_at)"
-                  class="text-xs text-amber-600 font-medium"
+                  v-if="opp.expires_at"
+                  :class="['text-xs', urgencyClass[formatTimeRemaining(opp.expires_at).urgency]]"
                 >
-                  Expires {{ formatDate(opp.expires_at) }}
+                  {{ formatTimeRemaining(opp.expires_at).text }}
                 </span>
               </div>
               <h3 class="text-sm font-semibold text-[var(--color-text-primary)]">{{ opp.title }}</h3>
@@ -69,7 +105,7 @@ function isExpiringSoon(expiresAt: string | null): boolean {
           </div>
 
           <p v-if="opp.detected_at" class="mt-3 text-xs text-[var(--color-text-muted)]">
-            Detected {{ formatDate(opp.detected_at) }}
+            Detected {{ new Date(opp.detected_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }}
           </p>
         </div>
       </div>

@@ -6,6 +6,70 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Version 0.2 Polish — Tier 1 & 2] — 2026-06-27
+
+### Changed
+
+**HealthCard + Brain.vue — T1-1 (active status fix)**
+- `resources/js/Components/Dashboard/HealthCard.vue` — status labels now only contain `initializing`, `active`, `error`; removed fake `crawling/analyzing/ready` variants that never matched DB values; `active` now shows "Active" in `text-emerald-600` instead of falling through to raw gray text
+- `resources/js/Pages/App/Brain.vue` — same fix: `twinStatusLabels` and `twinStatusVariants` updated to `active/initializing/error` only
+
+**Onboarding redirect + timeout — T1-2 + T2-14**
+- `backend/app/Http/Controllers/Api/OnboardingStatusController.php` — added `first_recommendation_id` to JSON response (queries first pending recommendation for the company)
+- `resources/js/Pages/Onboarding/Status.vue` — routes to `/app/recommendations/{id}` when recommendation ready; polls at 5s; shows timeout message after 5 min; hard-stops polling at 10 min; stepLabels use actual enum values
+
+**Enum badge translation — T1-3**
+- `resources/js/Pages/App/Opportunities.vue` — `typeLabels` map translates `featured_item`, `urgency_promotion`, `new_arrival`, `re_engagement` to readable labels
+- `resources/js/Pages/App/Campaigns/Show.vue` — `statusLabels` and `executionStatusLabels` maps added; all status badges now show human-readable labels
+- `resources/js/Pages/App/Campaigns/Index.vue` — `statusLabels` map added; `published` variant added
+- `resources/js/Pages/App/Learning.vue` — `signalLabels` (11 signals) and `sourceTypeLabels` maps translate all signal and source values
+
+**Analytics metric key translation — T1-4**
+- `resources/js/Pages/App/Analytics/Show.vue` — `metricLabels` map covers all normalised and platform-specific metric keys; `labelMetricKey()` function with titleCase fallback; applied to expected_impact, actual_kpis, and channel breakdown metric displays
+
+**Edit & Approve button + explanatory copy + inline errors — T2-1 + T2-2 + T2-9**
+- `resources/js/Components/Recommendations/ApproveActions.vue` — "Edit & Approve" added as secondary button emitting `editAndApprove`; explanatory paragraph added below buttons; `approveError` and `rejectError` refs wired to `onError` callbacks
+- `resources/js/Pages/App/Recommendations/Show.vue` — listens for `@edit-and-approve` and calls `startEdit(content_assets[0])`
+
+**ScoreBar — T2-3 + T2-4**
+- `resources/js/Components/UI/ScoreBar.vue` — fully rewritten; dynamic fill color by value range (red 0–39, orange 40–59, yellow 60–74, green 75–89, emerald 90+); `role="progressbar"` + `aria-valuenow/min/max` ARIA attributes; screen-reader span; numeric label always visible
+
+**Opportunity expiry treatment — T2-5**
+- `resources/js/Pages/App/Opportunities.vue` — `formatTimeRemaining()` returns `{ text, urgency }`; <24h → rose; 24–48h → amber; 2–7 days → plain text; >7 days → calendar date; urgency class applied to expiry label
+
+**Page title tags — T2-6**
+- `<Head>` with `<title>` added to all 16 app pages: Dashboard, Recommendations/Index, Recommendations/Show, Opportunities, Brain, Campaigns/Index, Campaigns/Show, Publishing, Analytics/Index, Analytics/Show, Learning, Settings, Onboarding/Index, Onboarding/Status, Auth/Login, Auth/Register
+
+**Mobile padding — T2-7**
+- `resources/js/Layouts/AppLayout.vue` — `<main>` changed from `px-8 py-6` to `px-4 py-6 lg:px-8`; flash message wrapper changed from `px-8` to `px-4 lg:px-8`
+
+**Form label typography — T2-10**
+- `resources/js/Pages/Auth/Login.vue` — all `<label>` elements updated to `text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest`
+- `resources/js/Pages/Auth/Register.vue` — same
+- `resources/js/Pages/Onboarding/Index.vue` — same
+- `resources/js/Pages/App/Settings.vue` — same
+
+**Health score in HealthCard — T2-11**
+- `resources/js/Components/Dashboard/HealthCard.vue` — `twin_health_score` prop added; `score` computed (0 when null); `healthLabel` computed ("Healthy" 80+, "Building" 50+, "Learning" <50); health score row added to card display
+- `resources/js/Pages/App/Dashboard.vue` — passes `twin_health_score` from health prop to HealthCard
+
+**Business Brain nav label — T2-12**
+- `resources/js/Layouts/AppLayout.vue` — navLinks entry for `/app/brain` renamed from `'Brain'` to `'Business Brain'`
+
+**Rationale text size — T2-13**
+- `resources/js/Components/Recommendations/RationaleCard.vue` — body `<p>` changed from `text-sm` to `text-base leading-relaxed`
+
+### Quality Gates
+
+| Gate | Result |
+|------|--------|
+| PHPUnit (581 tests) | 579 passing, 2 Redis skipped |
+| PHPStan level 8 | 0 errors |
+| Laravel Pint | Clean |
+| Frontend build (Vite) | 129 modules, 0 errors |
+
+---
+
 ## [Product Validation Sprint] — 2026-06-27
 
 ### Added

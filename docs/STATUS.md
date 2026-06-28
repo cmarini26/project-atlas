@@ -34,20 +34,50 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
+**Version 0.2 Polish — Tier 1 & 2 ✅ Complete**
+*Completed: 2026-06-27*
+
+All Tier 1 (trust blockers) and Tier 2 (clarity gaps) items from `docs/plans/Version-0.2-Polish.md` implemented. 17 frontend issues resolved across 16 files. All four quality gates pass.
+
+See:
+- [Version-0.2-Polish-Tier-1-2-Review.md](reviews/Version-0.2-Polish-Tier-1-2-Review.md) — implementation notes and decisions
+
+**Tier 1 — Trust blockers (all resolved):**
+- T1-1: HealthCard + Brain.vue status labels fixed — `active` → "Active" in emerald, not raw gray
+- T1-2: Onboarding redirects to first recommendation; 5-min timeout message; polling at 5s intervals
+- T1-3: All enum badge values translated — opportunity types, campaign statuses, execution statuses, learning signals, source types
+- T1-4: Analytics metric keys translated with human-readable labels and titleCase fallback
+
+**Tier 2 — Clarity gaps (all resolved):**
+- T2-1: "Edit & Approve" secondary button added; emits event to open ContentEditor
+- T2-2: Explanatory copy added below approval buttons
+- T2-3 + T2-4: ScoreBar rewritten — value-based color scale + ARIA progressbar roles
+- T2-5: Opportunity expiry shows time remaining with amber (<48h) / rose (<24h) urgency coloring
+- T2-6: `<Head>` title tags added to all 16 app pages (title formatter wired in app.ts)
+- T2-7: Mobile padding fixed — `px-8` → `px-4 lg:px-8` throughout AppLayout
+- T2-8: Already done (Inertia progress bar was wired in app.ts)
+- T2-9: Inline error messages added to approval buttons via `onError` callbacks
+- T2-10: Form label typography — `text-xs uppercase tracking-widest text-muted` on all form pages
+- T2-11: Health score (0–100) + "Healthy"/"Building"/"Learning" label added to HealthCard
+- T2-12: Nav label "Brain" → "Business Brain"
+- T2-13: Rationale body text → `text-base leading-relaxed`
+- T2-14: Onboarding timeout message shown after 5 min with suggestions
+
+**Quality gates:**
+
+| Gate | Result |
+|------|--------|
+| PHPUnit (581 tests) | 579 passing, 2 Redis skipped |
+| PHPStan level 8 | 0 errors |
+| Laravel Pint | Clean |
+| Frontend build | 129 modules, 0 errors |
+
+**Previous milestone:**
+
 **Product Validation Sprint ✅ Complete**
 *Completed: 2026-06-27*
 
-Full customer experience review against all spec documents (CLAUDE.md, FOUNDING_PRINCIPLES.md, docs/design/System.md, PRD.md, Personas.md, UserFlows.md). 24 issues identified across 20 review areas. Two output documents written: a detailed review and a prioritized polish plan.
-
-See:
-- [Product-Validation-Review.md](reviews/Product-Validation-Review.md) — 24 issues with severity, description, why it matters, recommended fix, and effort estimate
-- [Version-0.2-Polish.md](plans/Version-0.2-Polish.md) — prioritized Tier 1/2/3 implementation plan (~12 working days)
-
-**Key findings:**
-- 1 Critical: Active DigitalTwin status not handled in HealthCard — every onboarded customer sees a broken brain card
-- 4 High: Onboarding redirects to wrong page; "Edit & Approve" button missing; raw enum values in badges; analytics metric keys exposed
-- 14 Medium: Score bars single color; no expiry urgency treatment; no page titles; mobile padding; form label typography; approval error handling; etc.
-- 9 Low: Nav label drift; focus rings; button shade; favicon; etc.
+Full customer experience review. 24 issues across 20 review areas. See [Product-Validation-Review.md](reviews/Product-Validation-Review.md) and [Version-0.2-Polish.md](plans/Version-0.2-Polish.md).
 
 **Previous milestone:**
 
@@ -496,6 +526,6 @@ All production-blocking items resolved. Remaining pre-production items:
 
 ## Last Updated
 
-**2026-06-27** — Product Validation Sprint complete. 24 issues across 20 review areas documented in `docs/reviews/Product-Validation-Review.md`. Prioritized Tier 1/2/3 polish plan written in `docs/plans/Version-0.2-Polish.md`. No code changes — review and planning only.
+**2026-06-27** — Version 0.2 Polish Tier 1 & 2 complete. 17 frontend issues resolved: active DigitalTwin status, onboarding redirect, enum badge translation, analytics metric labels, Edit & Approve button, approval copy, score bar colors + ARIA, expiry urgency, page titles, mobile padding, inline errors, form label typography, health score display, Business Brain nav label, rationale text size, onboarding timeout message. All quality gates pass.
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Head } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
 import type { Campaign, CampaignKpiSnapshot, ExecutionMetric } from '@/types'
@@ -17,6 +18,40 @@ interface ShowProps {
 
 defineProps<ShowProps>()
 
+const metricLabels: Record<string, string> = {
+  normalised_reach: 'Estimated Reach',
+  normalised_engagement: 'Engagements',
+  normalised_engagement_rate: 'Engagement Rate',
+  normalised_clicks: 'Clicks',
+  normalised_impressions: 'Impressions',
+  open_count: 'Opens',
+  click_count: 'Clicks',
+  bounce_count: 'Bounces',
+  bounce_hard_count: 'Hard Bounces',
+  bounce_soft_count: 'Soft Bounces',
+  spam_complaint_count: 'Spam Complaints',
+  unsubscribe_count: 'Unsubscribes',
+  delivery_count: 'Delivered',
+  impressions: 'Impressions',
+  reach: 'Reach',
+  engagement: 'Engagements',
+  clicks: 'Clicks',
+  shares: 'Shares',
+  saves: 'Saves',
+  replies: 'Replies',
+  retweets: 'Reposts',
+  likes: 'Likes',
+  comments: 'Comments',
+}
+
+function labelMetricKey(key: string): string {
+  return metricLabels[key] ?? String(key).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
+function labelImpactKey(key: string): string {
+  return String(key).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
 function formatDate(date: string | null): string {
   if (!date) return '—'
   return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -24,6 +59,7 @@ function formatDate(date: string | null): string {
 </script>
 
 <template>
+  <Head><title>{{ campaign.title }} — Analytics — Atlas</title></Head>
   <AppLayout>
     <div class="max-w-3xl">
       <!-- Header -->
@@ -43,7 +79,7 @@ function formatDate(date: string | null): string {
           <h2 class="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide mb-3">Expected</h2>
           <div v-if="decision?.expected_impact && Object.keys(decision.expected_impact).length > 0" class="space-y-2">
             <div v-for="(value, key) in decision.expected_impact" :key="key">
-              <p class="text-xs text-[var(--color-text-muted)] capitalize">{{ String(key).replace(/_/g, ' ') }}</p>
+              <p class="text-xs text-[var(--color-text-muted)]">{{ labelImpactKey(String(key)) }}</p>
               <p class="text-sm font-medium text-[var(--color-text-primary)]">{{ value }}</p>
             </div>
           </div>
@@ -54,7 +90,7 @@ function formatDate(date: string | null): string {
           <h2 class="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide mb-3">Actual</h2>
           <dl v-if="snapshot" class="space-y-2">
             <div v-for="(value, key) in snapshot.actual_kpis" :key="key">
-              <dt class="text-xs text-[var(--color-text-muted)] capitalize">{{ String(key).replace(/_/g, ' ') }}</dt>
+              <dt class="text-xs text-[var(--color-text-muted)]">{{ labelMetricKey(String(key)) }}</dt>
               <dd class="text-sm font-semibold text-[var(--color-text-primary)] tabular-nums">{{ value }}</dd>
             </div>
           </dl>
@@ -84,15 +120,15 @@ function formatDate(date: string | null): string {
             </div>
             <dl class="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div v-for="(value, key) in metric.metrics" :key="key">
-                <dt class="text-xs text-[var(--color-text-muted)] capitalize mb-0.5">{{ String(key).replace(/_/g, ' ') }}</dt>
+                <dt class="text-xs text-[var(--color-text-muted)] mb-0.5">{{ labelMetricKey(String(key)) }}</dt>
                 <dd class="text-sm font-semibold text-[var(--color-text-primary)] tabular-nums">{{ value }}</dd>
               </div>
               <div v-if="metric.normalised_reach !== null && metric.normalised_reach !== undefined">
-                <dt class="text-xs text-[var(--color-text-muted)] mb-0.5">Reach</dt>
+                <dt class="text-xs text-[var(--color-text-muted)] mb-0.5">Estimated Reach</dt>
                 <dd class="text-sm font-semibold text-[var(--color-text-primary)] tabular-nums">{{ metric.normalised_reach }}</dd>
               </div>
               <div v-if="metric.normalised_engagement_rate !== null && metric.normalised_engagement_rate !== undefined">
-                <dt class="text-xs text-[var(--color-text-muted)] mb-0.5">Eng. rate</dt>
+                <dt class="text-xs text-[var(--color-text-muted)] mb-0.5">Engagement Rate</dt>
                 <dd class="text-sm font-semibold text-[var(--color-text-primary)] tabular-nums">{{ metric.normalised_engagement_rate }}</dd>
               </div>
             </dl>
