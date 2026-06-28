@@ -170,7 +170,7 @@ class PublishCampaignJobTest extends TestCase
         $job->handle($this->app->make(ExecutionService::class));
 
         Bus::assertDispatched(PublishContent::class, function (PublishContent $job): bool {
-            return $job->queue() === 'high';
+            return $job->queue === 'high';
         });
     }
 }

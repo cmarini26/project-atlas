@@ -10,15 +10,37 @@ use App\Models\Company;
 use App\Models\DigitalTwin;
 use App\Models\Observation;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 class BusinessBrainService
 {
+    private const TTL_SECONDS = 300;
+
+    public static function cacheKey(string $companyId): string
+    {
+        return "brain:{$companyId}";
+    }
+
     public function __construct(
         private readonly FactRepository $facts,
         private readonly KnowledgeRepository $knowledge,
     ) {}
 
     public function for(Company $company): BusinessBrain
+    {
+        return Cache::remember(
+            self::cacheKey($company->id),
+            self::TTL_SECONDS,
+            fn () => $this->assemble($company),
+        );
+    }
+
+    public static function invalidate(string $companyId): void
+    {
+        Cache::forget(self::cacheKey($companyId));
+    }
+
+    private function assemble(Company $company): BusinessBrain
     {
         $twin = DigitalTwin::withoutGlobalScopes()
             ->where('company_id', $company->id)

@@ -68,7 +68,7 @@ The `Learning` model was created in Phase 7. Phase 8 reads from it; it does not 
 | signal       | varchar   | Signal type (see §1.5) |
 | source_type  | varchar   | `execution_result`, `approval`, `rejection`, `approval_edit` |
 | source_id    | char(26)  | Polymorphic ID of the source record |
-| payload      | json      | Signal-specific data (see §1.5) |
+| value        | json      | Signal-specific data (see §1.5) |
 | applied_at   | timestamp | Nullable; set by `ApplyLearnings` when processed |
 | created_at   | timestamp | Immutable |
 
@@ -164,11 +164,11 @@ Use `HasUlids`, `BelongsToCompany`. Cast `weights` to `array`. No `UPDATED_AT`.
 
 ### 1.5 Signal Types and Payload Schema
 
-All signal types emitted by Phase 7 and Phase 5 are documented here with their expected `payload` shape. Phase 8 reads these payloads to determine what effects to produce.
+All signal types emitted by Phase 7 and Phase 5 are documented here with their expected `value` shape. Phase 8 reads these values to determine what effects to produce.
 
 **From Phase 7 — Analytics:**
 
-| Signal | Payload keys | Evidence threshold | Adjusts |
+| Signal | Value keys | Evidence threshold | Adjusts |
 |--------|--------------|--------------------|---------|
 | `channel_outperformed` | `channel_type`, `engagement_rate`, `vs_campaign_average`, `campaign_type` | 2+ signals | Channel affinity Knowledge, scoring affinity for channel |
 | `channel_underperformed` | `channel_type`, `engagement_rate`, `vs_campaign_average` | 2+ signals | Channel affinity Knowledge |
@@ -181,7 +181,7 @@ All signal types emitted by Phase 7 and Phase 5 are documented here with their e
 
 **From Phase 5 — Approval Workflow:**
 
-| Signal | Payload keys | Evidence threshold | Adjusts |
+| Signal | Value keys | Evidence threshold | Adjusts |
 |--------|--------------|--------------------|---------|
 | `recommendation_approved` | `campaign_type`, `channel_type`, `opportunity_type`, `confidence_score` | 1 signal (upward only) | Opportunity type approval rate Knowledge |
 | `recommendation_rejected` | `campaign_type`, `channel_type`, `opportunity_type`, `notes` | 2+ signals | Opportunity type Knowledge; channel affinity |
@@ -247,7 +247,7 @@ Some signals do not meet their evidence threshold when first processed. These ar
 ### 3.1 Job Definition
 
 **Class:** `App\Jobs\ApplyLearnings`  
-**Queue:** `ai` (requires careful reasoning; not time-critical but must not saturate default queue)  
+**Queue:** `maintenance` (daily scheduled batch; not time-critical; must not saturate the `ai` queue reserved for interactive inference)  
 **Schedule:** Daily at 02:00 UTC (low-traffic window; outside publishing hours)  
 **Scope:** One job invocation per company — the scheduler dispatches one `ApplyLearnings` job per active company  
 
@@ -256,7 +256,7 @@ class ApplyLearnings implements ShouldQueue, ShouldBeUnique
 {
     public function __construct(public readonly string $companyId)
     {
-        $this->onQueue('ai');
+        $this->onQueue('maintenance');
     }
 
     public function uniqueId(): string
@@ -387,7 +387,7 @@ Evidence is counted per `(company_id, signal, discriminator)` — where discrimi
 evidence_count = Learning::withoutGlobalScopes()
     ->where('company_id', $companyId)
     ->where('signal', $signalType)
-    ->where("payload->>'discriminator_key'", $discriminatorValue)
+    ->where("value->>'discriminator_key'", $discriminatorValue)
     ->where('created_at', '>=', now()->subDays(90))  // rolling 90-day window
     ->count();
 ```

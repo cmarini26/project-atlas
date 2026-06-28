@@ -4,6 +4,7 @@ namespace Tests\Feature\Brain;
 
 use App\AI\Contracts\AiProvider;
 use App\AI\Testing\FakeAiProvider;
+use App\Events\DigitalTwinActivated;
 use App\Events\ObservationProcessed;
 use App\Jobs\ProcessObservation;
 use App\Models\Catalog;
@@ -31,6 +32,10 @@ class ProcessObservationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Prevent DigitalTwinActivated from cascading into DetectOpportunities in unit tests
+        // that only provision fixtures for the observation/knowledge phase.
+        Event::fake([DigitalTwinActivated::class]);
 
         $this->fake = new FakeAiProvider();
         $this->app->instance(AiProvider::class, $this->fake);
@@ -142,7 +147,7 @@ class ProcessObservationTest extends TestCase
 
     public function test_fires_observation_processed_event(): void
     {
-        Event::fake([ObservationProcessed::class]);
+        Event::fake([ObservationProcessed::class, DigitalTwinActivated::class]);
         $this->fake->queueFixture('website-facts');
 
         (new ProcessObservation($this->observation))->handle(

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\ApplyLearnings;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -46,6 +47,15 @@ class QueueDispatchTest extends TestCase
         }
 
         Queue::assertCount(count($queues));
+    }
+
+    public function test_apply_learnings_dispatches_to_maintenance_queue(): void
+    {
+        Queue::fake();
+
+        ApplyLearnings::dispatch();
+
+        Queue::assertPushedOn('maintenance', ApplyLearnings::class);
     }
 
     public function test_queue_configuration_includes_all_atlas_queues(): void

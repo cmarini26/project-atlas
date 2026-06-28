@@ -17,16 +17,14 @@ class DetectOpportunities implements ShouldQueue
 
     public int $tries = 3;
 
-    public function __construct(public readonly Company $company) {}
+    public function __construct(public readonly Company $company)
+    {
+        $this->onQueue('default');
+    }
 
     public function handle(BusinessBrainService $brainService, OpportunityEngine $engine): void
     {
         $brain = $brainService->for($this->company);
         $engine->scan($this->company, $brain);
-    }
-
-    public function queue(): string
-    {
-        return 'default';
     }
 }

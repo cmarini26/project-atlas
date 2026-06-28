@@ -6,6 +6,55 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 9.5 — Version 0.1 Stabilization Sprint] — 2026-06-27
+
+### Added
+
+- `app/AI/Providers/AnthropicProvider.php` — full `AiProvider` implementation against the Anthropic Messages API; supports `generate` and `tool_use` (structured JSON via forced tool call); `embed` raises `UnsupportedOperationException`
+- `config/ai.php` — AI provider configuration (model, temperature, max tokens, API key)
+- `.env.example` — `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `ANTHROPIC_MAX_TOKENS`, `ANTHROPIC_TEMPERATURE`
+- `database/migrations/..._add_is_superadmin_to_users_table.php` — `is_superadmin` boolean column on `users`
+- `app/Services/Observatory/Connectors/Website/SsrfValidator.php` — SSRF validator; 14 blocked CIDR ranges; blocks loopback hostnames; validates IPv4, IPv6, IPv6-mapped IPv4, DNS-resolved hostnames
+- `app/Services/Observatory/Connectors/Website/Exceptions/SsrfBlockedException.php` — exception with `blockedUrl()` and `blockedIp()` factories
+- `app/Http/Controllers/Api/HealthController.php` — `GET /health`, `GET /health/live`, `GET /health/ready` endpoints; 200 on healthy, 503 on DB/cache failure
+- `tests/Feature/PipelineSmokeTest.php` — end-to-end smoke test; full `ObservationRecorded → Recommendation` pipeline; 5 AI fixtures; asserts all intermediate and final states
+
+### Fixed
+
+- **Jobs silently not dispatching** — all 10 Atlas jobs had `public function queue(): string` which Laravel's `Bus\Dispatcher::dispatchToQueue()` intercepted as a job ID, silently dropping the dispatch. Removed `queue()` method from all jobs; replaced with `$this->onQueue('name')` in constructors. Affected: `ProcessObservation`, `DetectOpportunities`, `CommitDecision`, `PrepareCampaign`, `GenerateContent`, `CreateRecommendation`, `PublishCampaign`, `PublishContent`, `PublishScheduledContent`, `CheckChannelHealth`
+- **Duplicate event listeners** — Laravel's auto-discovery (`EventServiceProvider::$shouldDiscoverEvents = true`) was scanning `app/Listeners/` and registering all listeners automatically, while `AppServiceProvider::boot()` was also registering them manually. Every event had two listeners, causing every cascade to fire twice. Fixed by calling `EventServiceProvider::disableEventDiscovery()` in `AppServiceProvider::register()`
+- `SsrfValidator::BLOCKED_CIDRS` — corrected `@var` annotation from `array<string, array{network: int, mask: int}>` to `list<string>` (PHPStan level 8)
+
+### Changed
+
+- `app/Providers/AppServiceProvider.php` — `AnthropicProvider` bound for non-test environments; `EventServiceProvider::disableEventDiscovery()` called in `register()` to prevent duplicate listener registration
+- `app/Services/Observatory/Connectors/Website/WebPageCrawler.php` — `SsrfValidator::validate()` called before every Guzzle request
+- `app/Filament/Providers/AdminPanelProvider.php` — `canAccess()` checks `$user->is_superadmin`; access denied returns 403
+- `app/Models/User.php` — `$isSuperadmin` property added
+- `database/factories/UserFactory.php` — `->superadmin()` factory state added
+- `bootstrap/app.php` — health routes registered without auth middleware
+
+### Test Stabilization
+
+After fixing the two systemic defects, 13 unit tests required isolation updates (they were passing only because jobs were silently dropped):
+
+- `KnowledgeServiceTest` — 3 tests: added `Event::fake([DigitalTwinActivated::class])` to prevent cascade beyond knowledge phase
+- `ProcessObservationTest` — `Event::fake([DigitalTwinActivated::class])` added in `setUp()`; `test_fires_observation_processed_event` updated to fake both `ObservationProcessed` and `DigitalTwinActivated`
+- `DecisionEngineTest` — 2 tests: added `Event::fake([DecisionCommitted::class])` to prevent campaign cascade
+- `CampaignPipelineTest::test_campaign_assets_ready_event_dispatches_create_recommendation_job` — fixed stale assertion (`assertNotDispatched(CampaignAssetsReady)` → `Bus::assertDispatched(CreateRecommendation)`)
+- `ApprovalServiceTest::test_approve_transitions_campaign_to_approved` — added `Event::fake([RecommendationApproved::class])` to prevent publishing cascade that set campaign status to `cancelled`
+- `PublishCampaignJobTest::test_executions_are_dispatched_on_high_queue` — changed `$job->queue()` to `$job->queue` (method removed, property remains)
+
+### Final State
+
+| Metric | Value |
+|--------|-------|
+| Tests | 519 (517 passing, 2 Redis skipped) |
+| PHPStan | Level 8 — 0 errors |
+| Pint | Clean |
+
+---
+
 ## [Version 0.1 Architecture Audit Plan] — 2026-06-26
 
 ### Added

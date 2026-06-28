@@ -20,7 +20,10 @@ class PublishContent implements ShouldQueue
 
     public int $tries = 4; // 1 attempt + 3 retries
 
-    public function __construct(public readonly Execution $execution) {}
+    public function __construct(public readonly Execution $execution)
+    {
+        $this->onQueue('high');
+    }
 
     /** @return list<int> */
     public function backoff(): array
@@ -99,10 +102,5 @@ class PublishContent implements ShouldQueue
         if ($execution !== null && $execution->status !== 'failed') {
             app(ExecutionService::class)->markFailed($execution, $e->getMessage());
         }
-    }
-
-    public function queue(): string
-    {
-        return 'high';
     }
 }

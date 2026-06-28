@@ -23,37 +23,39 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined |
 | Implementation    | ✅ Core loop complete | All 9 milestones delivered. 5 blocking production gaps identified in V0.1 Audit (see Current Milestone). |
-| Tests             | ✅ Strong | 449 tests (447 passing, 2 Redis skipped); PHPStan level 8 — 0 errors; Pint clean |
+| Tests             | ✅ Strong | 519 tests (517 passing, 2 Redis skipped); PHPStan level 8 — 0 errors; Pint clean |
 | CI/CD             | 🟡 Defined | GitHub Actions workflow written; not yet triggered (no PR opened against remote) |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
 
-**Overall:** Milestone 9 complete. Full Learning Engine implemented: `LearningApplication` + `CompanyScoringWeights` models and migrations; `LearningEngine` with 3-tier signal prioritization, evidence evaluation, conflict resolution (4 rules), Fact and Knowledge mutation, and WeightCalibrator; `ApplyLearnings` job (daily schedule, idempotent, ShouldBeUnique); `LearningRollbackService` (compensating records, no deletes); `EditPatternDetector`; `OpportunityScorer` extended with per-company type_modifiers; `ApprovalService` wired for recommendation_approved, recommendation_rejected, and recommendation_edited_and_approved Learning signals; Filament Learning Log + Applied Effects visibility. 449 tests (447 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean.
+**Overall:** Milestone 9.5 (Version 0.1 Stabilization Sprint) complete. All 5 production-blocking gaps resolved: `AnthropicProvider`, Filament superadmin gate, SSRF protection, health endpoints, and end-to-end smoke test. Two systemic pipeline defects fixed: jobs silently not dispatching (queue() method conflict) and duplicate event listeners (auto-discovery + manual registration conflict). 519 tests (517 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean.
 
 ---
 
 ## Current Milestone
 
-**Version 0.1 Architecture Audit ✅ Complete**
-*Completed: 2026-06-26*
+**Milestone 9.5 — Version 0.1 Stabilization Sprint ✅ Complete**
+*Completed: 2026-06-27*
 
-Pre-customer-dashboard readiness review complete. `docs/plans/Version-0.1-Architecture-Audit.md` written. 15 audit areas assessed. See audit plan for full findings.
+All 5 production-blocking gaps from the V0.1 Architecture Audit resolved. Two systemic pipeline defects discovered and fixed. See [Milestone-9.5-Review.md](reviews/Milestone-9.5-Review.md) for full details.
 
-**Blocking for production (must resolve before any customer data):**
-1. Implement `AnthropicProvider` (or equivalent) — Atlas cannot run any AI pipeline without it
-2. Add Filament superadmin gate — currently all company data is accessible to any registered user
-3. SSRF protection on `WebPageCrawler` — user-supplied URLs not validated to public IPs
-4. Health check endpoint (`GET /api/health`) — required before hosting is provisioned
-5. Confirm PostgreSQL RLS strategy
+**Production blockers resolved:**
 
-**Blocking for customer dashboard (must resolve before building customer-facing UI):**
-6. `BusinessBrainService` Redis caching (5-min TTL per company)
-7. Rate limiting on `/api/analytics/webhooks/{provider}`
-8. End-to-end pipeline smoke test
-9. Spec/code column drift cleanup (`Learning.value` vs spec `payload`; `LearningApplication` applied_at)
-10. `docs/STATUS.md` stale sections cleanup
+| Item | Status |
+|------|--------|
+| `AnthropicProvider` | ✅ Implemented — bound in `AppServiceProvider` for non-test environments |
+| Filament superadmin gate | ✅ Implemented — `is_superadmin` column; `canAccess()` in `AdminPanelProvider` |
+| SSRF protection | ✅ Implemented — `SsrfValidator` with 14 CIDR blocks; `WebPageCrawler` validates before every request |
+| Health endpoints | ✅ Implemented — `GET /health`, `GET /health/live`, `GET /health/ready` |
+| End-to-end smoke test | ✅ Passing — `PipelineSmokeTest` exercises full pipeline, 5 AI fixtures |
 
-**Next:** Begin resolving blocking items in priority order. See `docs/plans/Version-0.1-Architecture-Audit.md`.
+**Remaining pre-production items (lower priority):**
+- `BusinessBrainService` Redis caching (5-min TTL per company) — customer-dashboard-blocking
+- Rate limiting on `/api/analytics/webhooks/{provider}` — customer-dashboard-blocking
+- Spec/code drift cleanup (`Learning.value` vs spec `payload`) — cleanup only
+- `ApplyLearnings` queue alignment (`ai` → `maintenance`) — low-risk
+
+**Next:** First production environment provisioning or customer dashboard work.
 
 ---
 
@@ -391,27 +393,21 @@ See `docs/plans/Version-0.1-Architecture-Audit.md` for the full pre-customer-das
 
 ---
 
-## Next Tasks (Post-M9 — Production Readiness)
+## Next Tasks (Post-M9.5)
 
-See `docs/plans/Version-0.1-Architecture-Audit.md` for the full ordered checklist.
+All production-blocking items resolved. Remaining pre-production items:
 
-**Blocking for production (resolve in order):**
-1. Implement `AnthropicProvider` (or `OpenAiProvider`) and bind in `AppServiceProvider`
-2. Add Filament superadmin gate — `AdminPanelProvider` `authMiddleware` or `canAccess()` policy
-3. SSRF protection on `WebPageCrawler` — validate URL resolves to public IP before Guzzle request
-4. Add `GET /api/health` endpoint
-5. Plan PostgreSQL RLS rollout (first 5 tables)
-
-**Blocking for customer dashboard (resolve before building customer-facing UI):**
-6. `BusinessBrainService` Redis caching (5-minute TTL per `company_id`)
-7. Rate limiting on `/api/analytics/webhooks/{provider}`
-8. End-to-end pipeline smoke test (Observation → Recommendation, all fakes)
-9. Resolve spec/code drift (`Learning.value` vs `payload`; `LearningApplication` columns)
-10. Align `ApplyLearnings` to `maintenance` queue per Architecture.md
+1. `BusinessBrainService` Redis caching — 5-min TTL per `company_id`; required before the brain is queried at any scale
+2. Rate limiting on `/api/analytics/webhooks/{provider}` — required before analytics webhooks are exposed publicly
+3. Spec/code drift — `Learning.value` vs spec `payload`; update spec to match implementation
+4. `ApplyLearnings` queue alignment — change from `ai` to `maintenance` per Architecture.md
+5. First production environment provisioning (Forge + DigitalOcean or Vapor)
 
 ---
 
 ## Recently Completed
+
+- **Milestone 9.5 — Version 0.1 Stabilization Sprint** — All 5 production blockers resolved: `AnthropicProvider`, Filament superadmin gate, SSRF protection, health endpoints, E2E smoke test. Two systemic pipeline defects fixed (job dispatch silencing, duplicate event listeners). 519 tests (517 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean. See [Milestone-9.5-Review.md](reviews/Milestone-9.5-Review.md).
 
 - **Version 0.1 Architecture Audit** — `docs/plans/Version-0.1-Architecture-Audit.md` written. 15 audit areas reviewed. 5 critical/production-blocking items identified. 5 customer-dashboard-blocking items identified. 12 recommended refactors prioritized.
 
@@ -459,6 +455,6 @@ See `docs/plans/Version-0.1-Architecture-Audit.md` for the full ordered checklis
 
 ## Last Updated
 
-**2026-06-26** — Version 0.1 Architecture Audit complete (`docs/plans/Version-0.1-Architecture-Audit.md`). 15 audit areas reviewed. 5 critical production blockers identified. Next step: resolve blocking items before customer dashboard work begins.
+**2026-06-27** — Milestone 9.5 (Version 0.1 Stabilization Sprint) complete. All 5 production blockers resolved. Two systemic pipeline defects fixed. 519 tests (517 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean.
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*

@@ -116,19 +116,19 @@ class CampaignPipelineTest extends TestCase
     {
         Bus::fake([CreateRecommendation::class]);
 
-        Event::fake([CampaignAssetsReady::class]);
-
         $this->fake->queueFixture('campaign-blueprint');
         $this->fake->queueFixture('email-content');
 
-        // run prepare synchronously
+        // run prepare synchronously — GenerateContent runs inline (sync queue),
+        // fires CampaignAssetsReady, which triggers TriggerRecommendationCreation,
+        // which dispatches CreateRecommendation (faked above)
         $prepareJob = new PrepareCampaign($this->decision);
         $prepareJob->handle(
             $this->app->make(CampaignPreparationService::class),
             $this->app->make(BusinessBrainService::class),
         );
 
-        Event::assertNotDispatched(CampaignAssetsReady::class);
+        Bus::assertDispatched(CreateRecommendation::class);
     }
 
     public function test_full_pipeline_end_to_end(): void

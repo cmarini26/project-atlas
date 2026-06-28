@@ -20,6 +20,11 @@ class ApplyLearnings implements ShouldBeUnique, ShouldQueue
 
     public int $uniqueFor = 86400; // 24 hours — one run per day
 
+    public function __construct()
+    {
+        $this->onQueue('maintenance');
+    }
+
     public function handle(LearningEngine $engine): void
     {
         Company::withoutGlobalScopes()
@@ -33,10 +38,5 @@ class ApplyLearnings implements ShouldBeUnique, ShouldQueue
                     ]);
                 }
             });
-    }
-
-    public function queue(): string
-    {
-        return 'ai';
     }
 }

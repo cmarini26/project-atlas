@@ -16,6 +16,11 @@ class ExpireOpportunities implements ShouldQueue
 
     public int $tries = 1;
 
+    public function __construct()
+    {
+        $this->onQueue('maintenance');
+    }
+
     public function handle(): void
     {
         $expired = Opportunity::withoutGlobalScopes()
@@ -33,10 +38,5 @@ class ExpireOpportunities implements ShouldQueue
         if ($count > 0) {
             Log::info("ExpireOpportunities: expired {$count} opportunities.");
         }
-    }
-
-    public function queue(): string
-    {
-        return 'maintenance';
     }
 }

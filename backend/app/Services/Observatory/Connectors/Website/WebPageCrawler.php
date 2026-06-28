@@ -2,6 +2,7 @@
 
 namespace App\Services\Observatory\Connectors\Website;
 
+use App\Services\Observatory\Connectors\Website\Exceptions\SsrfBlockedException;
 use DateTimeImmutable;
 use DOMDocument;
 use DOMElement;
@@ -10,15 +11,21 @@ use DOMXPath;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
 use Illuminate\Support\Collection;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\UriInterface;
 
 class WebPageCrawler
 {
     private Client $http;
 
+    private SsrfValidator $ssrfValidator;
+
     public function __construct(
         private readonly int $maxPages = 20,
         private readonly int $maxDepth = 3,
         private readonly int $requestTimeout = 15,
+        ?SsrfValidator $ssrfValidator = null,
     ) {
         $this->http = new Client([
             'timeout' => $this->requestTimeout,
@@ -27,19 +34,33 @@ class WebPageCrawler
                 'User-Agent' => 'AtlasBot/1.0 (+https://atlas.app)',
                 'Accept' => 'text/html,application/xhtml+xml',
             ],
-            'allow_redirects' => ['max' => 5],
-            'verify' => false,
+            'allow_redirects' => [
+                'max' => 5,
+                'on_redirect' => function (RequestInterface $request, ResponseInterface $response, UriInterface $uri): void {
+                    // Validate each redirect destination to prevent SSRF via redirect.
+                    $this->ssrfValidator->validate((string) $uri);
+                },
+            ],
+            'verify' => true,
         ]);
+
+        $this->ssrfValidator = $ssrfValidator ?? new SsrfValidator();
     }
 
     /**
      * Crawl the site starting at $startUrl.
      *
      * @return Collection<int, WebPageData>
+     *
+     * @throws SsrfBlockedException if the start URL resolves to a blocked address
      */
     public function crawl(string $startUrl): Collection
     {
         $startUrl = rtrim($startUrl, '/');
+
+        // Validate before making any outbound connection.
+        $this->ssrfValidator->validate($startUrl);
+
         $baseDomain = $this->extractDomain($startUrl);
 
         /** @var array<string, true> $visited */

@@ -20,7 +20,10 @@ class CommitDecision implements ShouldBeUnique, ShouldQueue
 
     public int $backoff = 60;
 
-    public function __construct(public readonly Company $company) {}
+    public function __construct(public readonly Company $company)
+    {
+        $this->onQueue('ai');
+    }
 
     public function handle(BusinessBrainService $brainService, DecisionEngine $engine): void
     {
@@ -31,10 +34,5 @@ class CommitDecision implements ShouldBeUnique, ShouldQueue
     public function uniqueId(): string
     {
         return $this->company->id;
-    }
-
-    public function queue(): string
-    {
-        return 'ai';
     }
 }

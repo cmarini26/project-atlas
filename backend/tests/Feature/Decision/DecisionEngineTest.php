@@ -5,6 +5,7 @@ namespace Tests\Feature\Decision;
 use App\AI\Contracts\AiProvider;
 use App\AI\Testing\FakeAiProvider;
 use App\Domain\BusinessBrain\BusinessBrain;
+use App\Events\DecisionCommitted;
 use App\Models\Campaign;
 use App\Models\Catalog;
 use App\Models\CatalogItem;
@@ -16,6 +17,7 @@ use App\Models\Opportunity;
 use App\Models\Recommendation;
 use App\Services\Decision\DecisionEngine;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 class DecisionEngineTest extends TestCase
@@ -65,6 +67,7 @@ class DecisionEngineTest extends TestCase
 
     public function test_commits_decision_when_all_guards_pass(): void
     {
+        Event::fake([DecisionCommitted::class]);
         $this->fake->queueFixture('rationale-generation');
 
         $this->makeChannel();
@@ -170,6 +173,7 @@ class DecisionEngineTest extends TestCase
 
     public function test_selects_highest_scoring_candidate_first(): void
     {
+        Event::fake([DecisionCommitted::class]);
         $this->fake->queueFixture('rationale-generation');
 
         $this->makeChannel();

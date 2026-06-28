@@ -17,7 +17,10 @@ class PublishCampaign implements ShouldQueue
 
     public int $tries = 1;
 
-    public function __construct(public readonly Campaign $campaign) {}
+    public function __construct(public readonly Campaign $campaign)
+    {
+        $this->onQueue('high');
+    }
 
     public function handle(ExecutionService $executionService): void
     {
@@ -59,10 +62,5 @@ class PublishCampaign implements ShouldQueue
             'dispatched' => $dispatched,
             'scheduled' => count($executions) - $dispatched,
         ]);
-    }
-
-    public function queue(): string
-    {
-        return 'high';
     }
 }

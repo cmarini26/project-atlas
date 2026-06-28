@@ -23,7 +23,10 @@ class PrepareCampaign implements ShouldQueue
 
     public int $backoff = 60;
 
-    public function __construct(public readonly Decision $decision) {}
+    public function __construct(public readonly Decision $decision)
+    {
+        $this->onQueue('ai');
+    }
 
     public function handle(
         CampaignPreparationService $preparationService,
@@ -60,17 +63,12 @@ class PrepareCampaign implements ShouldQueue
                 continue;
             }
 
-            GenerateContent::dispatch($campaign, $channel)->onQueue('ai');
+            GenerateContent::dispatch($campaign, $channel);
         }
 
         Log::info('PrepareCampaign: dispatched content generation.', [
             'campaign_id' => $campaign->id,
             'channel_count' => count($channelIds),
         ]);
-    }
-
-    public function queue(): string
-    {
-        return 'ai';
     }
 }

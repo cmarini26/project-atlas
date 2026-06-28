@@ -64,6 +64,8 @@ class KnowledgeServiceTest extends TestCase
 
     public function test_synthesizes_knowledge_entries_from_facts(): void
     {
+        Event::fake([DigitalTwinActivated::class]);
+
         $this->seedFacts();
 
         $entries = $this->service->synthesizeForCompany($this->company);
@@ -120,6 +122,8 @@ class KnowledgeServiceTest extends TestCase
 
     public function test_updates_existing_knowledge_rather_than_creating_duplicate(): void
     {
+        Event::fake([DigitalTwinActivated::class]);
+
         $this->seedFacts();
         $this->service->synthesizeForCompany($this->company);
         $this->service->synthesizeForCompany($this->company);
@@ -137,6 +141,8 @@ class KnowledgeServiceTest extends TestCase
 
     public function test_updates_last_enriched_at_on_every_synthesis(): void
     {
+        Event::fake([DigitalTwinActivated::class]);
+
         $this->seedFacts();
 
         $this->service->synthesizeForCompany($this->company);

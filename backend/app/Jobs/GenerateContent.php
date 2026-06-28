@@ -26,7 +26,9 @@ class GenerateContent implements ShouldQueue
     public function __construct(
         public readonly Campaign $campaign,
         public readonly Channel $channel,
-    ) {}
+    ) {
+        $this->onQueue('ai');
+    }
 
     public function handle(
         ContentGenerationAnalyst $analyst,
@@ -46,10 +48,5 @@ class GenerateContent implements ShouldQueue
             'channel_id' => $channel->id,
             'type' => $assetData->type,
         ]);
-    }
-
-    public function queue(): string
-    {
-        return 'ai';
     }
 }

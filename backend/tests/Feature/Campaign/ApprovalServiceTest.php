@@ -122,6 +122,8 @@ class ApprovalServiceTest extends TestCase
 
     public function test_approve_transitions_campaign_to_approved(): void
     {
+        Event::fake([RecommendationApproved::class]);
+
         $this->service->approve($this->recommendation, $this->user);
 
         $this->campaign->refresh();

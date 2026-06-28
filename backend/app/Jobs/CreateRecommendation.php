@@ -19,7 +19,10 @@ class CreateRecommendation implements ShouldQueue
 
     public int $backoff = 30;
 
-    public function __construct(public readonly Campaign $campaign) {}
+    public function __construct(public readonly Campaign $campaign)
+    {
+        $this->onQueue('default');
+    }
 
     public function handle(RecommendationService $recommendationService): void
     {
@@ -31,10 +34,5 @@ class CreateRecommendation implements ShouldQueue
             'campaign_id' => $campaign->id,
             'recommendation_id' => $recommendation->id,
         ]);
-    }
-
-    public function queue(): string
-    {
-        return 'default';
     }
 }

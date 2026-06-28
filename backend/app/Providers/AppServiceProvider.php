@@ -3,11 +3,14 @@
 namespace App\Providers;
 
 use App\AI\Contracts\AiProvider;
+use App\AI\Providers\AnthropicProvider;
 use App\AI\Testing\FakeAiProvider;
 use App\Events\CampaignAssetsReady;
 use App\Events\DecisionCommitted;
 use App\Events\DigitalTwinActivated;
 use App\Events\ExecutionCompleted;
+use App\Events\FactExtracted;
+use App\Events\KnowledgeSynthesized;
 use App\Events\ObservationRecorded;
 use App\Events\OpportunityDetected;
 use App\Events\RecommendationApproved;
@@ -23,7 +26,9 @@ use App\Models\CatalogItem;
 use App\Models\Company;
 use App\Services\Analytics\AnalyticsProviderRegistry;
 use App\Services\Analytics\FakeAnalyticsProvider;
+use App\Services\Brain\BusinessBrainService;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Foundation\Support\Providers\EventServiceProvider;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
@@ -31,9 +36,16 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        // All listeners are registered explicitly in boot(). Disable auto-discovery
+        // to prevent duplicate registrations when both mechanisms run together.
+        EventServiceProvider::disableEventDiscovery();
         // In the test environment, bind FakeAiProvider so tests can override it
         // with app()->instance(AiProvider::class, $fake). In production, a real
         // provider (AnthropicProvider) must be bound before AI jobs are dispatched.
+        if (! $this->app->environment('testing')) {
+            $this->app->singleton(AiProvider::class, AnthropicProvider::class);
+        }
+
         if ($this->app->environment('testing')) {
             $this->app->singleton(AiProvider::class, FakeAiProvider::class);
             // FakeAnalyticsProvider is registered as the catch-all in testing.
@@ -56,6 +68,14 @@ class AppServiceProvider extends ServiceProvider
             'catalog' => Catalog::class,
             'company' => Company::class,
         ]);
+
+        Event::listen(FactExtracted::class, function (FactExtracted $event): void {
+            BusinessBrainService::invalidate($event->fact->company_id);
+        });
+
+        Event::listen(KnowledgeSynthesized::class, function (KnowledgeSynthesized $event): void {
+            BusinessBrainService::invalidate($event->knowledge->company_id);
+        });
 
         Event::listen(ObservationRecorded::class, DispatchObservationProcessing::class);
         Event::listen(DigitalTwinActivated::class, TriggerOpportunityDetection::class);

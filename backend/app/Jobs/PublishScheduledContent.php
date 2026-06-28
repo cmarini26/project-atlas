@@ -14,6 +14,11 @@ class PublishScheduledContent implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public function __construct()
+    {
+        $this->onQueue('maintenance');
+    }
+
     public function handle(): void
     {
         // Only handle scheduled executions (not null scheduled_at).
@@ -34,10 +39,5 @@ class PublishScheduledContent implements ShouldQueue
                 'count' => $count,
             ]);
         }
-    }
-
-    public function queue(): string
-    {
-        return 'maintenance';
     }
 }

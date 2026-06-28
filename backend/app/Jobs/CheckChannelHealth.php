@@ -15,6 +15,11 @@ class CheckChannelHealth implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public function __construct()
+    {
+        $this->onQueue('maintenance');
+    }
+
     public function handle(ChannelPublisherRegistry $registry): void
     {
         ChannelCredentials::withoutGlobalScopes()
@@ -40,10 +45,5 @@ class CheckChannelHealth implements ShouldQueue
                     ]);
                 }
             });
-    }
-
-    public function queue(): string
-    {
-        return 'maintenance';
     }
 }
