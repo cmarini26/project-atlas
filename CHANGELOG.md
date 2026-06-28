@@ -6,6 +6,31 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 10 — Customer Dashboard & UX — Implementation Plan] — 2026-06-27
+
+### Added
+
+- `docs/plans/Milestone-10-Implementation.md` — full implementation plan for the first customer-facing experience on top of the Atlas intelligence platform
+
+**Plan contents:**
+- Personas: Marcus (comic book auction house owner) and Sofia (marketing manager) — two user archetypes that drive all UX decisions
+- User flows: 6 primary flows — first-time setup, recommendation review/approve, edit before approve, reject, campaign status, analytics
+- Architecture decision: Inertia.js + Vue 3 + TypeScript + Tailwind CSS for the customer dashboard (`/app/*`); Filament stays at `/admin` for superadmin ops
+- 10 implementation phases in strict sequence: Specification → Frontend Foundation → Auth + Company Routing → Onboarding Wizard → Dashboard Overview → Recommendation Workflow → Opportunities + Business Brain → Campaigns + Publishing → Analytics + Learning → Settings + Polish
+- Route structure: 18 customer-facing routes + 2 API endpoints
+- Controller inventory: 12 controllers mapping to existing services — no new business logic
+- Data shapes: exact props each Inertia page receives from each controller, with the specific models and services sourced from
+- Vue component inventory: 2 layouts, 15 pages, 25+ reusable components
+- TypeScript types: domain types for all 12 Atlas domain entities
+- Security constraints: company isolation, role-gated approval actions (owner + admin only), SSRF protection (existing)
+- Testing plan: PHPUnit feature tests per controller + Vitest component tests; approval workflow integration tests; middleware security tests
+- Acceptance criteria: 11 verifiable criteria including the PRD north-star metric (URL → recommendation < 10 minutes)
+- Open questions: 6 decisions required before Phase 2 begins, with recommendations for each
+
+**Scope note:** This plan contains no new AI capabilities. The dashboard reads from existing models and services. No backend redesign.
+
+---
+
 ## [Milestone 9.5 — Version 0.1 Stabilization Sprint] — 2026-06-27
 
 ### Added

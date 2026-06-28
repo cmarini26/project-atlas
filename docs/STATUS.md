@@ -34,6 +34,24 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
+**Milestone 10 — Customer Dashboard & UX 🔵 In Planning**
+*Plan authored: 2026-06-27*
+
+Implementation plan written: `docs/plans/Milestone-10-Implementation.md`. No code yet.
+
+**Plan covers:**
+- Inertia.js + Vue 3 + TypeScript as the customer-facing frontend (separate from Filament admin)
+- 10 implementation phases in strict sequence: spec → foundation → auth → onboarding → dashboard → recommendation workflow → opportunities/brain → campaigns/publishing → analytics/learning → polish
+- 8 customer-facing intelligence surfaces
+- Personas (Marcus — auction house owner, Sofia — marketing manager) and 6 user flows defined
+- Route structure, controller inventory, Vue page/component inventory, TypeScript types
+- Feature tests (PHPUnit) + component tests (Vitest)
+- Security constraints: company isolation, approval authorization, role-gated actions
+
+**Implementation begins next.** Start with Phase 1 (write Personas.md and UserFlows.md), then Phase 2 (frontend foundation).
+
+---
+
 **Milestone 9.5 — Version 0.1 Stabilization Sprint ✅ Complete**
 *Completed: 2026-06-27*
 
@@ -455,6 +473,6 @@ All production-blocking items resolved. Remaining pre-production items:
 
 ## Last Updated
 
-**2026-06-27** — Milestone 9.5 (Version 0.1 Stabilization Sprint) complete. All 5 production blockers resolved. Two systemic pipeline defects fixed. 519 tests (517 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean.
+**2026-06-27** — Milestone 10 implementation plan written (`docs/plans/Milestone-10-Implementation.md`). 10 implementation phases defined. Inertia.js + Vue 3 + TypeScript chosen for customer dashboard. Personas and user flows authored. Implementation begins next.
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*
