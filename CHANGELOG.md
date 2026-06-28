@@ -6,6 +6,17 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [CI Fix: pdo_sqlite extension] — 2026-06-28
+
+### Fixed
+
+- `.github/workflows/ci.yml` — added `pdo_sqlite` to `setup-php` extensions list
+- `backend/composer.json` / `backend/composer.lock` — added `brianium/paratest ^7.20` dev dependency for `php artisan test --parallel` support
+
+**Root cause:** `phpunit.xml` overrides `DB_CONNECTION=sqlite` / `DB_DATABASE=:memory:` for all tests, but the CI `setup-php` step did not explicitly include `pdo_sqlite`. This caused test failures in CI while passing locally where the extension is available by default.
+
+---
+
 ## [Private Beta Readiness Audit] — 2026-06-27
 
 ### Added
