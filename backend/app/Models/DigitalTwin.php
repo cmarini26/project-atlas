@@ -19,15 +19,13 @@ class DigitalTwin extends Model
         'metadata',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'health_score' => 'integer',
-            'last_observed_at' => 'datetime',
-            'last_enriched_at' => 'datetime',
-            'metadata' => 'array',
-        ];
-    }
+    /** @var array<string, string> */
+    protected $casts = [
+        'health_score' => 'integer',
+        'last_observed_at' => 'datetime',
+        'last_enriched_at' => 'datetime',
+        'metadata' => 'array',
+    ];
 
     public function isActive(): bool
     {

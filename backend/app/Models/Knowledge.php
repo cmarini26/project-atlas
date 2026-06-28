@@ -26,16 +26,14 @@ class Knowledge extends Model
         'expires_at',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'structured' => 'array',
-            'source_fact_ids' => 'array',
-            'is_active' => 'boolean',
-            'generated_at' => 'datetime',
-            'expires_at' => 'datetime',
-        ];
-    }
+    /** @var array<string, string> */
+    protected $casts = [
+        'structured' => 'array',
+        'source_fact_ids' => 'array',
+        'is_active' => 'boolean',
+        'generated_at' => 'datetime',
+        'expires_at' => 'datetime',
+    ];
 
     /** @param Builder<Knowledge> $query */
     public function scopeActive(Builder $query): void

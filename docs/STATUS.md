@@ -22,90 +22,64 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 | Dimension         | Status | Notes |
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined |
-| Implementation    | ✅ Core loop complete | All 9 milestones delivered. 5 blocking production gaps identified in V0.1 Audit (see Current Milestone). |
-| Tests             | ✅ Strong | 519 tests (517 passing, 2 Redis skipped); PHPStan level 8 — 0 errors; Pint clean |
+| Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. |
+| Tests             | ✅ Strong | 581 tests (579 passing, 2 Redis skipped); PHPStan level 8 — 0 errors; Pint clean |
 | CI/CD             | 🟡 Defined | GitHub Actions workflow written; not yet triggered (no PR opened against remote) |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
 
-**Overall:** Milestone 9.5 (Version 0.1 Stabilization Sprint) complete. All 5 production-blocking gaps resolved: `AnthropicProvider`, Filament superadmin gate, SSRF protection, health endpoints, and end-to-end smoke test. Two systemic pipeline defects fixed: jobs silently not dispatching (queue() method conflict) and duplicate event listeners (auto-discovery + manual registration conflict). 519 tests (517 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean.
+**Overall:** Milestone 10 (Customer Dashboard & UX) complete. Full customer-facing dashboard built with Inertia.js + Vue 3 + TypeScript across 10 implementation phases: auth, onboarding wizard, dashboard, recommendation workflow, business brain, opportunities, campaigns, publishing queue, analytics, learning log, and settings. 581 tests (579 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean.
 
 ---
 
 ## Current Milestone
 
-**Milestone 10.1 — Customer Design System ✅ Complete**
-*Completed: 2026-06-27*
+**Milestone 10 — Customer Dashboard & UX ✅ Complete**
+*Completed: 2026-06-28*
 
-Design system document written: `docs/design/System.md`. No code yet.
+Full customer-facing dashboard built across 10 phases. See [Milestone-10-Review.md](reviews/Milestone-10-Review.md) for full details.
 
-**Covers all 21 required topics:**
-- Design philosophy: calm, clear, low cognitive load — built for business owners, not marketers
-- Typography: Instrument Sans (400/500/600), 9-size scale from 11px label to 30px display
-- Color palette: warm stone neutrals + single indigo accent; semantic `@theme` tokens; rejection is never red
-- Spacing scale: 4px base unit, 14 tokens from 4px to 96px
-- Layout grid: 12-column, 1140px max-width, 240px fixed sidebar
-- Responsive breakpoints: 5 breakpoints; sidebar appears at `lg` (1024px); mobile-first
-- Icons: Heroicons v2 — 5 sizes, outline/solid rules, standard icon mapping for all Atlas concepts
-- Card components: 4 variants (default, highlighted, subtle, ghost); anatomy and padding rules
-- Buttons: 3-level hierarchy (Primary = Approve, Secondary = Edit & Approve, Tertiary = Reject); never red for rejection
-- Form controls: inputs, labels, helper/error text, checkboxes — all with focus/error/disabled states
-- Tables: column patterns, row styles, pagination strip
-- Recommendation cards: compact (dashboard) and expanded (detail page) forms; rationale quadrant layout
-- Opportunity cards: score bar styles, 6-state expiry treatment
-- Campaign cards: progress trail for full lifecycle
-- Metric cards: single-metric and expected-vs-actual KPI variants
-- Timeline components: vertical event trail
-- Empty states: 3 categories by tone (working, action needed, genuinely empty)
-- Loading skeletons: pulse animation, card/metric/table variants
-- Animations: conservative — no bounce, no confetti; 5 duration tokens
-- Accessibility: WCAG 2.1 AA, ARIA requirements, keyboard nav, `prefers-reduced-motion`
-- Dark mode strategy: light only for MVP; token architecture designed for future addition
+**Delivered:**
 
-**Milestone 10 — Customer Dashboard & UX 🔵 In Planning**
-*Plan authored: 2026-06-27*
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | Personas + User Flows | ✅ |
+| 2 | Frontend foundation — Vite + Vue 3 + TS + Inertia.js | ✅ |
+| 3 | Auth + Company Routing — Login, Register, `EnsureCompanyMembership` middleware, `AppLayout` | ✅ |
+| 4 | Onboarding Wizard — 3-step wizard + status polling page | ✅ |
+| 5 | Dashboard — summary counts, digital twin health, pending recommendation prompt | ✅ |
+| 6 | Recommendation Workflow — review, approve, edit & approve, reject; role-gated | ✅ |
+| 7 | Business Brain + Opportunities — facts, knowledge, observations, scored opportunity list | ✅ |
+| 8 | Campaigns + Publishing Queue — campaign timeline, execution queue with channel/status | ✅ |
+| 9 | Analytics + Learning — KPI snapshots, execution metrics, learning log, applied effects | ✅ |
+| 10 | Settings — company profile, integration list, sync trigger; PHPUnit feature tests for all controllers | ✅ |
 
-Implementation plan written: `docs/plans/Milestone-10-Implementation.md`. No code yet.
+**Quality gates:**
 
-**Plan covers:**
-- Inertia.js + Vue 3 + TypeScript as the customer-facing frontend (separate from Filament admin)
-- 10 implementation phases in strict sequence: spec → foundation → auth → onboarding → dashboard → recommendation workflow → opportunities/brain → campaigns/publishing → analytics/learning → polish
-- 8 customer-facing intelligence surfaces
-- Personas (Marcus — auction house owner, Sofia — marketing manager) and 6 user flows defined
-- Route structure, controller inventory, Vue page/component inventory, TypeScript types
-- Feature tests (PHPUnit) + component tests (Vitest)
-- Security constraints: company isolation, approval authorization, role-gated actions
+| Gate | Result |
+|------|--------|
+| PHPUnit (581 tests) | 579 passing, 2 Redis skipped |
+| PHPStan level 8 | 0 errors |
+| Laravel Pint | Clean |
+| Frontend build | 129 modules, 0 errors |
 
-**Implementation begins next.** Start with Phase 1 (write Personas.md and UserFlows.md), then Phase 2 (frontend foundation).
+**Next:** Production environment provisioning or first real company onboarding.
 
 ---
-
-**Milestone 9.5 — Version 0.1 Stabilization Sprint ✅ Complete**
-*Completed: 2026-06-27*
-
-All 5 production-blocking gaps from the V0.1 Architecture Audit resolved. Two systemic pipeline defects discovered and fixed. See [Milestone-9.5-Review.md](reviews/Milestone-9.5-Review.md) for full details.
-
-**Production blockers resolved:**
-
-| Item | Status |
-|------|--------|
-| `AnthropicProvider` | ✅ Implemented — bound in `AppServiceProvider` for non-test environments |
-| Filament superadmin gate | ✅ Implemented — `is_superadmin` column; `canAccess()` in `AdminPanelProvider` |
-| SSRF protection | ✅ Implemented — `SsrfValidator` with 14 CIDR blocks; `WebPageCrawler` validates before every request |
-| Health endpoints | ✅ Implemented — `GET /health`, `GET /health/live`, `GET /health/ready` |
-| End-to-end smoke test | ✅ Passing — `PipelineSmokeTest` exercises full pipeline, 5 AI fixtures |
-
-**Remaining pre-production items (lower priority):**
-- `BusinessBrainService` Redis caching (5-min TTL per company) — customer-dashboard-blocking
-- Rate limiting on `/api/analytics/webhooks/{provider}` — customer-dashboard-blocking
-- Spec/code drift cleanup (`Learning.value` vs spec `payload`) — cleanup only
-- `ApplyLearnings` queue alignment (`ai` → `maintenance`) — low-risk
-
-**Next:** First production environment provisioning or customer dashboard work.
 
 ---
 
 ## Completed Milestones
+
+### Milestone 10 — Customer Dashboard & UX ✅
+*Completed: 2026-06-28*
+
+Full customer-facing Inertia.js + Vue 3 + TypeScript dashboard. 10 implementation phases. 581 tests. See [Milestone-10-Review.md](reviews/Milestone-10-Review.md).
+
+### Milestone 9.5 — Version 0.1 Stabilization Sprint ✅
+*Completed: 2026-06-27*
+
+All 5 production-blocking gaps resolved. Two systemic pipeline defects fixed. See [Milestone-9.5-Review.md](reviews/Milestone-9.5-Review.md).
 
 ### Milestone 8.5 — Learning Engine Specification ✅
 *Completed: 2026-06-26*

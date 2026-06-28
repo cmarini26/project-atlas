@@ -10,7 +10,8 @@ class ApplicationBootTest extends TestCase
     {
         $response = $this->get('/');
 
-        $response->assertStatus(200);
+        // Root redirects to /login
+        $response->assertRedirect('/login');
     }
 
     public function test_application_container_resolves_core_bindings(): void

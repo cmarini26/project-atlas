@@ -1,0 +1,216 @@
+<?php
+
+namespace Tests\Feature\App;
+
+use App\Models\Campaign;
+use App\Models\Company;
+use App\Models\CompanyMembership;
+use App\Models\Decision;
+use App\Models\Opportunity;
+use App\Models\Recommendation;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class RecommendationControllerTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_index_requires_auth(): void
+    {
+        $this->get('/app/recommendations')->assertRedirect('/login');
+    }
+
+    public function test_index_renders_inertia_component(): void
+    {
+        [$user] = $this->userWithCompany();
+
+        $this->actingAs($user)
+            ->get('/app/recommendations')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->component('App/Recommendations/Index'));
+    }
+
+    public function test_index_includes_pending_and_recent(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+
+        Recommendation::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_type' => 'social_post',
+            'status' => 'pending',
+        ]);
+
+        Recommendation::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_type' => 'email_campaign',
+            'status' => 'approved',
+        ]);
+
+        $this->actingAs($user)
+            ->get('/app/recommendations')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('pending', 1)
+                ->has('recent', 1)
+            );
+    }
+
+    public function test_show_renders_recommendation_page(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+
+        $rec = Recommendation::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_type' => 'social_post',
+            'status' => 'pending',
+        ]);
+
+        $this->actingAs($user)
+            ->get("/app/recommendations/{$rec->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->component('App/Recommendations/Show'));
+    }
+
+    public function test_show_returns_404_for_other_company_recommendation(): void
+    {
+        [$user] = $this->userWithCompany();
+        $other = Company::withoutGlobalScopes()->create(['name' => 'Other', 'slug' => 'other']);
+
+        $rec = Recommendation::withoutGlobalScopes()->create([
+            'company_id' => $other->id,
+            'campaign_type' => 'email_campaign',
+            'status' => 'pending',
+        ]);
+
+        $this->actingAs($user)
+            ->get("/app/recommendations/{$rec->id}")
+            ->assertNotFound();
+    }
+
+    public function test_owner_can_approve_recommendation(): void
+    {
+        [$user, $company] = $this->userWithCompany('owner');
+
+        $rec = $this->pendingRecommendation($company);
+
+        $this->actingAs($user)
+            ->post("/app/recommendations/{$rec->id}/approve")
+            ->assertRedirect('/app/recommendations');
+
+        $this->assertDatabaseHas('recommendations', [
+            'id' => $rec->id,
+            'status' => 'approved',
+        ]);
+    }
+
+    public function test_admin_can_approve_recommendation(): void
+    {
+        [$user, $company] = $this->userWithCompany('admin');
+
+        $rec = $this->pendingRecommendation($company);
+
+        $this->actingAs($user)
+            ->post("/app/recommendations/{$rec->id}/approve")
+            ->assertRedirect('/app/recommendations');
+
+        $this->assertDatabaseHas('recommendations', [
+            'id' => $rec->id,
+            'status' => 'approved',
+        ]);
+    }
+
+    public function test_member_cannot_approve_recommendation(): void
+    {
+        [$user, $company] = $this->userWithCompany('member');
+
+        $rec = $this->pendingRecommendation($company);
+
+        $this->actingAs($user)
+            ->post("/app/recommendations/{$rec->id}/approve")
+            ->assertForbidden();
+    }
+
+    public function test_owner_can_reject_recommendation(): void
+    {
+        [$user, $company] = $this->userWithCompany('owner');
+
+        $rec = $this->pendingRecommendation($company);
+
+        $this->actingAs($user)
+            ->post("/app/recommendations/{$rec->id}/reject", ['notes' => 'Not right now'])
+            ->assertRedirect('/app/recommendations');
+
+        $this->assertDatabaseHas('recommendations', [
+            'id' => $rec->id,
+            'status' => 'rejected',
+        ]);
+    }
+
+    public function test_approve_is_denied_for_other_company_recommendation(): void
+    {
+        [$user] = $this->userWithCompany('owner');
+        $other = Company::withoutGlobalScopes()->create(['name' => 'Other', 'slug' => 'other-co']);
+
+        $rec = $this->pendingRecommendation($other);
+
+        $this->actingAs($user)
+            ->post("/app/recommendations/{$rec->id}/approve")
+            ->assertNotFound();
+    }
+
+    /** @return array{User, Company} */
+    private function userWithCompany(string $role = 'owner'): array
+    {
+        $user = User::factory()->create();
+        $company = Company::withoutGlobalScopes()->create(['name' => 'Test Co', 'slug' => 'test-co']);
+        CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => $role]);
+
+        return [$user, $company];
+    }
+
+    private function pendingRecommendation(Company $company): Recommendation
+    {
+        $opportunity = Opportunity::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'featured_item',
+            'title' => 'Test Opportunity',
+            'description' => 'A test opportunity.',
+            'status' => 'selected',
+            'composite_score' => 80,
+            'relevance_score' => 80,
+            'timing_score' => 80,
+            'confidence_score' => 80,
+            'urgency_score' => 80,
+            'detected_at' => now(),
+        ]);
+
+        $decision = Decision::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'opportunity_id' => $opportunity->id,
+            'campaign_type' => 'featured_item',
+            'channel_ids' => [],
+            'rationale' => ['why_now' => 'Good timing'],
+            'expected_impact' => ['reach' => '1000'],
+            'status' => 'recommended',
+            'decided_at' => now(),
+        ]);
+
+        $campaign = Campaign::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'decision_id' => $decision->id,
+            'campaign_type' => 'social_post',
+            'title' => 'Test Campaign',
+            'status' => 'draft',
+        ]);
+
+        return Recommendation::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'decision_id' => $decision->id,
+            'campaign_id' => $campaign->id,
+            'campaign_type' => 'social_post',
+            'rationale_display' => ['why_now' => 'Good timing'],
+            'status' => 'pending',
+        ]);
+    }
+}

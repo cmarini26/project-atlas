@@ -5,6 +5,9 @@ namespace App\Domain\BusinessBrain;
 use App\Models\Catalog;
 use App\Models\Company;
 use App\Models\DigitalTwin;
+use App\Models\Fact;
+use App\Models\Knowledge;
+use App\Models\Observation;
 use Illuminate\Support\Collection;
 
 /**
@@ -15,9 +18,9 @@ use Illuminate\Support\Collection;
 readonly class BusinessBrain
 {
     /**
-     * @param  Collection<int, mixed>  $activeFacts
-     * @param  Collection<int, mixed>  $activeKnowledge
-     * @param  Collection<int, mixed>  $recentObservations
+     * @param  Collection<int, Fact>  $activeFacts
+     * @param  Collection<int, Knowledge>  $activeKnowledge
+     * @param  Collection<int, Observation>  $recentObservations
      * @param  Collection<int, mixed>  $featuredItems
      * @param  Collection<int, mixed>  $recentCampaigns
      */

@@ -32,19 +32,17 @@ class Opportunity extends Model
         'detected_at',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'relevance_score' => 'integer',
-            'timing_score' => 'integer',
-            'confidence_score' => 'integer',
-            'urgency_score' => 'integer',
-            'composite_score' => 'integer',
-            'ai_detected' => 'boolean',
-            'expires_at' => 'datetime',
-            'detected_at' => 'datetime',
-        ];
-    }
+    /** @var array<string, string> */
+    protected $casts = [
+        'relevance_score' => 'integer',
+        'timing_score' => 'integer',
+        'confidence_score' => 'integer',
+        'urgency_score' => 'integer',
+        'composite_score' => 'integer',
+        'ai_detected' => 'boolean',
+        'expires_at' => 'datetime',
+        'detected_at' => 'datetime',
+    ];
 
     /** @return MorphTo<Model, $this> */
     public function subject(): MorphTo

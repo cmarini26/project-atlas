@@ -6,6 +6,99 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 10 — Customer Dashboard & UX] — 2026-06-28
+
+### Added
+
+**Frontend foundation**
+- `package.json` — Vue 3, TypeScript, Inertia.js v3, Tailwind CSS v4, Heroicons, Vite
+- `vite.config.ts`, `tsconfig.json`, `resources/js/app.ts` — Vite + TypeScript bootstrap
+- `resources/css/app.css` — `@theme {}` design token block: warm stone neutrals + indigo accent, Instrument Sans via Bunny fonts CDN
+- `resources/views/app.blade.php` — Inertia root template
+- `app/Http/Middleware/HandleInertiaRequests.php` — shares `auth.user`, `company`, `flash` with every Inertia response
+
+**Layouts and shared components**
+- `resources/js/Layouts/AuthLayout.vue` — centered card layout for login/register
+- `resources/js/Layouts/AppLayout.vue` — 240px fixed sidebar; mobile hamburger + overlay; flash messages; user menu with logout
+- `resources/js/Components/UI/Badge.vue` — 6 variants (default, accent, success, warning, neutral, muted)
+- `resources/js/Components/UI/EmptyState.vue` — icon + heading + description; 3 tones
+- `resources/js/Components/UI/ScoreBar.vue` — animated width bar for opportunity scoring
+- `resources/js/Components/UI/LoadingSpinner.vue` — pulse spinner
+- `resources/js/types/index.ts` — complete TypeScript types matching all controller response shapes
+
+**Auth and company routing**
+- `resources/js/Pages/Auth/Login.vue`, `Register.vue` — forms with Inertia `useForm`
+- `resources/js/Pages/App/CompanySelector.vue` — multi-company selection; single-membership users bypass this
+- `app/Http/Middleware/EnsureCompanyMembership.php` — resolves company from session (multi) or direct (single); aborts with 401/redirect as appropriate
+
+**Onboarding**
+- `resources/js/Pages/Onboarding/Index.vue` — 3-step wizard: company name + industry → website URL → confirmation
+- `resources/js/Pages/Onboarding/Status.vue` — polls `/api/onboarding/status` every 4 seconds; auto-redirects when first recommendation appears
+- `app/Http/Controllers/OnboardingController.php` — `createCompany`, `createIntegration`, `status`
+- `app/Http/Controllers/Api/OnboardingStatusController.php` — JSON status endpoint
+
+**Dashboard**
+- `resources/js/Pages/App/Dashboard.vue` — summary counts, health card, pending recommendation prompt, recent campaigns, recent executions
+- `resources/js/Components/Dashboard/SummaryCard.vue`, `HealthCard.vue`, `RecommendationPrompt.vue`
+- `app/Http/Controllers/App/DashboardController.php` — health data nested under `health` key
+
+**Recommendation workflow**
+- `resources/js/Pages/App/Recommendations/Index.vue` — pending and recent lists
+- `resources/js/Pages/App/Recommendations/Show.vue` — full review: rationale, expected impact, content preview, approval actions
+- `resources/js/Components/Recommendations/RationaleCard.vue`, `ImpactCard.vue`, `ContentPreview.vue`, `ContentEditor.vue`, `ApproveActions.vue`
+- `app/Http/Controllers/App/RecommendationController.php` — `index`, `show`, `approve`, `approveEdit`, `reject`; `requireApprovalRole` gates owner/admin only
+
+**Business Brain and Opportunities**
+- `resources/js/Pages/App/Brain.vue` — facts, knowledge, recent observations; initializing state
+- `resources/js/Pages/App/Opportunities.vue` — scored opportunity cards with score bars
+- `app/Http/Controllers/App/BusinessBrainController.php`, `OpportunityController.php`
+
+**Campaigns and Publishing**
+- `resources/js/Pages/App/Campaigns/Index.vue`, `Show.vue`
+- `resources/js/Pages/App/Publishing.vue` — paginated execution queue
+- `app/Http/Controllers/App/CampaignController.php`, `PublishingController.php`
+
+**Analytics and Learning**
+- `resources/js/Pages/App/Analytics/Index.vue`, `Show.vue`
+- `resources/js/Pages/App/Learning.vue`
+- `app/Http/Controllers/App/AnalyticsController.php`, `LearningController.php`
+
+**Settings**
+- `resources/js/Pages/App/Settings.vue` — company profile, integration list, sync trigger
+- `app/Http/Controllers/App/SettingsController.php`
+
+**Feature tests (62 new)**
+- `tests/Feature/App/MiddlewareTest.php`
+- `tests/Feature/App/DashboardControllerTest.php`
+- `tests/Feature/App/RecommendationControllerTest.php`
+- `tests/Feature/App/OnboardingControllerTest.php`
+- `tests/Feature/App/BusinessBrainControllerTest.php`
+- `tests/Feature/App/OpportunityControllerTest.php`
+- `tests/Feature/App/CampaignControllerTest.php`
+- `tests/Feature/App/PublishingControllerTest.php`
+- `tests/Feature/App/AnalyticsControllerTest.php`
+- `tests/Feature/App/LearningControllerTest.php`
+- `tests/Feature/App/SettingsControllerTest.php`
+
+### Changed
+
+**Models — method-style to property-style casts (larastan v3.10 compatibility)**
+- `app/Models/Knowledge.php` — `protected function casts()` → `protected array $casts`; larastan now infers `expires_at` as Carbon
+- `app/Models/Opportunity.php` — same conversion; larastan now infers `detected_at` and `expires_at` as Carbon
+- `app/Models/DigitalTwin.php` — same conversion; larastan now infers `last_enriched_at` as Carbon
+
+**BusinessBrain VO**
+- `app/Domain/BusinessBrain/BusinessBrain.php` — PHPDoc updated from `Collection<int, mixed>` to `Collection<int, Fact>`, `Collection<int, Knowledge>`, `Collection<int, Observation>`
+
+**Controllers — PHPStan fixes**
+- All App controllers: `abort_unless($user instanceof User, 401)` pattern for `$request->user()` narrowing
+- `AnalyticsController`: `$s->snapshotted_at->toIso8601String()` (non-nullable Carbon, no nullsafe needed)
+- `LearningController`: `$a->created_at->toIso8601String()` (same)
+- `CompanySelectorController`: ternary null check for BelongsTo `company` relation
+- `OpportunityController`: `$o->detected_at->toIso8601String()` (non-nullable per larastan after cast conversion)
+
+---
+
 ## [Milestone 10.1 — Customer Design System] — 2026-06-27
 
 ### Added
