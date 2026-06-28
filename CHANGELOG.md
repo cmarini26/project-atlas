@@ -6,6 +6,46 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Private Beta Readiness Audit] — 2026-06-27
+
+### Added
+
+- `docs/reviews/Beta-Readiness-Audit.md` — comprehensive CTO-style operational audit across 40 areas
+- `docs/plans/Private-Beta-Plan.md` — 4-week sprint plan to safely onboard first 10 paying customers
+
+**Audit scope:** Product readiness, authentication, authorization, multi-tenancy, data isolation, AI provider resilience, prompt management, queue architecture, scheduler, background jobs, failure recovery, logging, monitoring, health endpoints, security, SSRF, secrets management, backups, disaster recovery, migrations, deployment, CI/CD, test coverage, performance, scalability, caching, storage, email delivery, domain, analytics, learning, audit trails, customer support, admin tooling, runbooks, privacy, legal, documentation, known limitations.
+
+**Key findings:**
+
+| # | Finding | Severity | Blocks Beta? |
+|---|---------|----------|-------------|
+| B1 | `ResolveCurrentCompany` middleware unverified / missing | Critical | Yes |
+| B2 | No production server provisioned | Critical | Yes |
+| B3 | Email uses log driver only | Critical | Yes |
+| B4 | No monitoring or alerting | Critical | Yes |
+| B5 | No database backups | Critical | Yes |
+| B6 | No domain configured | Critical | Yes |
+| B7 | No privacy policy or terms of service | Critical | Yes |
+| — | AI provider rate limiting missing | High | No |
+| — | No auth rate limiting or security headers | High | No |
+| — | No operational runbooks | High | No |
+| — | BusinessBrainService cache not implemented | High | No |
+
+**Beta Readiness Score: 31 / 100**
+**Go / No-Go: NO-GO**
+
+**Private Beta Plan covers:**
+- Week 1: Production infrastructure (server, domain, SSL, queues, storage, email)
+- Week 2: Security, tenancy verification, compliance (privacy policy, ToS, email verification)
+- Week 3: Monitoring, reliability, operational runbooks, end-to-end production test
+- Week 4: Customer onboarding polish, Getting Started guide, beta launch
+
+**Updated:**
+
+- `docs/STATUS.md` — current milestone updated with audit summary and critical blockers
+
+---
+
 ## [Landing Page Design & Content Specification] — 2026-06-27
 
 ### Added
