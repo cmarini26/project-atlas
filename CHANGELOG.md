@@ -6,6 +6,26 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [New Company Onboarding Happy Path Fix] — 2026-06-28
+
+### Fixed
+
+Three bugs that prevented a new user from reaching the website connection step after creating a company:
+
+| Bug | File | Fix |
+|-----|------|-----|
+| `OnboardingController::index()` bounced any user with a membership to `/app`, skipping the integration step | `OnboardingController.php` | Now routes by company state: no membership → step 1; membership + no integration → step 2; has integration → status page |
+| Integration form posted field `url`, server validated `website_url` | `Onboarding/Index.vue` | Fixed field name; added `initial_step` prop so server controls starting step; removed "Skip for now" button |
+| `/app` showed empty dashboard when company had no integration | `DashboardController.php` | Added redirect to `/onboarding` when no integration exists |
+
+### Added
+
+- 6 new `OnboardingControllerTest` cases covering the full happy path and `SyncIntegration` job dispatch
+- 1 new `DashboardControllerTest` case for the no-integration redirect
+- `docs/reviews/New-Company-Onboarding-Fix.md`
+
+---
+
 ## [CI Fix: pdo_sqlite extension] — 2026-06-28
 
 ### Fixed

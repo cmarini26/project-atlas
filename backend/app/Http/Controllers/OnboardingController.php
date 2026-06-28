@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Company;
 use App\Models\CompanyMembership;
+use App\Models\Integration;
 use App\Models\User;
 use App\Services\Company\CompanyService;
 use App\Services\Observatory\IntegrationService;
@@ -24,12 +25,22 @@ class OnboardingController extends Controller
         $user = $request->user();
         abort_unless($user instanceof User, 401);
 
-        $existing = CompanyMembership::where('user_id', $user->id)->first();
-        if ($existing) {
-            return redirect()->route('app.dashboard');
+        $membership = CompanyMembership::with('company')->where('user_id', $user->id)->first();
+
+        if (! $membership) {
+            return Inertia::render('Onboarding/Index', ['initial_step' => 1]);
         }
 
-        return Inertia::render('Onboarding/Index');
+        $company = $membership->company;
+        abort_unless($company instanceof Company, 404);
+
+        // Company exists but no integration yet — collect website URL
+        if (! Integration::where('company_id', $company->id)->exists()) {
+            return Inertia::render('Onboarding/Index', ['initial_step' => 2]);
+        }
+
+        // Integration submitted — wait for analysis to complete
+        return redirect()->route('onboarding.status');
     }
 
     public function createCompany(Request $request): RedirectResponse
@@ -52,7 +63,7 @@ class OnboardingController extends Controller
 
         $request->session()->put('onboarding_company_id', $company->id);
 
-        return redirect()->route('onboarding')->with('step', 'integration');
+        return redirect()->route('onboarding');
     }
 
     public function createIntegration(Request $request): RedirectResponse

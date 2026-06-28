@@ -4,6 +4,7 @@ namespace Tests\Feature\App;
 
 use App\Models\Company;
 use App\Models\CompanyMembership;
+use App\Models\Integration;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -26,7 +27,7 @@ class MiddlewareTest extends TestCase
 
     public function test_user_with_single_membership_accesses_app(): void
     {
-        [$user] = $this->userWithCompany();
+        [$user] = $this->userWithCompanyAndIntegration();
 
         $this->actingAs($user)->get('/app')->assertOk();
     }
@@ -51,6 +52,7 @@ class MiddlewareTest extends TestCase
         foreach (['co-x', 'co-y'] as $slug) {
             $company = Company::withoutGlobalScopes()->create(['name' => $slug, 'slug' => $slug]);
             CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => 'owner']);
+            $this->createIntegration($company);
             $companies[] = $company;
         }
 
@@ -61,12 +63,24 @@ class MiddlewareTest extends TestCase
     }
 
     /** @return array{User, Company} */
-    private function userWithCompany(string $role = 'owner'): array
+    private function userWithCompanyAndIntegration(string $role = 'owner'): array
     {
         $user = User::factory()->create();
         $company = Company::withoutGlobalScopes()->create(['name' => 'Test Co', 'slug' => 'test-co']);
         CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => $role]);
+        $this->createIntegration($company);
 
         return [$user, $company];
+    }
+
+    private function createIntegration(Company $company): void
+    {
+        Integration::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'website_crawl',
+            'name' => 'Website',
+            'config' => ['url' => 'https://test.com'],
+            'status' => 'active',
+        ]);
     }
 }

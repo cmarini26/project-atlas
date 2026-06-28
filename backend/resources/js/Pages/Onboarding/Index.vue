@@ -3,7 +3,11 @@ import { ref } from 'vue'
 import { Head, useForm } from '@inertiajs/vue3'
 import AuthLayout from '@/Layouts/AuthLayout.vue'
 
-const step = ref<1 | 2 | 3>(1)
+const props = defineProps<{
+  initial_step: 1 | 2 | 3
+}>()
+
+const step = ref<1 | 2 | 3>(props.initial_step)
 
 const companyForm = useForm({
   name: '',
@@ -11,18 +15,12 @@ const companyForm = useForm({
 })
 
 const integrationForm = useForm({
-  url: '',
+  website_url: '',
 })
-
-const companyId = ref<string | null>(null)
 
 function submitCompany(): void {
   companyForm.post('/onboarding/company', {
-    onSuccess: (page) => {
-      const data = page.props as Record<string, unknown>
-      if (typeof data.company_id === 'string') {
-        companyId.value = data.company_id
-      }
+    onSuccess: () => {
       step.value = 2
     },
   })
@@ -34,10 +32,6 @@ function submitIntegration(): void {
       step.value = 3
     },
   })
-}
-
-function goToDashboard(): void {
-  window.location.href = '/onboarding/status'
 }
 </script>
 
@@ -107,25 +101,25 @@ function goToDashboard(): void {
     <!-- Step 2: Website URL -->
     <div v-else-if="step === 2">
       <h1 class="text-base font-semibold text-[var(--color-text-primary)] mb-1">Connect your website</h1>
-      <p class="text-sm text-[var(--color-text-muted)] mb-5">Atlas will crawl it to learn about your business.</p>
+      <p class="text-sm text-[var(--color-text-muted)] mb-5">Atlas will crawl it to build your Business Brain.</p>
 
       <form class="space-y-4" @submit.prevent="submitIntegration">
         <div>
-          <label for="url" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Website URL</label>
+          <label for="website_url" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Website URL</label>
           <input
-            id="url"
-            v-model="integrationForm.url"
+            id="website_url"
+            v-model="integrationForm.website_url"
             type="url"
             required
             :class="[
               'w-full px-3 py-2 text-sm rounded-lg border bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] placeholder-[var(--color-text-placeholder)] transition-colors duration-[var(--duration-fast)]',
-              integrationForm.errors.url
+              integrationForm.errors.website_url
                 ? 'border-rose-300 focus:outline-none focus:ring-1 focus:ring-rose-400'
                 : 'border-[var(--color-border)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)]',
             ]"
             placeholder="https://acmecomics.com"
           />
-          <p v-if="integrationForm.errors.url" class="mt-1 text-xs text-rose-600">{{ integrationForm.errors.url }}</p>
+          <p v-if="integrationForm.errors.website_url" class="mt-1 text-xs text-rose-600">{{ integrationForm.errors.website_url }}</p>
         </div>
 
         <button
@@ -135,18 +129,10 @@ function goToDashboard(): void {
         >
           {{ integrationForm.processing ? 'Connecting…' : 'Connect website' }}
         </button>
-
-        <button
-          type="button"
-          class="w-full py-2.5 px-4 text-sm font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)] transition-colors duration-[var(--duration-fast)]"
-          @click="step = 3"
-        >
-          Skip for now
-        </button>
       </form>
     </div>
 
-    <!-- Step 3: Confirm -->
+    <!-- Step 3: Confirm (shown briefly before redirect to /onboarding/status) -->
     <div v-else>
       <div class="mb-5 flex items-center justify-center">
         <div class="size-12 rounded-full bg-[var(--color-accent-50)] flex items-center justify-center">
@@ -154,16 +140,8 @@ function goToDashboard(): void {
         </div>
       </div>
 
-      <h1 class="text-base font-semibold text-[var(--color-text-primary)] mb-1 text-center">You're all set</h1>
-      <p class="text-sm text-[var(--color-text-muted)] mb-6 text-center">Atlas is now learning about your business. Your first recommendation will appear once it has enough context.</p>
-
-      <button
-        type="button"
-        class="w-full py-2.5 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] transition-colors duration-[var(--duration-fast)]"
-        @click="goToDashboard"
-      >
-        Go to dashboard
-      </button>
+      <h1 class="text-base font-semibold text-[var(--color-text-primary)] mb-1 text-center">Connected</h1>
+      <p class="text-sm text-[var(--color-text-muted)] mb-6 text-center">Atlas is now learning about your business. Redirecting…</p>
     </div>
   </AuthLayout>
 </template>

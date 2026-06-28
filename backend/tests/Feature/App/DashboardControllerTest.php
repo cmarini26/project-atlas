@@ -5,6 +5,7 @@ namespace Tests\Feature\App;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\DigitalTwin;
+use App\Models\Integration;
 use App\Models\Recommendation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -19,9 +20,20 @@ class DashboardControllerTest extends TestCase
         $this->get('/app')->assertRedirect('/login');
     }
 
+    public function test_dashboard_redirects_to_onboarding_when_no_integration(): void
+    {
+        $user = User::factory()->create();
+        $company = Company::withoutGlobalScopes()->create(['name' => 'Test Co', 'slug' => 'test-co']);
+        CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => 'owner']);
+
+        $this->actingAs($user)
+            ->get('/app')
+            ->assertRedirect(route('onboarding'));
+    }
+
     public function test_dashboard_renders_inertia_component(): void
     {
-        [$user] = $this->userWithCompany();
+        [$user] = $this->userWithCompanyAndIntegration();
 
         $this->actingAs($user)
             ->get('/app')
@@ -31,7 +43,7 @@ class DashboardControllerTest extends TestCase
 
     public function test_dashboard_includes_twin_status_when_no_twin(): void
     {
-        [$user] = $this->userWithCompany();
+        [$user] = $this->userWithCompanyAndIntegration();
 
         $this->actingAs($user)
             ->get('/app')
@@ -44,7 +56,7 @@ class DashboardControllerTest extends TestCase
 
     public function test_dashboard_shows_active_twin_status(): void
     {
-        [$user, $company] = $this->userWithCompany();
+        [$user, $company] = $this->userWithCompanyAndIntegration();
 
         DigitalTwin::withoutGlobalScopes()->create([
             'company_id' => $company->id,
@@ -63,7 +75,7 @@ class DashboardControllerTest extends TestCase
 
     public function test_dashboard_shows_pending_recommendation(): void
     {
-        [$user, $company] = $this->userWithCompany();
+        [$user, $company] = $this->userWithCompanyAndIntegration();
 
         Recommendation::withoutGlobalScopes()->create([
             'company_id' => $company->id,
@@ -81,11 +93,18 @@ class DashboardControllerTest extends TestCase
     }
 
     /** @return array{User, Company} */
-    private function userWithCompany(string $role = 'owner'): array
+    private function userWithCompanyAndIntegration(string $role = 'owner'): array
     {
         $user = User::factory()->create();
         $company = Company::withoutGlobalScopes()->create(['name' => 'Test Co', 'slug' => 'test-co']);
         CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => $role]);
+        Integration::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'website_crawl',
+            'name' => 'Website',
+            'config' => ['url' => 'https://test.com'],
+            'status' => 'active',
+        ]);
 
         return [$user, $company];
     }

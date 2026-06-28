@@ -13,16 +13,21 @@ use App\Models\Knowledge;
 use App\Models\Learning;
 use App\Models\Opportunity;
 use App\Models\Recommendation;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(Request $request): Response|RedirectResponse
     {
         /** @var Company $company */
         $company = $request->attributes->get('company');
+
+        if (! Integration::where('company_id', $company->id)->exists()) {
+            return redirect()->route('onboarding');
+        }
 
         $twin = DigitalTwin::where('company_id', $company->id)->first();
 
