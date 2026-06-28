@@ -34,27 +34,33 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
+**Version 0.2 Planning ✅ Complete**
+*Completed: 2026-06-27*
+
+9-milestone roadmap written covering all production-readiness and real-provider work. See [Version-0.2-Roadmap.md](plans/Version-0.2-Roadmap.md) for full details.
+
+**Planned milestones:**
+
+| Milestone | Goal | Status |
+|-----------|------|--------|
+| M11 — Production Infrastructure | Forge + DigitalOcean, PostgreSQL RLS, zero-downtime deploys | ⬜ |
+| M12 — Error Reporting | Flare or Sentry; job failure alerts; exception triage runbook | ⬜ |
+| M13 — Telemetry & Monitoring | Laravel Pulse; uptime monitoring; scheduled job heartbeats | ⬜ |
+| M14 — Demo Environment | Seeded `mountain-city-comics`; nightly reset; read-only guard | ⬜ |
+| M15 — Onboarding Improvements | Email verification; progress persistence; welcome email; error recovery | ⬜ |
+| M16 — Real Email Publishing | `PostmarkEmailProvider`; channel credential UI; sandbox mode | ⬜ |
+| M17 — Real Social Publishing | Meta OAuth; `MetaPublisher`; image upload; content policy handling | ⬜ |
+| M18 — Real Analytics Integrations | `MetaAnalyticsProvider`; Postmark pull; real learning signals | ⬜ |
+| M19 — Customer Feedback Tooling | In-app NPS; `Feedback` model; weekly digest; Filament review panel | ⬜ |
+
+**Previous milestone:**
+
 **Milestone 10 — Customer Dashboard & UX ✅ Complete**
 *Completed: 2026-06-28*
 
 Full customer-facing dashboard built across 10 phases. See [Milestone-10-Review.md](reviews/Milestone-10-Review.md) for full details.
 
-**Delivered:**
-
-| Phase | Description | Status |
-|-------|-------------|--------|
-| 1 | Personas + User Flows | ✅ |
-| 2 | Frontend foundation — Vite + Vue 3 + TS + Inertia.js | ✅ |
-| 3 | Auth + Company Routing — Login, Register, `EnsureCompanyMembership` middleware, `AppLayout` | ✅ |
-| 4 | Onboarding Wizard — 3-step wizard + status polling page | ✅ |
-| 5 | Dashboard — summary counts, digital twin health, pending recommendation prompt | ✅ |
-| 6 | Recommendation Workflow — review, approve, edit & approve, reject; role-gated | ✅ |
-| 7 | Business Brain + Opportunities — facts, knowledge, observations, scored opportunity list | ✅ |
-| 8 | Campaigns + Publishing Queue — campaign timeline, execution queue with channel/status | ✅ |
-| 9 | Analytics + Learning — KPI snapshots, execution metrics, learning log, applied effects | ✅ |
-| 10 | Settings — company profile, integration list, sync trigger; PHPUnit feature tests for all controllers | ✅ |
-
-**Quality gates:**
+**Quality gates (M10):**
 
 | Gate | Result |
 |------|--------|
@@ -62,8 +68,6 @@ Full customer-facing dashboard built across 10 phases. See [Milestone-10-Review.
 | PHPStan level 8 | 0 errors |
 | Laravel Pint | Clean |
 | Frontend build | 129 modules, 0 errors |
-
-**Next:** Production environment provisioning or first real company onboarding.
 
 ---
 
@@ -475,6 +479,6 @@ All production-blocking items resolved. Remaining pre-production items:
 
 ## Last Updated
 
-**2026-06-27** — Milestone 10.1 complete. Customer design system written (`docs/design/System.md`). 21 design topics covered: typography, color palette, spacing, layout grid, responsive breakpoints, icons, all 8 component types, animations, accessibility, and dark mode strategy. Implementation of the customer dashboard begins next.
+**2026-06-27** — Version 0.2 planning complete. `docs/plans/Version-0.2-Roadmap.md` written: 9 milestones covering production infrastructure, error reporting, telemetry, demo environment, onboarding improvements, real email and social publishing, real analytics integrations, and early customer feedback tooling.
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*

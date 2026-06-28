@@ -6,6 +6,27 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Version 0.2 Planning] — 2026-06-27
+
+### Added
+
+- `docs/plans/Version-0.2-Roadmap.md` — 9-milestone roadmap for taking Atlas from a functional local pipeline to a live, observable, customer-onboarded product with real publishing and real feedback
+  - **M11 — Production Infrastructure:** Forge + DigitalOcean provisioning, PostgreSQL RLS, Supervisor queue workers, zero-downtime deploys, staging environment
+  - **M12 — Error Reporting:** Flare (or Sentry) integration, exception triage runbook, job failure alerting
+  - **M13 — Telemetry & Monitoring:** Laravel Pulse (queues, slow queries, exceptions), uptime monitoring, scheduled job heartbeats
+  - **M14 — Demo Environment:** Seeded `mountain-city-comics` company, nightly reset command, read-only guard, shareable URL
+  - **M15 — Onboarding Improvements:** Email verification, progress persistence, crawl status copy improvements, timeout handling, welcome email, post-onboarding checklist
+  - **M16 — Real Email Publishing:** `PostmarkEmailProvider`, channel credential UI, sandbox mode, Postmark webhook integration
+  - **M17 — Real Social Publishing:** Meta OAuth flow, `MetaPublisher` (Instagram + Facebook), image upload, content policy error handling, token refresh
+  - **M18 — Real Analytics Integrations:** `MetaAnalyticsProvider`, `PostmarkAnalyticsProvider`, real learning signal generation from live engagement data
+  - **M19 — Customer Feedback Tooling:** In-app NPS widget, `Feedback` model, `FeedbackNotification`, weekly digest, Filament review panel
+
+### Changed
+
+- `docs/STATUS.md` — Current Milestone section updated to reflect V0.2 planning complete; planned milestones table added; Last Updated updated
+
+---
+
 ## [Milestone 10 — Customer Dashboard & UX] — 2026-06-28
 
 ### Added
