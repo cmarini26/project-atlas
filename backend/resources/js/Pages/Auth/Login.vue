@@ -17,11 +17,11 @@ function submit(): void {
 
 <template>
   <AuthLayout>
-    <h1 class="text-base font-semibold text-[--color-text-primary] mb-5">Sign in</h1>
+    <h1 class="text-base font-semibold text-[var(--color-text-primary)] mb-5">Sign in</h1>
 
     <form class="space-y-4" @submit.prevent="submit">
       <div>
-        <label for="email" class="block text-sm font-medium text-[--color-text-secondary] mb-1.5">Email</label>
+        <label for="email" class="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5">Email</label>
         <input
           id="email"
           v-model="form.email"
@@ -29,10 +29,10 @@ function submit(): void {
           autocomplete="email"
           required
           :class="[
-            'w-full px-3 py-2 text-sm rounded-lg border bg-[--color-surface-elevated] text-[--color-text-primary] placeholder-[--color-text-placeholder] transition-colors duration-[--duration-fast]',
+            'w-full px-3 py-2 text-sm rounded-lg border bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] placeholder-[var(--color-text-placeholder)] transition-colors duration-[var(--duration-fast)]',
             form.errors.email
               ? 'border-rose-300 focus:outline-none focus:ring-1 focus:ring-rose-400'
-              : 'border-[--color-border] focus:outline-none focus:ring-1 focus:ring-[--color-border-focus] focus:border-[--color-border-focus]',
+              : 'border-[var(--color-border)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)]',
           ]"
           placeholder="you@example.com"
         />
@@ -40,7 +40,7 @@ function submit(): void {
       </div>
 
       <div>
-        <label for="password" class="block text-sm font-medium text-[--color-text-secondary] mb-1.5">Password</label>
+        <label for="password" class="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5">Password</label>
         <input
           id="password"
           v-model="form.password"
@@ -48,10 +48,10 @@ function submit(): void {
           autocomplete="current-password"
           required
           :class="[
-            'w-full px-3 py-2 text-sm rounded-lg border bg-[--color-surface-elevated] text-[--color-text-primary] transition-colors duration-[--duration-fast]',
+            'w-full px-3 py-2 text-sm rounded-lg border bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] transition-colors duration-[var(--duration-fast)]',
             form.errors.password
               ? 'border-rose-300 focus:outline-none focus:ring-1 focus:ring-rose-400'
-              : 'border-[--color-border] focus:outline-none focus:ring-1 focus:ring-[--color-border-focus] focus:border-[--color-border-focus]',
+              : 'border-[var(--color-border)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)]',
           ]"
           placeholder="••••••••"
         />
@@ -61,15 +61,15 @@ function submit(): void {
       <button
         type="submit"
         :disabled="form.processing"
-        class="w-full py-2.5 px-4 text-sm font-medium rounded-lg bg-[--color-accent-600] text-white hover:bg-[--color-accent-700] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[--duration-fast]"
+        class="w-full py-2.5 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
       >
         {{ form.processing ? 'Signing in…' : 'Sign in' }}
       </button>
     </form>
 
-    <p class="mt-5 text-center text-sm text-[--color-text-muted]">
+    <p class="mt-5 text-center text-sm text-[var(--color-text-muted)]">
       Don't have an account?
-      <a href="/register" class="text-[--color-text-link] hover:underline">Create one</a>
+      <a href="/register" class="text-[var(--color-text-link)] hover:underline">Create one</a>
     </p>
   </AuthLayout>
 </template>

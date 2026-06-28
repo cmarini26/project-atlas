@@ -25,8 +25,8 @@ function formatDate(date: string | null): string {
 <template>
   <AppLayout>
     <div class="max-w-3xl">
-      <h1 class="text-xl font-semibold text-[--color-text-primary] mb-2">Learning</h1>
-      <p class="text-sm text-[--color-text-muted] mb-6">How Atlas is improving its understanding of your business over time.</p>
+      <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-2">Learning</h1>
+      <p class="text-sm text-[var(--color-text-muted)] mb-6">How Atlas is improving its understanding of your business over time.</p>
 
       <EmptyState
         v-if="learnings.data.length === 0"
@@ -37,22 +37,22 @@ function formatDate(date: string | null): string {
       <div v-else>
         <!-- Applied effects section -->
         <div v-if="applied_effects.length > 0" class="mb-6">
-          <h2 class="text-xs font-semibold text-[--color-text-muted] uppercase tracking-wide mb-3">How Atlas Applied Recent Learnings</h2>
+          <h2 class="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide mb-3">How Atlas Applied Recent Learnings</h2>
           <div class="space-y-3">
             <div
               v-for="application in applied_effects"
               :key="application.id"
-              class="bg-[--color-surface-elevated] border border-[--color-border] rounded-xl p-4"
+              class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-4"
             >
-              <p class="text-xs text-[--color-text-muted] mb-2">{{ formatDate(application.created_at) }}</p>
+              <p class="text-xs text-[var(--color-text-muted)] mb-2">{{ formatDate(application.created_at) }}</p>
               <ul class="space-y-1.5">
                 <li
                   v-for="(effect, i) in application.effects"
                   :key="i"
                   class="flex items-start gap-2"
                 >
-                  <svg class="size-3.5 text-[--color-accent-500] mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
-                  <span class="text-xs text-[--color-text-secondary]">{{ effect.description }}</span>
+                  <svg class="size-3.5 text-[var(--color-accent-500)] mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                  <span class="text-xs text-[var(--color-text-secondary)]">{{ effect.description }}</span>
                 </li>
               </ul>
             </div>
@@ -60,34 +60,34 @@ function formatDate(date: string | null): string {
         </div>
 
         <!-- All learnings -->
-        <h2 class="text-xs font-semibold text-[--color-text-muted] uppercase tracking-wide mb-3">All Learnings</h2>
+        <h2 class="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide mb-3">All Learnings</h2>
         <div class="space-y-3 mb-4">
           <div
             v-for="learning in learnings.data"
             :key="learning.id"
-            class="bg-[--color-surface-elevated] border border-[--color-border] rounded-xl p-4"
+            class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-4"
           >
             <div class="flex items-start justify-between gap-3 mb-2">
               <div class="flex items-center gap-2 flex-wrap">
                 <Badge variant="default">{{ learning.source_type }}</Badge>
                 <span v-if="learning.applied_at" class="text-xs text-emerald-600 font-medium">Applied</span>
               </div>
-              <p class="text-xs text-[--color-text-muted] shrink-0">{{ formatDate(learning.created_at) }}</p>
+              <p class="text-xs text-[var(--color-text-muted)] shrink-0">{{ formatDate(learning.created_at) }}</p>
             </div>
 
-            <p class="text-sm text-[--color-text-primary] font-medium">{{ learning.signal }}</p>
+            <p class="text-sm text-[var(--color-text-primary)] font-medium">{{ learning.signal }}</p>
 
             <dl v-if="Object.keys(learning.value ?? {}).length > 0" class="mt-2 grid grid-cols-2 gap-2">
               <div v-for="(val, key) in learning.value" :key="key">
-                <dt class="text-xs text-[--color-text-muted] capitalize">{{ String(key).replace(/_/g, ' ') }}</dt>
-                <dd class="text-xs text-[--color-text-secondary] font-medium">{{ val }}</dd>
+                <dt class="text-xs text-[var(--color-text-muted)] capitalize">{{ String(key).replace(/_/g, ' ') }}</dt>
+                <dd class="text-xs text-[var(--color-text-secondary)] font-medium">{{ val }}</dd>
               </div>
             </dl>
           </div>
         </div>
 
         <!-- Pagination info -->
-        <p v-if="learnings.total > learnings.data.length" class="text-sm text-center text-[--color-text-muted]">
+        <p v-if="learnings.total > learnings.data.length" class="text-sm text-center text-[var(--color-text-muted)]">
           Showing {{ learnings.data.length }} of {{ learnings.total }} learnings
         </p>
       </div>

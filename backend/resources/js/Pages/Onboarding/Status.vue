@@ -61,47 +61,47 @@ onUnmounted(() => {
     <div class="text-center">
       <!-- Spinner -->
       <div class="flex items-center justify-center mb-5">
-        <div class="size-12 rounded-full border-2 border-[--color-border] border-t-[--color-accent-500] animate-spin" aria-hidden="true" />
+        <div class="size-12 rounded-full border-2 border-[var(--color-border)] border-t-[var(--color-accent-500)] animate-spin" aria-hidden="true" />
       </div>
 
-      <h1 class="text-base font-semibold text-[--color-text-primary] mb-1">
+      <h1 class="text-base font-semibold text-[var(--color-text-primary)] mb-1">
         {{ loading ? 'Checking in with Atlas…' : (stepLabels[status.twin_status] ?? 'Processing…') }}
       </h1>
-      <p class="text-sm text-[--color-text-muted] mb-6">This usually takes a few minutes. You can leave and come back.</p>
+      <p class="text-sm text-[var(--color-text-muted)] mb-6">This usually takes a few minutes. You can leave and come back.</p>
 
       <!-- Progress items -->
       <div class="space-y-3 text-left" aria-live="polite">
         <div class="flex items-center gap-3">
-          <div :class="['size-5 rounded-full flex items-center justify-center shrink-0', status.fact_count > 0 ? 'bg-[--color-accent-500]' : 'bg-[--color-border]']">
+          <div :class="['size-5 rounded-full flex items-center justify-center shrink-0', status.fact_count > 0 ? 'bg-[var(--color-accent-500)]' : 'bg-[var(--color-border)]']">
             <svg v-if="status.fact_count > 0" class="size-3 text-white" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
           </div>
-          <span class="text-sm text-[--color-text-secondary]">
+          <span class="text-sm text-[var(--color-text-secondary)]">
             Facts gathered
-            <span v-if="status.fact_count > 0" class="text-[--color-text-muted]">({{ status.fact_count }})</span>
+            <span v-if="status.fact_count > 0" class="text-[var(--color-text-muted)]">({{ status.fact_count }})</span>
           </span>
         </div>
 
         <div class="flex items-center gap-3">
-          <div :class="['size-5 rounded-full flex items-center justify-center shrink-0', status.opportunity_count > 0 ? 'bg-[--color-accent-500]' : 'bg-[--color-border]']">
+          <div :class="['size-5 rounded-full flex items-center justify-center shrink-0', status.opportunity_count > 0 ? 'bg-[var(--color-accent-500)]' : 'bg-[var(--color-border)]']">
             <svg v-if="status.opportunity_count > 0" class="size-3 text-white" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
           </div>
-          <span class="text-sm text-[--color-text-secondary]">
+          <span class="text-sm text-[var(--color-text-secondary)]">
             Opportunities identified
-            <span v-if="status.opportunity_count > 0" class="text-[--color-text-muted]">({{ status.opportunity_count }})</span>
+            <span v-if="status.opportunity_count > 0" class="text-[var(--color-text-muted)]">({{ status.opportunity_count }})</span>
           </span>
         </div>
 
         <div class="flex items-center gap-3">
-          <div :class="['size-5 rounded-full flex items-center justify-center shrink-0', status.recommendation_count > 0 ? 'bg-[--color-accent-500]' : 'bg-[--color-border]']">
+          <div :class="['size-5 rounded-full flex items-center justify-center shrink-0', status.recommendation_count > 0 ? 'bg-[var(--color-accent-500)]' : 'bg-[var(--color-border)]']">
             <svg v-if="status.recommendation_count > 0" class="size-3 text-white" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
           </div>
-          <span class="text-sm text-[--color-text-secondary]">First recommendation ready</span>
+          <span class="text-sm text-[var(--color-text-secondary)]">First recommendation ready</span>
         </div>
       </div>
 
       <a
         href="/app"
-        class="mt-6 inline-block text-sm text-[--color-text-link] hover:underline"
+        class="mt-6 inline-block text-sm text-[var(--color-text-link)] hover:underline"
       >
         Skip to dashboard
       </a>

@@ -32,7 +32,7 @@ function reject(): void {
       <button
         type="button"
         :disabled="approveForm.processing || rejectForm.processing"
-        class="flex-1 py-2.5 px-4 text-sm font-medium rounded-lg bg-[--color-accent-600] text-white hover:bg-[--color-accent-700] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[--duration-fast]"
+        class="flex-1 py-2.5 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
         @click="approve"
       >
         {{ approveForm.processing ? 'Approving…' : 'Approve' }}
@@ -41,7 +41,7 @@ function reject(): void {
       <button
         type="button"
         :disabled="approveForm.processing || rejectForm.processing"
-        class="flex-1 py-2.5 px-4 text-sm font-medium rounded-lg border border-[--color-border] text-[--color-text-secondary] hover:bg-[--color-surface-subtle] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[--duration-fast]"
+        class="flex-1 py-2.5 px-4 text-sm font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
         @click="showRejectNote = !showRejectNote"
       >
         Not this time
@@ -52,13 +52,13 @@ function reject(): void {
       <textarea
         v-model="rejectNote"
         rows="2"
-        class="w-full px-3 py-2 text-sm rounded-lg border border-[--color-border] bg-[--color-surface-elevated] text-[--color-text-primary] resize-none focus:outline-none focus:ring-1 focus:ring-[--color-border-focus]"
+        class="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] resize-none focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)]"
         placeholder="Optional: tell Atlas why (helps it learn)"
       />
       <button
         type="button"
         :disabled="rejectForm.processing"
-        class="w-full py-2 px-4 text-sm font-medium rounded-lg border border-[--color-border] text-[--color-text-secondary] hover:bg-[--color-surface-subtle] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[--duration-fast]"
+        class="w-full py-2 px-4 text-sm font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
         @click="reject"
       >
         {{ rejectForm.processing ? 'Passing…' : 'Confirm: not this time' }}

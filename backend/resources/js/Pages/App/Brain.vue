@@ -36,12 +36,12 @@ function formatDate(date: string | null): string {
 <template>
   <AppLayout>
     <div class="max-w-4xl">
-      <h1 class="text-xl font-semibold text-[--color-text-primary] mb-6">Business Brain</h1>
+      <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-6">Business Brain</h1>
 
       <!-- Twin status -->
-      <div class="bg-[--color-surface-elevated] border border-[--color-border] rounded-xl p-5 mb-6">
+      <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5 mb-6">
         <div class="flex items-center justify-between mb-1">
-          <h2 class="text-sm font-semibold text-[--color-text-primary]">Digital Twin</h2>
+          <h2 class="text-sm font-semibold text-[var(--color-text-primary)]">Digital Twin</h2>
           <Badge
             v-if="twin"
             :variant="twinStatusVariants[twin.status] ?? 'muted'"
@@ -50,10 +50,10 @@ function formatDate(date: string | null): string {
           </Badge>
           <Badge v-else variant="muted">Not initialized</Badge>
         </div>
-        <p class="text-sm text-[--color-text-muted]">
+        <p class="text-sm text-[var(--color-text-muted)]">
           Atlas's model of your business — updated as it learns more.
         </p>
-        <p v-if="twin?.last_enriched_at" class="mt-2 text-xs text-[--color-text-muted]">
+        <p v-if="twin?.last_enriched_at" class="mt-2 text-xs text-[var(--color-text-muted)]">
           Last updated {{ formatDate(twin.last_enriched_at) }}
         </p>
       </div>
@@ -61,8 +61,8 @@ function formatDate(date: string | null): string {
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <!-- Facts -->
         <div>
-          <h2 class="text-xs font-semibold text-[--color-text-muted] uppercase tracking-wide mb-3">
-            Facts <span class="ml-1 text-[--color-text-placeholder]">({{ facts.length }})</span>
+          <h2 class="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide mb-3">
+            Facts <span class="ml-1 text-[var(--color-text-placeholder)]">({{ facts.length }})</span>
           </h2>
 
           <EmptyState
@@ -71,7 +71,7 @@ function formatDate(date: string | null): string {
             description="Facts appear as Atlas learns about your business."
           />
 
-          <div v-else class="bg-[--color-surface-elevated] border border-[--color-border] rounded-xl divide-y divide-[--color-border]">
+          <div v-else class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl divide-y divide-[var(--color-border)]">
             <div
               v-for="fact in facts"
               :key="fact.id"
@@ -79,12 +79,12 @@ function formatDate(date: string | null): string {
             >
               <div class="flex items-start justify-between gap-2">
                 <div class="flex-1 min-w-0">
-                  <p class="text-xs font-medium text-[--color-text-muted] mb-0.5">{{ fact.key }}</p>
-                  <p class="text-sm text-[--color-text-secondary]">{{ fact.value }}</p>
+                  <p class="text-xs font-medium text-[var(--color-text-muted)] mb-0.5">{{ fact.key }}</p>
+                  <p class="text-sm text-[var(--color-text-secondary)]">{{ fact.value }}</p>
                 </div>
                 <span
                   v-if="fact.confidence !== null && fact.confidence !== undefined"
-                  class="text-xs text-[--color-text-placeholder] tabular-nums shrink-0"
+                  class="text-xs text-[var(--color-text-placeholder)] tabular-nums shrink-0"
                 >
                   {{ Math.round((fact.confidence as number) * 100) }}%
                 </span>
@@ -95,8 +95,8 @@ function formatDate(date: string | null): string {
 
         <!-- Knowledge -->
         <div>
-          <h2 class="text-xs font-semibold text-[--color-text-muted] uppercase tracking-wide mb-3">
-            Knowledge <span class="ml-1 text-[--color-text-placeholder]">({{ knowledge.length }})</span>
+          <h2 class="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide mb-3">
+            Knowledge <span class="ml-1 text-[var(--color-text-placeholder)]">({{ knowledge.length }})</span>
           </h2>
 
           <EmptyState
@@ -109,13 +109,13 @@ function formatDate(date: string | null): string {
             <div
               v-for="k in knowledge"
               :key="k.id"
-              class="bg-[--color-surface-elevated] border border-[--color-border] rounded-xl p-4"
+              class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-4"
             >
               <div class="flex items-center gap-2 mb-2">
                 <Badge variant="default">{{ k.type }}</Badge>
-                <span v-if="k.subject" class="text-xs text-[--color-text-muted] truncate">{{ k.subject }}</span>
+                <span v-if="k.subject" class="text-xs text-[var(--color-text-muted)] truncate">{{ k.subject }}</span>
               </div>
-              <p class="text-sm text-[--color-text-secondary]">{{ k.body }}</p>
+              <p class="text-sm text-[var(--color-text-secondary)]">{{ k.body }}</p>
             </div>
           </div>
         </div>
@@ -123,8 +123,8 @@ function formatDate(date: string | null): string {
 
       <!-- Recent observations -->
       <section>
-        <h2 class="text-xs font-semibold text-[--color-text-muted] uppercase tracking-wide mb-3">
-          Recent Observations <span class="ml-1 text-[--color-text-placeholder]">({{ recent_observations.length }})</span>
+        <h2 class="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide mb-3">
+          Recent Observations <span class="ml-1 text-[var(--color-text-placeholder)]">({{ recent_observations.length }})</span>
         </h2>
 
         <EmptyState
@@ -133,16 +133,16 @@ function formatDate(date: string | null): string {
           description="Observations appear as Atlas monitors your business activity."
         />
 
-        <div v-else class="bg-[--color-surface-elevated] border border-[--color-border] rounded-xl divide-y divide-[--color-border]">
+        <div v-else class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl divide-y divide-[var(--color-border)]">
           <div
             v-for="obs in recent_observations"
             :key="obs.id"
             class="px-4 py-3 flex items-center gap-3"
           >
             <div class="flex-1 min-w-0">
-              <p class="text-sm text-[--color-text-secondary]">Status: {{ obs.status }}</p>
+              <p class="text-sm text-[var(--color-text-secondary)]">Status: {{ obs.status }}</p>
             </div>
-            <span class="text-xs text-[--color-text-placeholder] shrink-0">{{ formatDate(obs.created_at) }}</span>
+            <span class="text-xs text-[var(--color-text-placeholder)] shrink-0">{{ formatDate(obs.created_at) }}</span>
           </div>
         </div>
       </section>

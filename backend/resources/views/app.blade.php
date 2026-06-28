@@ -6,7 +6,7 @@
         @inertiaHead
         @vite(['resources/css/app.css', 'resources/js/app.ts'])
     </head>
-    <body class="bg-[--color-surface] text-[--color-text-secondary] antialiased">
+    <body class="bg-[var(--color-surface)] text-[var(--color-text-secondary)] antialiased">
         @inertia
     </body>
 </html>

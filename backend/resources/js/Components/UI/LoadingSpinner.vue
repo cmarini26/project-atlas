@@ -7,7 +7,7 @@ defineProps<{
 <template>
   <div
     :class="[
-      'rounded-full border-2 border-[--color-border] border-t-[--color-accent-500] animate-spin',
+      'rounded-full border-2 border-[var(--color-border)] border-t-[var(--color-accent-500)] animate-spin',
       !$props.size || $props.size === 'md' ? 'size-8' : '',
       $props.size === 'sm' ? 'size-5' : '',
       $props.size === 'lg' ? 'size-12' : '',

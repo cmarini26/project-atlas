@@ -34,12 +34,12 @@ function logout(): void {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[--color-surface]">
+  <div class="min-h-screen bg-[var(--color-surface)]">
     <!-- Mobile top bar -->
-    <div class="lg:hidden flex items-center justify-between px-4 h-14 bg-[--color-surface-elevated] border-b border-[--color-border]">
-      <span class="font-semibold text-[--color-text-primary]">Atlas</span>
+    <div class="lg:hidden flex items-center justify-between px-4 h-14 bg-[var(--color-surface-elevated)] border-b border-[var(--color-border)]">
+      <span class="font-semibold text-[var(--color-text-primary)]">Atlas</span>
       <button
-        class="p-2 rounded-lg text-[--color-text-muted] hover:bg-[--color-surface-subtle] transition-colors duration-[--duration-fast]"
+        class="p-2 rounded-lg text-[var(--color-text-muted)] hover:bg-[var(--color-surface-subtle)] transition-colors duration-[var(--duration-fast)]"
         aria-label="Open navigation"
         @click="sidebarOpen = !sidebarOpen"
       >
@@ -56,23 +56,23 @@ function logout(): void {
       class="fixed inset-0 z-40 lg:hidden"
       @click="sidebarOpen = false"
     >
-      <div class="absolute inset-0 bg-[--color-surface-overlay] opacity-50" />
+      <div class="absolute inset-0 bg-[var(--color-surface-overlay)] opacity-50" />
     </div>
 
     <!-- Sidebar -->
     <aside
       :class="[
-        'fixed top-0 left-0 z-50 h-full w-60 bg-[--color-surface-elevated] border-r border-[--color-border] flex flex-col transition-transform duration-[--duration-smooth]',
+        'fixed top-0 left-0 z-50 h-full w-60 bg-[var(--color-surface-elevated)] border-r border-[var(--color-border)] flex flex-col transition-transform duration-[var(--duration-smooth)]',
         'lg:translate-x-0',
         sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
       ]"
     >
       <!-- Logo -->
-      <div class="flex items-center gap-2 px-4 h-16 border-b border-[--color-border] shrink-0">
-        <span class="font-semibold text-lg text-[--color-text-primary] tracking-tight">Atlas</span>
+      <div class="flex items-center gap-2 px-4 h-16 border-b border-[var(--color-border)] shrink-0">
+        <span class="font-semibold text-lg text-[var(--color-text-primary)] tracking-tight">Atlas</span>
         <span
           v-if="company"
-          class="ml-auto text-xs font-medium text-[--color-text-muted] truncate max-w-24"
+          class="ml-auto text-xs font-medium text-[var(--color-text-muted)] truncate max-w-24"
         >{{ company.name }}</span>
       </div>
 
@@ -83,10 +83,10 @@ function logout(): void {
           :key="link.href"
           :href="link.href"
           :class="[
-            'flex items-center gap-3 px-3 h-10 rounded-lg text-sm transition-colors duration-[--duration-fast]',
+            'flex items-center gap-3 px-3 h-10 rounded-lg text-sm transition-colors duration-[var(--duration-fast)]',
             isActive(link.href)
-              ? 'bg-[--color-accent-50] text-[--color-accent-600] font-medium'
-              : 'text-[--color-text-secondary] hover:bg-[--color-surface-subtle] hover:text-[--color-text-primary]',
+              ? 'bg-[var(--color-accent-50)] text-[var(--color-accent-600)] font-medium'
+              : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)] hover:text-[var(--color-text-primary)]',
           ]"
           @click="sidebarOpen = false"
         >
@@ -107,10 +107,10 @@ function logout(): void {
       </nav>
 
       <!-- Settings + user -->
-      <div class="border-t border-[--color-border] p-3 space-y-0.5 shrink-0">
+      <div class="border-t border-[var(--color-border)] p-3 space-y-0.5 shrink-0">
         <Link
           href="/app/settings"
-          class="flex items-center gap-3 px-3 h-10 rounded-lg text-sm text-[--color-text-secondary] hover:bg-[--color-surface-subtle] hover:text-[--color-text-primary] transition-colors duration-[--duration-fast]"
+          class="flex items-center gap-3 px-3 h-10 rounded-lg text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)] hover:text-[var(--color-text-primary)] transition-colors duration-[var(--duration-fast)]"
           @click="sidebarOpen = false"
         >
           <svg class="size-5 shrink-0" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
@@ -119,15 +119,15 @@ function logout(): void {
 
         <!-- User menu -->
         <div class="flex items-center gap-2 px-3 py-2">
-          <div class="size-7 rounded-full bg-[--color-accent-100] flex items-center justify-center shrink-0">
-            <span class="text-xs font-medium text-[--color-accent-600]">{{ user?.name?.[0]?.toUpperCase() }}</span>
+          <div class="size-7 rounded-full bg-[var(--color-accent-100)] flex items-center justify-center shrink-0">
+            <span class="text-xs font-medium text-[var(--color-accent-600)]">{{ user?.name?.[0]?.toUpperCase() }}</span>
           </div>
           <div class="flex-1 min-w-0">
-            <p class="text-xs font-medium text-[--color-text-primary] truncate">{{ user?.name }}</p>
-            <p class="text-xs text-[--color-text-muted] truncate">{{ user?.email }}</p>
+            <p class="text-xs font-medium text-[var(--color-text-primary)] truncate">{{ user?.name }}</p>
+            <p class="text-xs text-[var(--color-text-muted)] truncate">{{ user?.email }}</p>
           </div>
           <button
-            class="text-[--color-text-muted] hover:text-[--color-text-secondary] transition-colors duration-[--duration-fast]"
+            class="text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors duration-[var(--duration-fast)]"
             aria-label="Sign out"
             @click="logout"
           >

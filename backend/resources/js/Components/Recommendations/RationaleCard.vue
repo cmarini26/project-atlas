@@ -18,12 +18,12 @@ const labels: Record<string, string> = {
     <div
       v-for="(value, key) in rationaleDisplay"
       :key="key"
-      class="bg-[--color-surface-elevated] border border-[--color-border] rounded-xl p-4"
+      class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-4"
     >
-      <h3 class="text-xs font-semibold text-[--color-text-muted] uppercase tracking-wide mb-2">
+      <h3 class="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide mb-2">
         {{ labels[key] ?? String(key).replace(/_/g, ' ') }}
       </h3>
-      <p class="text-sm text-[--color-text-secondary]">{{ value }}</p>
+      <p class="text-sm text-[var(--color-text-secondary)]">{{ value }}</p>
     </div>
   </div>
 </template>

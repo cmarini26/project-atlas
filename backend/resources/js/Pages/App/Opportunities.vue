@@ -23,7 +23,7 @@ function isExpiringSoon(expiresAt: string | null): boolean {
 <template>
   <AppLayout>
     <div class="max-w-3xl">
-      <h1 class="text-xl font-semibold text-[--color-text-primary] mb-6">Opportunities</h1>
+      <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-6">Opportunities</h1>
 
       <EmptyState
         v-if="opportunities.length === 0"
@@ -35,7 +35,7 @@ function isExpiringSoon(expiresAt: string | null): boolean {
         <div
           v-for="opp in opportunities"
           :key="opp.id"
-          class="bg-[--color-surface-elevated] border border-[--color-border] rounded-xl p-4"
+          class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-4"
         >
           <div class="flex items-start justify-between gap-3 mb-3">
             <div class="flex-1 min-w-0">
@@ -48,27 +48,27 @@ function isExpiringSoon(expiresAt: string | null): boolean {
                   Expires {{ formatDate(opp.expires_at) }}
                 </span>
               </div>
-              <h3 class="text-sm font-semibold text-[--color-text-primary]">{{ opp.title }}</h3>
-              <p v-if="opp.description" class="mt-1 text-sm text-[--color-text-secondary] line-clamp-2">{{ opp.description }}</p>
+              <h3 class="text-sm font-semibold text-[var(--color-text-primary)]">{{ opp.title }}</h3>
+              <p v-if="opp.description" class="mt-1 text-sm text-[var(--color-text-secondary)] line-clamp-2">{{ opp.description }}</p>
             </div>
           </div>
 
           <div class="space-y-2">
             <div v-if="opp.composite_score !== null && opp.composite_score !== undefined" class="flex items-center gap-2">
-              <span class="text-xs text-[--color-text-muted] w-20 shrink-0">Score</span>
+              <span class="text-xs text-[var(--color-text-muted)] w-20 shrink-0">Score</span>
               <ScoreBar :score="opp.composite_score" />
             </div>
             <div v-if="opp.urgency_score !== null && opp.urgency_score !== undefined" class="flex items-center gap-2">
-              <span class="text-xs text-[--color-text-muted] w-20 shrink-0">Urgency</span>
+              <span class="text-xs text-[var(--color-text-muted)] w-20 shrink-0">Urgency</span>
               <ScoreBar :score="opp.urgency_score" />
             </div>
             <div v-if="opp.relevance_score !== null && opp.relevance_score !== undefined" class="flex items-center gap-2">
-              <span class="text-xs text-[--color-text-muted] w-20 shrink-0">Relevance</span>
+              <span class="text-xs text-[var(--color-text-muted)] w-20 shrink-0">Relevance</span>
               <ScoreBar :score="opp.relevance_score" />
             </div>
           </div>
 
-          <p v-if="opp.detected_at" class="mt-3 text-xs text-[--color-text-muted]">
+          <p v-if="opp.detected_at" class="mt-3 text-xs text-[var(--color-text-muted)]">
             Detected {{ formatDate(opp.detected_at) }}
           </p>
         </div>
