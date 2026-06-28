@@ -6,6 +6,58 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Landing Page Design & Content Specification] — 2026-06-27
+
+### Added
+
+- `docs/marketing/Landing-Page.md` — complete landing page design and content specification for Atlas
+
+**Document scope:** 24 sections; ~5,500 words of spec covering every element of the Atlas marketing landing page from navigation through footer.
+
+**Sections specified:**
+
+| # | Section | Key content |
+|---|---------|-------------|
+| 01 | Navigation | Fixed bar with sticky CTAs; mobile hamburger overlay |
+| 02 | Hero | Three headline variants; full recommendation UI mockup; copy rationale |
+| 03 | Trust Bar | Pre-launch proof signals; real CBB Auctions design partnership noted |
+| 04 | Problem Statement | Marcus's 30-minute window framed as prose, not bullets |
+| 05 | How Atlas Works | Nine-step loop with visual emphasis on Step 06 (Approve) as the center |
+| 06 | The Digital Twin | Business Brain diagram; knowledge entries in plain language |
+| 07 | Recommendation Showcase | Full CBB Auctions recommendation mockup with real content |
+| 08 | The Approval Moment | Approval-as-design-intent section; "0 campaigns published without approval" |
+| 09 | Features | Four feature groups: Business Intelligence, Recommendation, Approval, Learning |
+| 10 | Learning Over Time | Day 1 vs Day 90 comparison; compounding value story |
+| 11 | Industries | Comic book auction houses and exotic car dealers; third card for expansion |
+| 12 | Social Proof | Testimonial structure for Marcus and Sofia archetypes; stat row |
+| 13 | Trust & Security | Six specific data trust statements; no vague security language |
+| 14 | Final CTA | Dark background close section; micro-copy removing last friction |
+| 15 | FAQ | 10 questions addressing real objections in specific, honest language |
+| 16 | Footer | Four-column layout; positioning tagline |
+| Mobile | Mobile Layout | Per-section adjustments; breakpoints; what reduces vs what stays |
+| Animation | Animation Spec | Timing values, easing, scroll triggers, reduced-motion fallbacks |
+| A11y | Accessibility | WCAG 2.1 AA; ARIA patterns; heading hierarchy; keyboard nav; screen reader |
+| CTA | CTA Strategy | Placement logic per section; four variants to A/B test; label rationale |
+| Copy | Copy Principles | Banned phrases; what Atlas sounds like; skimmability rules |
+
+**Strategic foundation:** Four core messages that every section reinforces:
+1. Atlas thinks before it creates
+2. Atlas explains every recommendation
+3. Atlas learns over time
+4. Humans remain in control
+
+**Key design decisions:**
+- Hero headline avoids the word "AI" — behavior communicates better than the label
+- The recommendation mockup is populated with specific CBB Auctions content (Action Comics #1 CGC 6.0, closing-auction urgency framing) — not generic placeholder text
+- The "Approve" step (06 of 09) in How Atlas Works receives distinct visual treatment to reinforce that approval is the product, not a limitation
+- Section 08 (The Approval Moment) has a dark background — a values-forward moment that benefits from visual distinction
+- CTAs are placed at the end of persuasive arguments, not randomly — explicit placement logic documented per section
+- Copy principles document bans 10 generic AI marketing phrases and provides positive direction
+
+**No code written.** This is a specification document for a designer and frontend engineer to implement.
+
+---
+
 ## [Version 0.2 Polish — Tier 1 & 2] — 2026-06-27
 
 ### Changed

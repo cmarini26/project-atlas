@@ -34,6 +34,27 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
+**Landing Page Design & Content Specification ✅ Complete**
+*Completed: 2026-06-27*
+
+Full landing page spec written for the Atlas marketing site. 24 sections covering hero through footer, mobile layout, animation, accessibility, CTA strategy, and copy principles. No code written — this is a design and content specification document.
+
+See:
+- [Landing-Page.md](marketing/Landing-Page.md) — complete landing page specification
+
+**Deliverables:**
+- Strategic foundation and four core messages
+- 16 content sections with full copy direction and layout guidance
+- Recommendation showcase mockup with specific, plausible CBB Auctions content
+- Industry cards for comic book auction houses and exotic car dealers
+- Mobile layout specification for every section
+- Animation recommendations with explicit timing and easing values
+- WCAG 2.1 AA accessibility requirements throughout
+- CTA strategy with placement logic and A/B test variants
+- Copy principles: what Atlas avoids and what it sounds like
+
+**Previous milestone:**
+
 **Version 0.2 Polish — Tier 1 & 2 ✅ Complete**
 *Completed: 2026-06-27*
 
@@ -526,6 +547,6 @@ All production-blocking items resolved. Remaining pre-production items:
 
 ## Last Updated
 
-**2026-06-27** — Version 0.2 Polish Tier 1 & 2 complete. 17 frontend issues resolved: active DigitalTwin status, onboarding redirect, enum badge translation, analytics metric labels, Edit & Approve button, approval copy, score bar colors + ARIA, expiry urgency, page titles, mobile padding, inline errors, form label typography, health score display, Business Brain nav label, rationale text size, onboarding timeout message. All quality gates pass.
+**2026-06-27** — Landing Page Design & Content Specification complete. Full marketing spec for Atlas: hero through footer, 16 content sections, recommendation showcase mockup, industry cards, mobile layout, animation spec, accessibility requirements, CTA strategy, and copy principles. See `docs/marketing/Landing-Page.md`.
 
 *Update this document at the end of every sprint and whenever a significant decision is made or risk changes.*
