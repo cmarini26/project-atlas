@@ -6,6 +6,33 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Product Validation Sprint] — 2026-06-27
+
+### Added
+
+- `docs/reviews/Product-Validation-Review.md` — full customer experience review against all spec documents (CLAUDE.md, FOUNDING_PRINCIPLES.md, docs/design/System.md, PRD.md, Personas.md, UserFlows.md). 24 issues across 20 review areas. Each issue documented with: severity, description, why it matters, screenshot location, recommended fix, and estimated effort.
+
+  **Issue severity breakdown:**
+  - 1 Critical: Active DigitalTwin status not handled (HealthCard shows raw "active" in gray for every onboarded customer)
+  - 4 High: Onboarding redirects to dashboard not recommendation; "Edit & Approve" not a visible button; raw enum values in all badges; analytics metric keys shown to user
+  - 14 Medium: Score bar fixed color; no expiry urgency treatment; no page titles; mobile padding; form label typography; no inline error on approval failure; no page transition indicator; no timeout on status page; health score not displayed; rationale text too small; empty state CTAs missing; no skeleton loading; campaign status raw values; learning signals raw
+  - 9 Low: "Brain" label not "Business Brain"; settings active state; "Publishing" label; rejection label wording; analytics empty CTA; empty state icons; settings scroll reset; typography/status tokens not in app.css; primary button shade; focus rings; favicon
+
+- `docs/plans/Version-0.2-Polish.md` — prioritized implementation plan for all 24 identified polish issues, organized into three tiers:
+  - **Tier 1 — Trust blockers (~2.5 days):** 4 issues that silently misrepresent the product's state. HealthCard active status fix, onboarding redirect to first recommendation, raw enum translation across all badges, analytics metric key translation.
+  - **Tier 2 — Clarity gaps (~5.5 days):** 13 issues requiring extra customer effort to work around. "Edit & Approve" button, explanatory approve copy, score bar colors + ARIA, opportunity expiry urgency, page titles, mobile padding, NProgress transition, inline approval errors, form label typography, health score display, rationale text size, status page timeout message.
+  - **Tier 3 — Polish (~4 days):** 14 lower-priority items. Campaign lifecycle trail, contextual empty state icons, empty state CTAs, nav label fixes, design system token registration, focus rings, favicon, button shade, isActive fix, etc.
+
+### Changed
+
+- `docs/STATUS.md` — Product Validation Sprint added as completed milestone; key findings summarized; V0.2 Planning moved to previous milestone
+
+### Not Changed
+
+- No code was modified in this sprint. Review and planning only. Implementation begins in the Version 0.2 Polish sprint.
+
+---
+
 ## [Version 0.2 Planning] — 2026-06-27
 
 ### Added
