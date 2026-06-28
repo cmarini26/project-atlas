@@ -8,6 +8,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class OpportunityResource extends Resource
 {
@@ -26,20 +27,42 @@ class OpportunityResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn (Builder $query) => $query->withoutGlobalScopes()->with('company'))
             ->columns([
-                //
+                Tables\Columns\TextColumn::make('company.name')->searchable()->sortable(),
+                Tables\Columns\TextColumn::make('type')->badge(),
+                Tables\Columns\TextColumn::make('title')->limit(50)->searchable(),
+                Tables\Columns\TextColumn::make('status')->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'open' => 'primary',
+                        'selected' => 'success',
+                        'dismissed' => 'gray',
+                        'expired' => 'warning',
+                        default => 'gray',
+                    }),
+                Tables\Columns\TextColumn::make('composite_score')->label('Score')->sortable(),
+                Tables\Columns\IconColumn::make('ai_detected')->label('AI')->boolean(),
+                Tables\Columns\TextColumn::make('detected_at')->dateTime()->sortable(),
             ])
+            ->defaultSort('detected_at', 'desc')
             ->filters([
-                //
+                Tables\Filters\SelectFilter::make('status')
+                    ->options([
+                        'open' => 'Open',
+                        'selected' => 'Selected',
+                        'dismissed' => 'Dismissed',
+                        'expired' => 'Expired',
+                    ]),
+                Tables\Filters\SelectFilter::make('type')
+                    ->options([
+                        'featured_item' => 'Featured Item',
+                        'urgency_promotion' => 'Urgency Promotion',
+                        'new_arrival' => 'New Arrival',
+                        're_engagement' => 'Re-engagement',
+                    ]),
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
-            ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
-            ]);
+            ->actions([])
+            ->bulkActions([]);
     }
 
     public static function getRelations(): array
