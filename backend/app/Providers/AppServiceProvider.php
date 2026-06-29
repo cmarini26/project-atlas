@@ -41,19 +41,20 @@ class AppServiceProvider extends ServiceProvider
         // to prevent duplicate registrations when both mechanisms run together.
         EventServiceProvider::disableEventDiscovery();
         // Bind the AI provider appropriate for each environment.
-        // - production/staging: AnthropicProvider (requires ANTHROPIC_API_KEY)
-        // - local: LocalAiProvider — deterministic stubs, no API key needed.
-        //   Combine with QUEUE_CONNECTION=sync in .env so the full pipeline
-        //   runs end-to-end in a single HTTP request without queue workers.
         // - testing: FakeAiProvider — test-controlled via queueFixture().
-        if ($this->app->environment('local')) {
+        // - local without ANTHROPIC_API_KEY: LocalAiProvider — deterministic stubs,
+        //   no API key needed. Combine with QUEUE_CONNECTION=sync so the full
+        //   pipeline runs end-to-end in a single HTTP request without queue workers.
+        // - local with ANTHROPIC_API_KEY, production/staging: AnthropicProvider.
+        if ($this->app->environment('testing')) {
+            $this->app->singleton(AiProvider::class, FakeAiProvider::class);
+        } elseif ($this->app->environment('local') && empty(config('services.anthropic.api_key'))) {
             $this->app->singleton(AiProvider::class, LocalAiProvider::class);
-        } elseif (! $this->app->environment('testing')) {
+        } else {
             $this->app->singleton(AiProvider::class, AnthropicProvider::class);
         }
 
         if ($this->app->environment('testing')) {
-            $this->app->singleton(AiProvider::class, FakeAiProvider::class);
             // FakeAnalyticsProvider is registered as the catch-all in testing.
             // Register it AFTER the registry is booted via AnalyticsServiceProvider,
             // using afterResolving so it is prepended before LogAnalyticsProvider.

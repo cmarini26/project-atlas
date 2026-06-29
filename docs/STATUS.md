@@ -23,12 +23,12 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. |
-| Tests             | ✅ Strong | 603 tests (601 passing, 2 Redis skipped); PHPStan level 8 — 0 errors; Pint clean |
+| Tests             | ✅ Strong | 603 tests (601 passing, 2 Redis skipped); PHPStan level 8 — 0 errors; Pint clean. Phase 4: bodyText→body_text fix unblocks real fact extraction. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
 
-**Overall:** Milestone 10 complete + full P0 onboarding pipeline fixed (Phase 1–3). Users flow correctly from registration → company creation → website connection → analysis → first recommendation. Local development now works end-to-end without a queue worker or Anthropic key. Status page surfaces stalled pipeline state. 603 tests (601 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean.
+**Overall:** Milestone 10 complete + full P0 onboarding pipeline fixed (Phase 1–4). Users flow correctly from registration → company creation → website connection → analysis → first recommendation. Phase 4 fixed the critical `bodyText`→`body_text` key mismatch in `WebsiteAnalyst` that silently returned 0 facts on every real crawl. Anthropic is now used when `ANTHROPIC_API_KEY` is set in local env; `LocalAiProvider` is the fallback when no key. Status page has new AI failure card distinct from crawl failure. 603 tests (601 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean.
 
 ---
 
@@ -576,6 +576,8 @@ All production-blocking items resolved. Remaining pre-production items:
 ---
 
 ## Last Updated
+
+**2026-06-29** — P0 onboarding pipeline fix complete (Phase 4). Critical `body_text`/`bodyText` key mismatch in `WebsiteAnalyst` fixed — all real crawls now produce facts. AI provider binding updated: `AnthropicProvider` used when `ANTHROPIC_API_KEY` is set in local env; `LocalAiProvider` only when no key. `OnboardingStatusController` adds `crawl_succeeded` and `ai_failed` fields. Status page shows dedicated "AI analysis encountered an error" card distinct from crawl failure. All test payloads updated from `bodyText` to `body_text`. `SettingsControllerTest::test_sync_integration_dispatches_job` fixed with `Bus::fake()`. 603 tests (601 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. See [P0-New-Customer-Onboarding-Fix.md](reviews/P0-New-Customer-Onboarding-Fix.md).
 
 **2026-06-28** — P0 onboarding pipeline fix complete (Phase 3). AI pipeline now runs end-to-end in local development: `LocalAiProvider` returns deterministic stubs in `local` env; default blog channel seeded on onboarding; `.env.example` defaults to `QUEUE_CONNECTION=sync`; pipeline logging added at every stage; status page shows "queue worker needed" card when facts stall > 90s. Full crawl → facts → recommendation pipeline test added (`OnboardingPipelineTest`). 603 tests (601 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. See [P0-New-Customer-Onboarding-Fix.md](reviews/P0-New-Customer-Onboarding-Fix.md).
 

@@ -96,7 +96,7 @@ class OnboardingPipelineTest extends TestCase
                         payload: json_encode([
                             'url' => 'https://cbb-auctions.example.com',
                             'title' => 'CBB Auctions — Comic Book Marketplace',
-                            'bodyText' => 'We run weekly comic book auctions with rare Silver Age books. Browse thousands of CGC-graded comics.',
+                            'body_text' => 'We run weekly comic book auctions with rare Silver Age books. Browse thousands of CGC-graded comics.',
                         ], JSON_THROW_ON_ERROR),
                         observedAt: new DateTimeImmutable(),
                     ),

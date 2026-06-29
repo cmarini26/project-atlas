@@ -6,6 +6,30 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [P0 — Real Crawls Produce 0 Facts (body_text Key Mismatch)] — 2026-06-29
+
+### Fixed
+
+- **`WebsiteAnalyst` reads wrong payload key** — `WebPageData::toArray()` produces `body_text` (snake_case) but `WebsiteAnalyst::analyze()` was reading `$payload['bodyText']` (camelCase). The early-return guard `empty($payload['bodyText'])` was always `true` for every real crawl, returning an empty collection with no error or log. No AI call was made; observation was marked `processed` with 0 facts. Changed both occurrences to `body_text`.
+- **`ANTHROPIC_API_KEY` ignored in local env** — `AppServiceProvider` bound `LocalAiProvider` for `APP_ENV=local` regardless of whether `ANTHROPIC_API_KEY` was set. Users who added an API key expecting Anthropic to be used got stub responses instead. Binding now uses `AnthropicProvider` when `ANTHROPIC_API_KEY` is set (even in local), and `LocalAiProvider` only as a fallback when no key is configured.
+- **`SettingsControllerTest::test_sync_integration_dispatches_job`** — test triggered the full pipeline inline (via `QUEUE_CONNECTION=sync`) and called `FakeAiProvider::complete()` with no fixture queued, causing a 500. Fixed by adding `Bus::fake()` + `Bus::assertDispatched()` — the test now verifies dispatch only, as the name implies.
+- **Test payloads used `bodyText` instead of `body_text`** — 4 test files created observation payloads with `'bodyText'` (matching the old broken analyst). Updated to `'body_text'` to reflect `WebPageData::toArray()` output: `PipelineSmokeTest`, `OnboardingPipelineTest`, `WebsiteAnalystTest`, `ProcessObservationTest`.
+
+### Added
+
+- Structured logging in `WebsiteAnalyst::analyze()`: `Log::warning()` when `body_text` is absent/empty (logs observation ID and actual payload keys); `Log::info()` before AI call and after fact extraction (logs observation ID and fact count).
+- `crawl_succeeded` field in `GET /api/onboarding/status` — `true` when at least one Observation exists for the company; allows UI to distinguish "crawl failed" from "AI pipeline failed".
+- `ai_failed` field in `GET /api/onboarding/status` — `true` when an Observation exists but has `status = 'failed'`; signals an AI provider error distinct from a crawl error.
+- AI failure error card in `Status.vue` — distinct from the crawl-failure card; shown when `ai_failed` is true; explains the likely cause (missing/invalid `ANTHROPIC_API_KEY`); polling stops immediately.
+
+### Changed
+
+- `AppServiceProvider` — provider selection order changed: `testing` → `FakeAiProvider`; `local` without key → `LocalAiProvider`; `local` with key or production/staging → `AnthropicProvider`.
+- `OnboardingStatusController` — `pipeline_stalled` guard now also requires `!$aiFailed` so stalled and AI-failed states are mutually exclusive.
+- Early-return null-response path in `OnboardingStatusController` (no membership) — now includes `crawl_succeeded: false` and `ai_failed: false` for consistency.
+
+---
+
 ## [P0 — Observation Created But Facts Never Extract] — 2026-06-28
 
 ### Fixed

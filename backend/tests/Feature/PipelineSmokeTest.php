@@ -113,7 +113,7 @@ class PipelineSmokeTest extends TestCase
             'raw_payload' => json_encode([
                 'url' => 'https://atlas-smoke-test.example.com',
                 'title' => 'Atlas Smoke Test — Comic Auctions',
-                'bodyText' => 'We run weekly comic book auctions with rare Silver Age books.',
+                'body_text' => 'We run weekly comic book auctions with rare Silver Age books.',
             ], JSON_THROW_ON_ERROR),
             'status' => 'pending',
             'observed_at' => now(),
@@ -222,7 +222,7 @@ class PipelineSmokeTest extends TestCase
             'raw_payload' => json_encode([
                 'url' => 'https://atlas-smoke-test.example.com',
                 'title' => 'Atlas Smoke Test',
-                'bodyText' => 'Test content.',
+                'body_text' => 'Test content.',
             ], JSON_THROW_ON_ERROR),
             'status' => 'pending',
             'observed_at' => now(),

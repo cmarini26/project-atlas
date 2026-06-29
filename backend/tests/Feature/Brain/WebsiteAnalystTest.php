@@ -37,7 +37,7 @@ class WebsiteAnalystTest extends TestCase
         $observation = $this->makeObservation([
             'url' => 'https://cbbauctions.com',
             'title' => 'CBB Auctions',
-            'bodyText' => 'We are a comic book auction house.',
+            'body_text' => 'We are a comic book auction house.',
         ]);
 
         $facts = $this->analyst->analyze($observation);
@@ -54,7 +54,7 @@ class WebsiteAnalystTest extends TestCase
         $observation = $this->makeObservation([
             'url' => 'https://cbbauctions.com',
             'title' => 'CBB Auctions',
-            'bodyText' => 'We are a comic book auction house.',
+            'body_text' => 'We are a comic book auction house.',
         ]);
 
         $facts = $this->analyst->analyze($observation);
@@ -72,7 +72,7 @@ class WebsiteAnalystTest extends TestCase
         $observation = $this->makeObservation([
             'url' => 'https://example.com',
             'title' => 'Home',
-            'bodyText' => '',
+            'body_text' => '',
         ]);
 
         $facts = $this->analyst->analyze($observation);

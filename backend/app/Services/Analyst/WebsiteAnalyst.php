@@ -9,6 +9,7 @@ use App\Models\Observation;
 use App\Services\Analyst\Contracts\Analyst;
 use App\Services\Brain\Data\FactData;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 class WebsiteAnalyst implements Analyst
 {
@@ -26,14 +27,21 @@ class WebsiteAnalyst implements Analyst
     {
         $payload = json_decode((string) $observation->raw_payload, true);
 
-        if (! is_array($payload) || empty($payload['bodyText'])) {
+        if (! is_array($payload) || empty($payload['body_text'])) {
+            Log::warning('WebsiteAnalyst: observation payload missing body_text, skipping fact extraction.', [
+                'observation_id' => $observation->id,
+                'keys' => is_array($payload) ? array_keys($payload) : [],
+            ]);
+
             return collect();
         }
+
+        Log::info('WebsiteAnalyst: starting fact extraction.', ['observation_id' => $observation->id]);
 
         $prompt = new FactExtractionPrompt(
             pageUrl: (string) ($payload['url'] ?? $observation->source_identifier),
             pageTitle: (string) ($payload['title'] ?? ''),
-            bodyText: (string) $payload['bodyText'],
+            bodyText: (string) $payload['body_text'],
         );
 
         $response = $this->ai->complete($prompt);
@@ -41,6 +49,11 @@ class WebsiteAnalyst implements Analyst
 
         /** @var array<int, array{key: string, value: string, data_type: string, confidence: int}> $rawFacts */
         $rawFacts = $data['facts'] ?? [];
+
+        Log::info('WebsiteAnalyst: fact extraction complete.', [
+            'observation_id' => $observation->id,
+            'fact_count' => count($rawFacts),
+        ]);
 
         return collect($rawFacts)->map(fn (array $fact): FactData => new FactData(
             key: $fact['key'],

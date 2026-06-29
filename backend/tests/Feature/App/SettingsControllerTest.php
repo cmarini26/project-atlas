@@ -2,11 +2,13 @@
 
 namespace Tests\Feature\App;
 
+use App\Jobs\SyncIntegration;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\Integration;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Tests\TestCase;
 
 class SettingsControllerTest extends TestCase
@@ -77,6 +79,8 @@ class SettingsControllerTest extends TestCase
 
     public function test_sync_integration_dispatches_job(): void
     {
+        Bus::fake();
+
         [$user, $company] = $this->userWithCompany();
 
         $integration = Integration::withoutGlobalScopes()->create([
@@ -90,6 +94,8 @@ class SettingsControllerTest extends TestCase
         $this->actingAs($user)
             ->post("/app/settings/integrations/{$integration->id}/sync")
             ->assertRedirect();
+
+        Bus::assertDispatched(SyncIntegration::class, fn ($job) => $job->integration->id === $integration->id);
     }
 
     public function test_sync_integration_is_denied_for_other_company(): void

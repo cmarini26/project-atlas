@@ -1,8 +1,8 @@
 # P0 — Onboarding Website Submission Does Not Start Analysis
 
-**Status:** Complete (Phase 1 + Phase 2 + Phase 3)  
-**Date:** 2026-06-28  
-**Tests:** 603 total (601 passing, 2 Redis skipped) — Phase 3 added 2 tests  
+**Status:** Complete (Phase 1 + Phase 2 + Phase 3 + Phase 4)  
+**Date:** 2026-06-29  
+**Tests:** 603 total (601 passing, 2 Redis skipped) — Phase 4 fixed 5 tests  
 **PHPStan:** Level 8 — 0 errors  
 **Pint:** Clean  
 **Frontend build:** 0 errors  
@@ -312,3 +312,150 @@ A new `tests/Fixtures/AI/blog-content.json` fixture was added for the blog chann
 | Local dev with `QUEUE_CONNECTION=sync` | N/A (wasn't the default) | Full pipeline runs inline; recommendation ready in seconds |
 | No AI provider configured | Silent failure at first AI call | `LocalAiProvider` returns deterministic stubs in `local` env; pipeline completes |
 | New company with no Channel | `DecisionEngine` returns null; no recommendation | Blog channel seeded automatically; pipeline completes |
+
+---
+
+## Phase 4 — Real Crawls Produce 0 Facts (body_text Key Mismatch)
+
+### Problem
+
+After Phase 3, users who added `ANTHROPIC_API_KEY` and restarted Laravel saw the same symptom: `facts=0`, `opportunities=0`, `recommendations=0` after every real website crawl. `QUEUE_CONNECTION=sync` was set and the queue worker was not needed. The pipeline appeared to complete — no errors, observation marked `processed` — but nothing was extracted.
+
+### Root Cause
+
+**`WebsiteAnalyst::analyze()` read the wrong payload key.**
+
+`WebPageData::toArray()` (the output of every real crawl) produces `body_text` (snake_case):
+
+```php
+return [
+    'body_text' => $this->bodyText,   // ← snake_case
+    ...
+];
+```
+
+`WebsiteAnalyst::analyze()` read `$payload['bodyText']` (camelCase):
+
+```php
+// Before — always triggers early return for real crawls:
+if (! is_array($payload) || empty($payload['bodyText'])) {
+    return collect();    // ← always hit; key never exists
+}
+// ...
+bodyText: (string) $payload['bodyText'],   // ← also wrong
+```
+
+`empty($payload['bodyText'])` evaluated to `true` on every real crawl because the key simply did not exist. The analyst returned an empty `Collection<FactData>`, logged nothing, marked the observation `processed`, and the rest of the pipeline received 0 facts.
+
+**Why tests passed:** Tests created observation payloads manually with `'bodyText'` (camelCase), matching the old broken analyst. They never exercised the `WebPageData::toArray()` path, so the mismatch was invisible.
+
+**Secondary root cause — `ANTHROPIC_API_KEY` ignored in local env.** Even with an API key set, `AppServiceProvider` always bound `LocalAiProvider` for `APP_ENV=local`. Users who set an API key expecting Anthropic responses got stub responses and had no way to know why.
+
+### Fixes
+
+#### 1. `WebsiteAnalyst::analyze()` — `body_text` key
+
+Changed both occurrences:
+
+```php
+// After:
+if (! is_array($payload) || empty($payload['body_text'])) {
+    Log::warning('WebsiteAnalyst: observation payload missing body_text, skipping.', [
+        'observation_id' => $observation->id,
+        'keys' => is_array($payload) ? array_keys($payload) : [],
+    ]);
+    return collect();
+}
+// ...
+Log::info('WebsiteAnalyst: starting fact extraction.', ['observation_id' => $observation->id]);
+$prompt = new FactExtractionPrompt(
+    ...
+    bodyText: (string) $payload['body_text'],   // ← correct
+);
+// ...
+Log::info('WebsiteAnalyst: fact extraction complete.', [
+    'observation_id' => $observation->id,
+    'fact_count' => count($rawFacts),
+]);
+```
+
+The `Log::warning()` on missing/empty `body_text` means future breakage will be immediately visible in `laravel.log` rather than silently returning empty.
+
+#### 2. `AppServiceProvider` — respect `ANTHROPIC_API_KEY` in local env
+
+```php
+// Before:
+if ($this->app->environment('local')) {
+    $this->app->singleton(AiProvider::class, LocalAiProvider::class);
+} elseif (! $this->app->environment('testing')) {
+    $this->app->singleton(AiProvider::class, AnthropicProvider::class);
+}
+
+// After:
+if ($this->app->environment('testing')) {
+    $this->app->singleton(AiProvider::class, FakeAiProvider::class);
+} elseif ($this->app->environment('local') && empty(config('services.anthropic.api_key'))) {
+    $this->app->singleton(AiProvider::class, LocalAiProvider::class);
+} else {
+    $this->app->singleton(AiProvider::class, AnthropicProvider::class);
+}
+```
+
+`LocalAiProvider` is now only the fallback for local dev without a key — not the default for all `local` environments.
+
+#### 3. Test payloads — `bodyText` → `body_text`
+
+Four test files created observation payloads with `'bodyText'` to match the old broken key. Updated to `'body_text'` to match `WebPageData::toArray()`:
+
+- `tests/Feature/PipelineSmokeTest.php` — 2 occurrences
+- `tests/Feature/OnboardingPipelineTest.php` — 1 occurrence
+- `tests/Feature/Brain/WebsiteAnalystTest.php` — 3 occurrences
+- `tests/Feature/Brain/ProcessObservationTest.php` — 1 occurrence
+
+#### 4. `OnboardingStatusController` — `crawl_succeeded` and `ai_failed` fields
+
+Two new fields added to `GET /api/onboarding/status`:
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `crawl_succeeded` | `bool` | At least one Observation exists — website was reachable and the connector returned data |
+| `ai_failed` | `bool` | An Observation exists but has `status = 'failed'` — AI provider threw or returned an unusable response |
+
+These allow the UI to distinguish three distinct failure modes:
+- `integration_status === 'error'` → crawl failed (website unreachable)
+- `ai_failed === true` → crawl succeeded, AI processing failed
+- `pipeline_stalled === true` → crawl succeeded, AI jobs not dequeued (no worker)
+
+`pipeline_stalled` now also requires `!$aiFailed` so the two states are mutually exclusive.
+
+#### 5. `Status.vue` — AI failure card
+
+New error card shown when `ai_failed` is true:
+- Red warning icon (same as crawl failure)
+- "AI analysis encountered an error" heading
+- Explanation: likely caused by missing/invalid `ANTHROPIC_API_KEY`
+- Guidance to check `.env` and restart the server
+- Polling stops immediately — `isAiFailed.value` stops the interval alongside `isFailed.value`
+
+#### 6. `SettingsControllerTest` — `Bus::fake()`
+
+`test_sync_integration_dispatches_job` dispatched `SyncIntegration` without faking the bus. With `QUEUE_CONNECTION=sync` the full pipeline ran inline — hitting `FakeAiProvider::complete()` with an empty queue and throwing a 500. Added `Bus::fake()` + `Bus::assertDispatched(SyncIntegration::class)` so the test only verifies dispatch.
+
+### Tests Changed (Phase 4)
+
+| Test file | Change |
+|-----------|--------|
+| `tests/Feature/Brain/WebsiteAnalystTest.php` | `'bodyText'` → `'body_text'` in 3 observation payloads |
+| `tests/Feature/Brain/ProcessObservationTest.php` | `'bodyText'` → `'body_text'` in 1 observation payload |
+| `tests/Feature/PipelineSmokeTest.php` | `'bodyText'` → `'body_text'` in 2 observation payloads |
+| `tests/Feature/OnboardingPipelineTest.php` | `'bodyText'` → `'body_text'` in 1 fake connector payload |
+| `tests/Feature/App/SettingsControllerTest.php` | Added `Bus::fake()` + `Bus::assertDispatched()` |
+
+### Behaviour Comparison (Phase 4)
+
+| Scenario | Before Phase 4 | After Phase 4 |
+|----------|---------------|---------------|
+| Real crawl with any AI provider | `fact_count=0` silently; no log | Facts extracted correctly; `Log::info()` confirms count |
+| `ANTHROPIC_API_KEY` set in local env | `LocalAiProvider` used regardless; stub responses | `AnthropicProvider` used; real Anthropic API called |
+| AI provider throws / returns invalid JSON | Observation stays `pending` or `failed`; status page spins | `ai_failed=true` in API; status page shows "AI analysis encountered an error" card |
+| `SettingsController::syncIntegration()` test | 500 from empty `FakeAiProvider` queue | `Bus::fake()` prevents job execution; test passes cleanly |

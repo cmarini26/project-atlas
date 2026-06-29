@@ -71,7 +71,7 @@ class ProcessObservationTest extends TestCase
             'raw_payload' => json_encode([
                 'url' => 'https://cbbauctions.com',
                 'title' => 'CBB Auctions',
-                'bodyText' => 'We are a comic book auction house.',
+                'body_text' => 'We are a comic book auction house.',
             ], JSON_THROW_ON_ERROR),
             'status' => 'pending',
             'observed_at' => now(),
