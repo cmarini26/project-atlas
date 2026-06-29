@@ -10,6 +10,7 @@ use App\Models\Opportunity;
 use App\Services\Analyst\OpportunityDetectionAnalyst;
 use App\Services\Opportunity\Detectors\Contracts\OpportunityDetector;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 class OpportunityEngine
 {
@@ -34,6 +35,10 @@ class OpportunityEngine
      */
     public function scan(Company $company, BusinessBrain $brain): Collection
     {
+        Log::info('OpportunityEngine: scanning for opportunities.', [
+            'company_id' => $company->id,
+        ]);
+
         /** @var Collection<int, OpportunityCandidate> $candidates */
         $candidates = collect();
         $detectedTypes = [];
@@ -100,6 +105,12 @@ class OpportunityEngine
 
             OpportunityDetected::dispatch($opportunity);
         }
+
+        Log::info('OpportunityEngine: scan complete.', [
+            'company_id' => $company->id,
+            'candidates' => $candidates->count(),
+            'persisted' => $persisted->count(),
+        ]);
 
         return $persisted;
     }

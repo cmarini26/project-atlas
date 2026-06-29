@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\SyncIntegration;
+use App\Models\Channel;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\Integration;
@@ -97,6 +98,18 @@ class OnboardingController extends Controller
             'website_crawl',
             ['url' => $validated['website_url']]
         );
+
+        // Seed a default blog channel so DecisionEngine has at least one
+        // active channel to commit a Decision against. Users can add real
+        // connected channels (email, social) through Settings later.
+        if (! Channel::where('company_id', $company->id)->exists()) {
+            Channel::create([
+                'company_id' => $company->id,
+                'type' => 'blog',
+                'name' => 'Blog',
+                'is_active' => true,
+            ]);
+        }
 
         // Run the first sync inline so observations are recorded immediately,
         // before the user reaches the status page. Subsequent scheduled syncs

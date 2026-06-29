@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\AI\Contracts\AiProvider;
 use App\AI\Providers\AnthropicProvider;
+use App\AI\Providers\LocalAiProvider;
 use App\AI\Testing\FakeAiProvider;
 use App\Events\CampaignAssetsReady;
 use App\Events\DecisionCommitted;
@@ -39,10 +40,15 @@ class AppServiceProvider extends ServiceProvider
         // All listeners are registered explicitly in boot(). Disable auto-discovery
         // to prevent duplicate registrations when both mechanisms run together.
         EventServiceProvider::disableEventDiscovery();
-        // In the test environment, bind FakeAiProvider so tests can override it
-        // with app()->instance(AiProvider::class, $fake). In production, a real
-        // provider (AnthropicProvider) must be bound before AI jobs are dispatched.
-        if (! $this->app->environment('testing')) {
+        // Bind the AI provider appropriate for each environment.
+        // - production/staging: AnthropicProvider (requires ANTHROPIC_API_KEY)
+        // - local: LocalAiProvider — deterministic stubs, no API key needed.
+        //   Combine with QUEUE_CONNECTION=sync in .env so the full pipeline
+        //   runs end-to-end in a single HTTP request without queue workers.
+        // - testing: FakeAiProvider — test-controlled via queueFixture().
+        if ($this->app->environment('local')) {
+            $this->app->singleton(AiProvider::class, LocalAiProvider::class);
+        } elseif (! $this->app->environment('testing')) {
             $this->app->singleton(AiProvider::class, AnthropicProvider::class);
         }
 

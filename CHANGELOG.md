@@ -6,6 +6,31 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [P0 — Observation Created But Facts Never Extract] — 2026-06-28
+
+### Fixed
+
+- **Queue driver mismatch** — `ProcessObservation` dispatches to the `ai` queue via `dispatch()`, not `dispatchSync()`. With `QUEUE_CONNECTION=redis` and no worker, facts never extracted. `.env.example` now defaults to `QUEUE_CONNECTION=sync` so local dev works without a running worker.
+- **No AI provider in local environment** — `AnthropicProvider` was bound for all non-testing environments. Without `ANTHROPIC_API_KEY`, every AI call failed. New `LocalAiProvider` provides deterministic stubs for all 5 prompt types in the `local` environment.
+- **No Channel for new companies** — `DecisionEngine::evaluate()` Guard 5 requires at least one active Channel. `OnboardingController::createIntegration()` now seeds a default Blog channel if none exists, unblocking Decision evaluation.
+
+### Added
+
+- `app/AI/Providers/LocalAiProvider.php` — stub AI provider for `local` environment; all 5 prompt types; no API key required; passes `validateBlueprint()` validation
+- `tests/Feature/OnboardingPipelineTest.php` — 2 end-to-end tests covering the full crawl → facts → recommendation path and the failed-crawl error path; mocks `ConnectorRegistry`; blog channel matches onboarding default
+- `tests/Fixtures/AI/blog-content.json` — blog post content fixture for `GenerateContent` with blog channel type
+- Pipeline logging — `Log::info()` at each stage of `ObservationService`, `ProcessObservation`, and `OpportunityEngine`
+- `pipeline_stalled` in `GET /api/onboarding/status` — `true` when sync ran > 90s ago with no facts; surfaces queue worker absence
+- Stalled state card in `Status.vue` — yellow warning card with queue worker command when `pipeline_stalled` is true
+
+### Changed
+
+- `AppServiceProvider` — `LocalAiProvider` bound for `local` environment; `AnthropicProvider` for non-local/non-testing
+- `OnboardingController::createIntegration()` — seeds default Blog channel after integration creation if no channels exist
+- `.env.example` — `QUEUE_CONNECTION` default changed from `redis` to `sync`
+
+---
+
 ## [P0 — Onboarding Analysis Pipeline Does Not Start] — 2026-06-28
 
 ### Fixed

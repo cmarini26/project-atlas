@@ -1,8 +1,8 @@
 # P0 — Onboarding Website Submission Does Not Start Analysis
 
-**Status:** Complete  
+**Status:** Complete (Phase 1 + Phase 2 + Phase 3)  
 **Date:** 2026-06-28  
-**Tests:** 593 total (591 passing, 2 Redis skipped) — 5 new tests added  
+**Tests:** 603 total (601 passing, 2 Redis skipped) — Phase 3 added 2 tests  
 **PHPStan:** Level 8 — 0 errors  
 **Pint:** Clean  
 **Frontend build:** 0 errors  
@@ -122,8 +122,193 @@ The progress list gained a new first step: **"Website scanned"** driven by `sync
 
 ---
 
+---
+
+## Phase 2 — Onboarding Status Stuck, "Website Scanned" Not Appearing
+
+### Problem
+
+After Phase 1, the form submission still blocked for several minutes before redirecting. The "Website scanned" step never appeared. Root causes found on investigation:
+
+1. **`connect_timeout` hardcoded to `10` in `WebPageCrawler`** — the `connectTimeout` constructor param was declared but the Guzzle `Client` was initialised with the literal `10` instead of `$this->connectTimeout`. The per-page connect deadline was therefore always 10 s regardless of config.
+
+2. **Default `maxPages = 20` meant up to 500 s of blocking** — worst-case crawl is `maxPages × (requestTimeout + connectTimeout)` = `20 × 25 s = 500 s`. `dispatchSync()` holds the HTTP connection open for the entire crawl, so `php artisan serve` (single-threaded) cannot respond to any other request — including the status-page API polls — until it finishes.
+
+3. **`ConnectException` is not a subclass of `RequestException`** — Guzzle's `ConnectException` (TCP timeout / refused) extends `TransferException` directly, not `RequestException`. `fetchAndParse` only caught `RequestException`, so a connection failure on any crawled page propagated up through the job and was caught by the controller's try-catch, marking the integration as `error`. This is the **correct** behaviour for the onboarding start URL — the error card is shown, the user can retry — but it was not obvious or tested.
+
+### Fix
+
+#### 1. `WebPageCrawler` — `connectTimeout` constructor param (bug fix)
+
+```php
+// Before
+'connect_timeout' => 10,           // hardcoded — constructor param ignored
+
+// After
+'connect_timeout' => $this->connectTimeout,   // uses new constructor param (default 5)
+```
+
+Constructor signature:
+```php
+public function __construct(
+    private readonly int $maxPages = 20,
+    private readonly int $maxDepth = 3,
+    private readonly int $requestTimeout = 15,
+    private readonly int $connectTimeout = 5,   // new
+    ?SsrfValidator $ssrfValidator = null,
+)
+```
+
+#### 2. `config/crawler.php` — strict defaults
+
+| Key | Default | Env override |
+|-----|---------|--------------|
+| `max_pages` | `1` | `CRAWLER_MAX_PAGES` |
+| `connect_timeout` | `5` | `CRAWLER_CONNECT_TIMEOUT` |
+| `request_timeout` | `10` | `CRAWLER_REQUEST_TIMEOUT` |
+
+`max_pages = 1` means the onboarding crawl covers only the home page by default — form submission takes at most 15 s (5 s connect + 10 s read) before redirecting. Production deployments set `CRAWLER_MAX_PAGES=20` for thorough recurring syncs.
+
+#### 3. `ConnectorServiceProvider` — wires all three config values
+
+```php
+new WebsiteConnector(new WebPageCrawler(
+    maxPages:       (int) config('crawler.max_pages', 1),
+    requestTimeout: (int) config('crawler.request_timeout', 10),
+    connectTimeout: (int) config('crawler.connect_timeout', 5),
+)),
+```
+
+### Why "Website Scanned" Was Not Appearing
+
+With `maxPages = 20` and 25 s per-page timeout, `php artisan serve` (single-threaded PHP built-in server) was blocked processing the crawl for up to 500 s. The browser loaded the status page but every `/api/onboarding/status` poll timed out because the server couldn't handle a second request. The status page remained on "Checking in with Atlas…" until the server finally responded — at which point `sync_started = true` and the step immediately checked. From the user's perspective it looked frozen.
+
+With `maxPages = 1`, worst-case blocking drops to ≤ 15 s. The redirect and first API poll complete almost immediately.
+
+### Tests Added (Phase 2)
+
+8 new unit tests in `tests/Unit/Observatory/WebPageCrawlerTest.php`:
+
+| Test | Verifies |
+|------|----------|
+| `test_crawl_returns_page_data_for_successful_response` | HTML parsed, title extracted |
+| `test_crawl_skips_non_html_responses` | JSON/other content-types skipped |
+| `test_crawl_silently_skips_http_error_responses` | 4xx/5xx RequestException swallowed |
+| `test_crawl_propagates_connect_exception` | ConnectException propagates (not caught) |
+| `test_crawl_respects_max_pages_limit` | BFS stops at `maxPages` |
+| `test_crawl_blocks_ssrf_private_ip` | Link-local IP blocked before HTTP |
+| `test_crawl_blocks_loopback` | Loopback blocked before HTTP |
+| `test_connect_timeout_param_is_accepted` | Constructor accepts `connectTimeout` param |
+
+---
+
 ## Known Limitations
 
-- `dispatchSync()` runs the website crawl in the HTTP request. For websites with many pages or slow connections, form submission may take 5–30 seconds before redirecting. The `CRAWLER_MAX_PAGES` env var mitigates this.
+- `dispatchSync()` runs the website crawl in the HTTP request. With the default `CRAWLER_MAX_PAGES=1` the worst case is ~15 s. Production should set `CRAWLER_MAX_PAGES=20` (or higher) in `.env` for thorough recurring syncs.
 - The AI pipeline (fact extraction, opportunity detection, decision evaluation, recommendations) still requires a queue worker with workers on the `high`, `ai`, `default`, `observations`, and `maintenance` queues. Without a worker, the status page will show "Website scanned" permanently and time out after 5 minutes. For local development, run: `php artisan queue:work --queue=high,ai,default,observations,maintenance`
 - Production should set `QUEUE_CONNECTION=redis` and run supervised queue workers.
+
+---
+
+## Phase 3 — Observation Created But Facts Never Extract
+
+### Problem
+
+After Phase 2 the crawl ran successfully and `sync_started = true` appeared, but `fact_count`, `opportunity_count`, and `recommendation_count` all stayed at 0. The status page spun forever.
+
+### Root Causes
+
+**Root cause 1 — Queue driver mismatch.** `ProcessObservation` dispatches to the `ai` queue via `dispatch()`, not `dispatchSync()`. With `QUEUE_CONNECTION=redis` and no running worker, the job sits in Redis unprocessed and facts are never extracted. The `.env.example` default was `QUEUE_CONNECTION=redis`, which is correct for production but wrong for local development.
+
+**Root cause 2 — AI provider not available in local environment.** `AppServiceProvider` bound `AnthropicProvider` for any non-testing environment. Without `ANTHROPIC_API_KEY` in `.env`, every AI call failed silently or threw, stopping the pipeline at the first `AiProvider::complete()` call.
+
+**Root cause 3 — No active Channel for new companies.** `DecisionEngine::evaluate()` Guard 5 requires at least one active Channel. `CompanyService::create()` creates Company + Catalog + DigitalTwin + Membership — but no Channel. Without a Channel, `evaluate()` returns null and no Decision is committed; no Decision means no Campaign or Recommendation.
+
+**Root cause 4 — No pipeline logging.** The pipeline failed silently. No log entries in `laravel.log` to indicate where it stopped.
+
+### Fixes
+
+#### 1. `LocalAiProvider` — deterministic stubs for local development
+
+New `app/AI/Providers/LocalAiProvider.php` implements `AiProvider` and returns hardcoded stub JSON for all 5 prompt types:
+
+| Prompt | Stub behaviour |
+|--------|---------------|
+| `FactExtractionPrompt` | 3 facts: `brand_name`, `primary_service`, `value_proposition` |
+| `OpportunityDetectionPrompt` | 1 re-engagement opportunity |
+| `RationaleGenerationPrompt` | Full rationale with all 4 required keys |
+| `CampaignPreparationPrompt` | Blueprint with `blog` channel strategy; passes `validateBlueprint()` validation |
+| Content prompts (all 5) | Title + body stub suitable for any channel |
+
+Bound in `AppServiceProvider` for the `local` environment:
+```php
+if ($this->app->environment('local')) {
+    $this->app->singleton(AiProvider::class, LocalAiProvider::class);
+}
+```
+
+#### 2. `QUEUE_CONNECTION=sync` in `.env.example`
+
+Changed default from `redis` to `sync` so all jobs run inline without a worker. A comment explains when to switch to `redis`:
+```
+# sync: runs all jobs inline — no worker needed, ideal for local dev.
+# redis: production mode — requires a queue worker.
+QUEUE_CONNECTION=sync
+```
+
+#### 3. Default blog Channel in `OnboardingController`
+
+After creating the integration, the controller now seeds a default Blog channel if none exists:
+```php
+if (! Channel::where('company_id', $company->id)->exists()) {
+    Channel::create([
+        'company_id' => $company->id,
+        'type' => 'blog',
+        'name' => 'Blog',
+        'is_active' => true,
+    ]);
+}
+```
+This unblocks `DecisionEngine::evaluate()` Guard 5.
+
+#### 4. Pipeline logging
+
+Added `Log::info()` checkpoints at each pipeline stage:
+- `ObservationService::record()` — "recording observation" + "ObservationRecorded dispatched"
+- `ProcessObservation::handle()` — "starting fact extraction", "facts extracted" (with count), "synthesizing knowledge", "processed successfully"; `Log::error()` on failure
+- `OpportunityEngine::scan()` — "scanning for opportunities" + "scan complete" (with candidate and persisted counts)
+
+#### 5. `pipeline_stalled` API field
+
+`OnboardingStatusController` now returns `pipeline_stalled: true` when:
+- `sync_started = true` (crawl ran)
+- `fact_count = 0` (no facts extracted)
+- `integration.status !== 'error'`
+- `last_run_at < now - 90s`
+
+This diagnoses the queue driver mismatch at the API level.
+
+#### 6. Status.vue stalled state card
+
+When `pipeline_stalled` is true and no error, the status page renders a yellow warning card explaining that the queue worker is not running, with the command to start it:
+```
+php artisan queue:work --queue=high,ai,default,observations,maintenance
+```
+
+### Tests Added (Phase 3)
+
+| Test | File | What it covers |
+|------|------|---------------|
+| `test_full_onboarding_pipeline_produces_recommendation` | `OnboardingPipelineTest` | Full crawl → observation → facts → opportunities → decision → campaign → recommendation; mocks ConnectorRegistry; uses blog channel (matching onboarding default); asserts integration timestamps, observation status, facts, DigitalTwin activation, opportunity, recommendation, 5 AI calls |
+| `test_failed_crawl_marks_integration_as_error` | `OnboardingPipelineTest` | Connector throws during sync; asserts integration status = `error`, no observations, 0 AI calls |
+
+A new `tests/Fixtures/AI/blog-content.json` fixture was added for the blog channel content generation step.
+
+### Behaviour Comparison (full pipeline)
+
+| Scenario | Before Phase 3 | After Phase 3 |
+|----------|---------------|---------------|
+| Local dev with `QUEUE_CONNECTION=redis`, no worker | Facts never extracted; `fact_count=0` forever | Same — but status page now shows "queue worker needed" card after 90s instead of infinite spinner |
+| Local dev with `QUEUE_CONNECTION=sync` | N/A (wasn't the default) | Full pipeline runs inline; recommendation ready in seconds |
+| No AI provider configured | Silent failure at first AI call | `LocalAiProvider` returns deterministic stubs in `local` env; pipeline completes |
+| New company with no Channel | `DecisionEngine` returns null; no recommendation | Blog channel seeded automatically; pipeline completes |

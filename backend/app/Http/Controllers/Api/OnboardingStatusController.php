@@ -12,6 +12,7 @@ use App\Models\Recommendation;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class OnboardingStatusController extends Controller
 {
@@ -50,11 +51,23 @@ class OnboardingStatusController extends Controller
             ->oldest()
             ->first();
 
+        $syncStarted = $integration?->last_run_at !== null;
+        $factCount = Fact::where('company_id', $companyId)->where('is_current', true)->count();
+
+        // Stalled: sync ran > 90 s ago but no facts were extracted. Most likely
+        // cause is a queue worker that is not running (QUEUE_CONNECTION=redis with
+        // no active worker). Surfaced to the UI so the user gets actionable feedback.
+        $pipelineStalled = $syncStarted
+            && $factCount === 0
+            && $integration->status !== 'error'
+            && Carbon::parse($integration->last_run_at)->lt(now()->subSeconds(90));
+
         return response()->json([
             'twin_status' => $twin?->status,
             'integration_status' => $integration?->status,
-            'sync_started' => $integration?->last_run_at !== null,
-            'fact_count' => Fact::where('company_id', $companyId)->where('is_current', true)->count(),
+            'sync_started' => $syncStarted,
+            'pipeline_stalled' => $pipelineStalled,
+            'fact_count' => $factCount,
             'opportunity_count' => Opportunity::where('company_id', $companyId)->where('status', 'open')->count(),
             'recommendation_count' => Recommendation::where('company_id', $companyId)->where('status', 'pending')->count(),
             'first_recommendation_id' => $pendingRecommendation?->id,

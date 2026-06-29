@@ -7,6 +7,7 @@ use App\Models\Integration;
 use App\Models\Observation;
 use App\Services\Observatory\Connectors\ConnectorResult;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 class ObservationService
 {
@@ -24,6 +25,12 @@ class ObservationService
 
     public function record(Integration $integration, ConnectorResult $result): Observation
     {
+        Log::info('ObservationService: recording observation.', [
+            'integration_id' => $integration->id,
+            'source_type' => $result->sourceType,
+            'source_identifier' => $result->sourceIdentifier,
+        ]);
+
         $observation = Observation::create([
             'company_id' => $integration->company_id,
             'integration_id' => $integration->id,
@@ -35,6 +42,10 @@ class ObservationService
         ]);
 
         ObservationRecorded::dispatch($observation);
+
+        Log::info('ObservationService: ObservationRecorded dispatched.', [
+            'observation_id' => $observation->id,
+        ]);
 
         return $observation;
     }

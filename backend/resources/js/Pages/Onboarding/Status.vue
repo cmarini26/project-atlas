@@ -7,6 +7,7 @@ interface StatusData {
   twin_status: string | null
   integration_status: string | null
   sync_started: boolean
+  pipeline_stalled: boolean
   fact_count: number
   opportunity_count: number
   recommendation_count: number
@@ -17,6 +18,7 @@ const status = ref<StatusData>({
   twin_status: 'initializing',
   integration_status: 'active',
   sync_started: false,
+  pipeline_stalled: false,
   fact_count: 0,
   opportunity_count: 0,
   recommendation_count: 0,
@@ -29,6 +31,7 @@ let intervalId: ReturnType<typeof setInterval> | null = null
 
 const isTimedOut = computed(() => Date.now() - startTime > 5 * 60 * 1000)
 const isFailed = computed(() => status.value.integration_status === 'error')
+const isStalled = computed(() => status.value.pipeline_stalled && !isFailed.value)
 
 async function fetchStatus(): Promise<void> {
   if (Date.now() - startTime > 10 * 60 * 1000) {
@@ -95,6 +98,24 @@ onUnmounted(() => {
           class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] transition-colors duration-[var(--duration-fast)]"
         >
           Try a different URL
+        </a>
+      </div>
+
+      <!-- Pipeline stalled — queue worker not processing jobs -->
+      <div v-else-if="isStalled">
+        <div class="mb-5 flex items-center justify-center">
+          <div class="size-12 rounded-full bg-amber-50 flex items-center justify-center">
+            <svg class="size-6 text-amber-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
+          </div>
+        </div>
+        <h1 class="text-base font-semibold text-[var(--color-text-primary)] mb-2">AI pipeline is waiting for a queue worker</h1>
+        <p class="text-sm text-[var(--color-text-muted)] mb-3">Your website was scanned, but the AI analysis is queued and no worker is processing it.</p>
+        <p class="text-xs text-[var(--color-text-muted)] font-mono bg-[var(--color-surface-raised)] rounded px-3 py-2 mb-6 text-left">php artisan queue:work --queue=high,ai,default,observations,maintenance</p>
+        <a
+          href="/app"
+          class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] transition-colors duration-[var(--duration-fast)]"
+        >
+          Go to dashboard
         </a>
       </div>
 

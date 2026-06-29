@@ -25,11 +25,12 @@ class WebPageCrawler
         private readonly int $maxPages = 20,
         private readonly int $maxDepth = 3,
         private readonly int $requestTimeout = 15,
+        private readonly int $connectTimeout = 5,
         ?SsrfValidator $ssrfValidator = null,
     ) {
         $this->http = new Client([
             'timeout' => $this->requestTimeout,
-            'connect_timeout' => 10,
+            'connect_timeout' => $this->connectTimeout,
             'headers' => [
                 'User-Agent' => 'AtlasBot/1.0 (+https://atlas.app)',
                 'Accept' => 'text/html,application/xhtml+xml',

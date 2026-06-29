@@ -14,7 +14,9 @@ class ConnectorServiceProvider extends ServiceProvider
         $this->app->singleton(ConnectorRegistry::class, function (): ConnectorRegistry {
             return new ConnectorRegistry([
                 new WebsiteConnector(new WebPageCrawler(
-                    maxPages: (int) config('crawler.max_pages', 20),
+                    maxPages: (int) config('crawler.max_pages', 1),
+                    requestTimeout: (int) config('crawler.request_timeout', 10),
+                    connectTimeout: (int) config('crawler.connect_timeout', 5),
                 )),
             ]);
         });
