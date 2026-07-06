@@ -51,12 +51,15 @@ class WebPageCrawler
     /**
      * Crawl the site starting at $startUrl.
      *
+     * @param  int|null  $maxPages  per-crawl page budget; null uses the constructor default
      * @return Collection<int, WebPageData>
      *
      * @throws SsrfBlockedException if the start URL resolves to a blocked address
      */
-    public function crawl(string $startUrl): Collection
+    public function crawl(string $startUrl, ?int $maxPages = null): Collection
     {
+        $pageBudget = max(1, $maxPages ?? $this->maxPages);
+
         $startUrl = rtrim($startUrl, '/');
 
         // Validate before making any outbound connection.
@@ -70,7 +73,7 @@ class WebPageCrawler
         $queue = [['url' => $startUrl, 'depth' => 0]];
         $results = collect();
 
-        while (! empty($queue) && $results->count() < $this->maxPages) {
+        while (! empty($queue) && $results->count() < $pageBudget) {
             $item = array_shift($queue);
             $url = $item['url'];
             $depth = $item['depth'];

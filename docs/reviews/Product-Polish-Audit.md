@@ -180,14 +180,16 @@ Decent base (labels, `aria-label`s, `role=alert/status`). Gaps worth closing for
 
 ### P0 — Do before onboarding another real customer (≈3–4 days)
 
-| # | Item | Area | Effort |
-|---|------|------|--------|
-| 1 | Scheduled `atlas:sync-due-integrations` (the recurring loop) | System | ½ day |
-| 2 | Schedule `ExpireOpportunities` hourly + anti-suppression test | System | 2 h |
-| 3 | Rate limiting: login/register/webhooks | System | 2 h |
-| 4 | Password reset flow | Flow | 1 day |
-| 5 | Fix over-promising copy (notify-you, connect-channels) | Flow | 1 h |
-| 6 | Channels section in Settings (list + activate/deactivate) | Flow | 1 day |
+> **Status (2026-07-06): SHIPPED** — items 1–5 implemented (see [P0-Product-Polish-Review.md](P0-Product-Polish-Review.md)); rate limiting covers login/register/reset/onboarding-submit plus integration-reuse spend protection. Item 6 (Channels UI) deliberately deferred to P1 — the misleading copy was fixed instead.
+
+| # | Item | Area | Effort | Status |
+|---|------|------|--------|--------|
+| 1 | Scheduled `atlas:sync-due-integrations` (the recurring loop) | System | ½ day | ✅ Done |
+| 2 | Schedule `ExpireOpportunities` hourly + anti-suppression test | System | 2 h | ✅ Done |
+| 3 | Rate limiting: login/register/onboarding submit + spend protection | System | 2 h | ✅ Done |
+| 4 | Password reset flow | Flow | 1 day | ✅ Done |
+| 5 | Fix over-promising copy (notify-you, connect-channels) | Flow | 1 h | ✅ Done |
+| 6 | Channels section in Settings (list + activate/deactivate) | Flow | 1 day | → moved to P1 |
 
 ### P1 — The polish sprint (≈1 week)
 

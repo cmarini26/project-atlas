@@ -6,6 +6,26 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [P0 Product Polish — Recurring Loop, Account Safety, Truthful Copy] — 2026-07-06
+
+Implements the P0 tier of [Product-Polish-Audit.md](docs/reviews/Product-Polish-Audit.md). Details in [P0-Product-Polish-Review.md](docs/reviews/P0-Product-Polish-Review.md).
+
+### Added
+
+- **`atlas:sync-due-integrations` command** (scheduled every 15 min) — dispatches `SyncIntegration` for active integrations whose `next_run_at` has passed. The Observe → Learn loop now actually repeats; previously `next_run_at` was written but never consumed and Atlas observed each business exactly once.
+- **`ExpireOpportunities` scheduled hourly** — the job existed but was never dispatched. Expiry is what re-enables detection of a lapsed opportunity type (the engine's dedupe only counts open/selected rows); regression test added.
+- **Per-sync crawl depth** — `WebPageCrawler::crawl()` accepts a page-budget override; `WebsiteConnector` keeps the first sync shallow (`crawler.max_pages`, default 1, fast onboarding) and crawls deeper on every later sync (`crawler.recurring_max_pages`, default 10, env `CRAWLER_RECURRING_MAX_PAGES`).
+- **Password reset flow** — `Auth\PasswordResetController`, `password.request/email/reset/update` routes, `ForgotPassword.vue` + `ResetPassword.vue`, "Forgot password?" link on Login (which now renders flash success). Send-link always reports success — no account enumeration.
+- **Rate limiting** — `throttle:5,1` on login/register/forgot-password/reset-password; `throttle:3,1` on the onboarding website submit (each submit can queue a crawl + 5-call AI pipeline).
+- 19 tests: due-sync dispatch/exclusion rules, schedule registration, expiry no-suppression, crawl-budget selection, password reset (6), rate limits (4), integration reuse (2).
+
+### Changed
+
+- **Onboarding resubmits reuse the existing website integration** (update URL, reset status, clear `last_error`) instead of creating a new row + queued pipeline run each time — with `SyncIntegration`'s per-integration uniqueness this caps AI spend from repeat submits, and the "Try a different URL" flow now properly resets the errored integration.
+- **Truthful status-page copy** — the no-opportunity card no longer tells users to "connect more channels in Settings" (no channel UI exists); the timeout card no longer promises a notification (no notification system exists). Both now describe what actually happens: automatic re-scans and a recommendation waiting on the dashboard.
+
+---
+
 ## [P0 — Recommendations Page Blank (null campaign_type crashes render)] — 2026-07-06
 
 ### Fixed

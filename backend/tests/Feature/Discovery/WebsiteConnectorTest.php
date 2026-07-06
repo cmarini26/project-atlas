@@ -45,7 +45,9 @@ class WebsiteConnectorTest extends TestCase
         $crawler = Mockery::mock(WebPageCrawler::class);
         $crawler->expects('crawl')
             ->once()
-            ->with('https://example.com')
+            // First-ever sync (last_successful_run_at null) uses the shallow
+            // onboarding budget from crawler.max_pages.
+            ->with('https://example.com', (int) config('crawler.max_pages', 1))
             ->andReturn($pages);
 
         $connector = new WebsiteConnector($crawler);
@@ -72,6 +74,35 @@ class WebsiteConnectorTest extends TestCase
 
         $payload = json_decode($results->first()->payload, true);
         $this->assertEquals('Home', $payload['title']);
+    }
+
+    public function test_recurring_sync_uses_deeper_crawl_budget(): void
+    {
+        $crawler = Mockery::mock(WebPageCrawler::class);
+        $crawler->expects('crawl')
+            ->once()
+            // Any sync after the first crawls deeper so the Business Brain
+            // keeps learning beyond the home page.
+            ->with('https://example.com', (int) config('crawler.recurring_max_pages', 10))
+            ->andReturn(collect());
+
+        $connector = new WebsiteConnector($crawler);
+
+        $company = Company::withoutGlobalScopes()->create([
+            'name' => 'Test Co',
+            'slug' => 'test-co',
+        ]);
+
+        $integration = Integration::withoutGlobalScopes()->make([
+            'company_id' => $company->id,
+            'type' => 'website_crawl',
+            'name' => 'Site',
+            'config' => ['url' => 'https://example.com'],
+            'status' => 'active',
+            'last_successful_run_at' => now()->subDay(),
+        ]);
+
+        $this->assertCount(0, $connector->sync($integration));
     }
 
     public function test_supports_only_website_crawl_integrations(): void

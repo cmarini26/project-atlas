@@ -165,6 +165,65 @@ class OnboardingControllerTest extends TestCase
         $fakeAi->assertNothingSent();
     }
 
+    public function test_resubmitting_website_reuses_existing_integration(): void
+    {
+        // AI spend protection: repeat submits (retry with a different URL,
+        // double-clicks) must not create a new integration + queued pipeline
+        // run each time. The existing integration is updated in place, so
+        // SyncIntegration's per-integration uniqueness can deduplicate.
+        $user = User::factory()->create();
+        $company = Company::withoutGlobalScopes()->create(['name' => 'My Co', 'slug' => 'my-co']);
+        CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => 'owner']);
+
+        Bus::fake();
+
+        $this->actingAs($user)
+            ->post('/onboarding/integration', ['website_url' => 'https://first.example.com']);
+
+        $this->actingAs($user)
+            ->post('/onboarding/integration', ['website_url' => 'https://second.example.com']);
+
+        $integrations = Integration::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->where('type', 'website_crawl')
+            ->get();
+
+        $this->assertCount(1, $integrations, 'Resubmit must reuse the existing website integration.');
+        $this->assertSame('https://second.example.com', $integrations->first()->config['url']);
+        $this->assertSame('active', $integrations->first()->status);
+    }
+
+    public function test_resubmit_clears_previous_error_state(): void
+    {
+        $user = User::factory()->create();
+        $company = Company::withoutGlobalScopes()->create(['name' => 'My Co', 'slug' => 'my-co']);
+        CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => 'owner']);
+
+        $integration = Integration::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'website_crawl',
+            'name' => 'Website',
+            'config' => ['url' => 'https://unreachable.example.com'],
+            'status' => 'error',
+            'last_error' => 'Connection refused',
+        ]);
+
+        Bus::fake();
+
+        // "Try a different URL" flow: the retry must reset the integration
+        // to active so the queued sync (and stall detection) treat it fresh.
+        $this->actingAs($user)
+            ->post('/onboarding/integration', ['website_url' => 'https://working.example.com'])
+            ->assertRedirect(route('onboarding.status'));
+
+        $integration->refresh();
+        $this->assertSame('active', $integration->status);
+        $this->assertNull($integration->last_error);
+        $this->assertSame('https://working.example.com', $integration->config['url']);
+
+        Bus::assertDispatched(SyncIntegration::class);
+    }
+
     public function test_integration_step_marks_error_when_sync_fails(): void
     {
         $user = User::factory()->create();

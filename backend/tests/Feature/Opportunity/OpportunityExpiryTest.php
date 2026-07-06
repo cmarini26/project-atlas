@@ -5,6 +5,7 @@ namespace Tests\Feature\Opportunity;
 use App\Jobs\ExpireOpportunities;
 use App\Models\Company;
 use App\Models\Opportunity;
+use App\Services\Opportunity\OpportunityRepository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -68,6 +69,44 @@ class OpportunityExpiryTest extends TestCase
             'company_id' => $company->id,
             'status' => 'open',
         ]);
+    }
+
+    public function test_expired_opportunity_no_longer_suppresses_fresh_detection(): void
+    {
+        // The engine's dedupe (hasDuplicate) must only consider open/selected
+        // rows. If an expired opportunity still counted, the same opportunity
+        // type could never be re-detected after it lapses — the loop would
+        // silently stop producing recommendations of that type.
+        $company = Company::withoutGlobalScopes()->create([
+            'name' => 'Test Co', 'slug' => 'test-co',
+        ]);
+
+        Opportunity::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 're_engagement',
+            'subject_type' => null,
+            'subject_id' => null,
+            'title' => 'Old push',
+            'description' => 'Expired re-engagement opportunity',
+            'relevance_score' => 70,
+            'timing_score' => 70,
+            'confidence_score' => 60,
+            'urgency_score' => 48,
+            'composite_score' => 64,
+            'status' => 'open',
+            'expires_at' => now()->subHour(),
+            'detected_at' => now()->subDays(8),
+        ]);
+
+        $repository = new OpportunityRepository();
+
+        // Still open → suppresses.
+        $this->assertTrue($repository->hasDuplicate($company->id, 're_engagement', null, null));
+
+        (new ExpireOpportunities())->handle();
+
+        // Expired → no longer suppresses re-detection.
+        $this->assertFalse($repository->hasDuplicate($company->id, 're_engagement', null, null));
     }
 
     public function test_ignores_opportunities_without_expiry(): void

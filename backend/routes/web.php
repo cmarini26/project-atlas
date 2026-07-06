@@ -11,6 +11,7 @@ use App\Http\Controllers\App\PublishingController;
 use App\Http\Controllers\App\RecommendationController;
 use App\Http\Controllers\App\SettingsController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\OnboardingController;
 use Illuminate\Support\Facades\Route;
 
@@ -20,9 +21,15 @@ Route::get('/', fn () => redirect()->route('login'));
 // ── Auth ─────────────────────────────────────────────────────────────────────
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
-    Route::post('/login', [AuthController::class, 'login'])->name('login.attempt');
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1')->name('login.attempt');
     Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
-    Route::post('/register', [AuthController::class, 'register'])->name('register.attempt');
+    Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1')->name('register.attempt');
+
+    // Password reset
+    Route::get('/forgot-password', [PasswordResetController::class, 'request'])->name('password.request');
+    Route::post('/forgot-password', [PasswordResetController::class, 'email'])->middleware('throttle:5,1')->name('password.email');
+    Route::get('/reset-password/{token}', [PasswordResetController::class, 'reset'])->name('password.reset');
+    Route::post('/reset-password', [PasswordResetController::class, 'update'])->middleware('throttle:5,1')->name('password.update');
 });
 
 Route::middleware('auth')->post('/logout', [AuthController::class, 'logout'])->name('logout');
@@ -31,7 +38,8 @@ Route::middleware('auth')->post('/logout', [AuthController::class, 'logout'])->n
 Route::middleware('auth')->group(function (): void {
     Route::get('/onboarding', [OnboardingController::class, 'index'])->name('onboarding');
     Route::post('/onboarding/company', [OnboardingController::class, 'createCompany'])->name('onboarding.company');
-    Route::post('/onboarding/integration', [OnboardingController::class, 'createIntegration'])->name('onboarding.integration');
+    // Throttled: each submit can queue a crawl + AI pipeline run (real spend).
+    Route::post('/onboarding/integration', [OnboardingController::class, 'createIntegration'])->middleware('throttle:3,1')->name('onboarding.integration');
     Route::get('/onboarding/status', [OnboardingController::class, 'status'])->name('onboarding.status');
 });
 

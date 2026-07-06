@@ -94,11 +94,28 @@ class OnboardingController extends Controller
 
         $company->update(['website_url' => $validated['website_url']]);
 
-        $integration = $this->integrationService->create(
-            $company,
-            'website_crawl',
-            ['url' => $validated['website_url']]
-        );
+        // Reuse the company's website integration on resubmits ("try a
+        // different URL", double-clicks) instead of creating a new row each
+        // time. Combined with SyncIntegration's ShouldBeUnique (keyed on the
+        // integration id), this caps queued crawls + AI pipeline runs at one
+        // per company — repeat submits cannot stack AI spend.
+        $integration = Integration::where('company_id', $company->id)
+            ->where('type', 'website_crawl')
+            ->first();
+
+        if ($integration !== null) {
+            $integration->update([
+                'config' => ['url' => $validated['website_url']],
+                'status' => 'active',
+                'last_error' => null,
+            ]);
+        } else {
+            $integration = $this->integrationService->create(
+                $company,
+                'website_crawl',
+                ['url' => $validated['website_url']]
+            );
+        }
 
         // Seed a default blog channel so DecisionEngine has at least one
         // active channel to commit a Decision against. Users can add real

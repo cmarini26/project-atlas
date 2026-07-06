@@ -186,7 +186,7 @@ onUnmounted(() => {
           Atlas gathered {{ status.fact_count }} facts about your business, but didn't find a strong enough campaign opportunity from this first scan.
         </p>
         <p class="text-xs text-[var(--color-text-muted)] mb-6">
-          Next steps: review what Atlas learned in the Business Brain, connect more channels or add catalog items in Settings, and Atlas will keep scanning on future syncs.
+          Next steps: review what Atlas learned in the Business Brain. Atlas re-scans your website automatically and will surface a recommendation as soon as it finds a strong opportunity.
         </p>
         <div class="flex items-center justify-center gap-3">
           <a
@@ -212,7 +212,7 @@ onUnmounted(() => {
           </div>
         </div>
         <h1 class="text-base font-semibold text-[var(--color-text-primary)] mb-2">This is taking a moment</h1>
-        <p class="text-sm text-[var(--color-text-muted)] mb-6">Atlas is doing a thorough analysis. You can leave this page — we'll notify you when the first recommendation is ready.</p>
+        <p class="text-sm text-[var(--color-text-muted)] mb-6">Atlas is doing a thorough analysis. You can leave this page — your first recommendation will be waiting on the dashboard when it's ready.</p>
         <a
           href="/app"
           class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] transition-colors duration-[var(--duration-fast)]"
