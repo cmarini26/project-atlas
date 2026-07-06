@@ -6,6 +6,23 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [P0 — Recommendations Page Blank (null campaign_type crashes render)] — 2026-07-06
+
+### Fixed
+
+- **`RecommendationService::create()` never copied `campaign_type` onto the recommendation** — the decision and campaign both carried the type (e.g. `re_engagement`), but the recommendation was created without it, leaving `campaign_type` null. The recommendation detail and list pages call `campaign_type.replace(/_/g, ' ')` to render the heading; `.replace()` on `null` throws a `TypeError` that crashes the Vue render, so the page came up blank ("not loading"). Fixtures always set a non-null type, so it only surfaced once the real pipeline produced a recommendation. `create()` now sets `'campaign_type' => $campaign->campaign_type`, which also fixes `ApprovalService` reading `$recommendation->campaign_type ?? ''` (previously empty) when publishing on approval.
+- **Frontend rendered `campaign_type` without a null guard** in 4 places (`Recommendations/Show.vue`, `Recommendations/Index.vue` ×2, `Dashboard/RecommendationPrompt.vue`) — all now use `(campaign_type ?? '').replace(...)` so a null can never blank the page again. The `Recommendation` TypeScript interface's `campaign_type` was corrected to `string | null` to match reality.
+
+### Changed
+
+- Backfilled existing recommendations with a null `campaign_type` from their campaign (2 rows in the dev database).
+
+### Added
+
+- `test_copies_campaign_type_from_campaign` in `RecommendationServiceTest` — asserts the recommendation carries the campaign's type.
+
+---
+
 ## [P0 — CommitDecision Fails in 19 ms (Cached Business Brain Rejected as Incomplete Class)] — 2026-07-06
 
 ### Fixed

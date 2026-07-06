@@ -55,10 +55,12 @@ export interface BrainObservation {
 }
 
 // Recommendation as returned by RecommendationController.formatRecommendation()
+// campaign_type can be null for legacy recommendations created before
+// RecommendationService copied it from the campaign — templates must guard it.
 export interface Recommendation {
     id: string
     status: RecommendationStatus
-    campaign_type: string
+    campaign_type: string | null
     rationale_display: Record<string, string>
     expected_impact: Record<string, string>
     responded_at: string | null

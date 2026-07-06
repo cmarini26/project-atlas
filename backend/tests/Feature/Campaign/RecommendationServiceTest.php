@@ -140,4 +140,14 @@ class RecommendationServiceTest extends TestCase
         $this->assertIsArray($recommendation->expected_impact);
         $this->assertArrayHasKey('summary', $recommendation->expected_impact);
     }
+
+    public function test_copies_campaign_type_from_campaign(): void
+    {
+        // The recommendation must carry its own campaign_type: the UI renders it
+        // (a null crashed the recommendations page) and ApprovalService reads it
+        // when publishing. It was previously left null.
+        $recommendation = $this->service->create($this->campaign);
+
+        $this->assertSame('featured_item', $recommendation->campaign_type);
+    }
 }

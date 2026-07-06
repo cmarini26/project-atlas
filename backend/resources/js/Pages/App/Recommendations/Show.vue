@@ -87,7 +87,7 @@ function saveEdit(payload: { title: string; body: string }): void {
             </Badge>
           </div>
           <h1 class="text-xl font-semibold text-[var(--color-text-primary)] capitalize">
-            {{ recommendation.campaign_type.replace(/_/g, ' ') }} campaign
+            {{ (recommendation.campaign_type ?? '').replace(/_/g, ' ') }} campaign
           </h1>
         </div>
       </div>

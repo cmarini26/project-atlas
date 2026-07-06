@@ -55,7 +55,7 @@ function getRationalePreview(rec: Recommendation): string | null {
             <div class="flex items-start justify-between gap-3">
               <div class="flex-1 min-w-0">
                 <h3 class="text-sm font-semibold text-[var(--color-text-primary)] mb-1 capitalize">
-                  {{ rec.campaign_type.replace(/_/g, ' ') }} campaign
+                  {{ (rec.campaign_type ?? '').replace(/_/g, ' ') }} campaign
                 </h3>
                 <p v-if="getRationalePreview(rec)" class="text-sm text-[var(--color-text-secondary)] line-clamp-2">
                   {{ getRationalePreview(rec) }}
@@ -91,7 +91,7 @@ function getRationalePreview(rec: Recommendation): string | null {
           >
             <div class="flex-1 min-w-0">
               <p class="text-sm text-[var(--color-text-primary)] truncate capitalize">
-                {{ rec.campaign_type.replace(/_/g, ' ') }} campaign
+                {{ (rec.campaign_type ?? '').replace(/_/g, ' ') }} campaign
               </p>
               <p class="text-xs text-[var(--color-text-muted)]">{{ formatDate(rec.created_at) }}</p>
             </div>

@@ -20,6 +20,7 @@ class RecommendationService
             'company_id' => $campaign->company_id,
             'decision_id' => $decision->id,
             'campaign_id' => $campaign->id,
+            'campaign_type' => $campaign->campaign_type,
             'rationale_display' => $rationaleDisplay,
             'expected_impact' => $expectedImpact,
             'status' => 'pending',

@@ -21,7 +21,7 @@ const whyNow = props.recommendation.rationale_display?.why_now
       <div class="flex-1 min-w-0">
         <p class="text-xs font-medium text-[var(--color-accent-600)] mb-1">Atlas recommends</p>
         <h3 class="text-sm font-semibold text-[var(--color-text-primary)] mb-1.5 capitalize">
-          {{ recommendation.campaign_type.replace(/_/g, ' ') }} campaign
+          {{ (recommendation.campaign_type ?? '').replace(/_/g, ' ') }} campaign
         </h3>
         <p v-if="whyNow" class="text-sm text-[var(--color-text-secondary)] line-clamp-2">{{ whyNow }}</p>
         <a

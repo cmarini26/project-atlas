@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. |
-| Tests             | ✅ Strong | 637 tests (635 passing, 2 Redis skipped); PHPStan level 8 — 0 errors; Pint clean. Phase 9: Business Brain is memoized in-process instead of cached in Redis — fixes the `__PHP_Incomplete_Class` TypeError that failed `CommitDecision` on the queue. |
+| Tests             | ✅ Strong | 638 tests (636 passing, 2 Redis skipped); PHPStan level 8 — 0 errors; Pint clean. Latest: recommendations page no longer blanks on a null `campaign_type` — `RecommendationService` now copies it from the campaign, and the frontend null-guards it. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
