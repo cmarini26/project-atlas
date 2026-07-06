@@ -1,8 +1,8 @@
 # P0 — Onboarding Website Submission Does Not Start Analysis
 
-**Status:** Complete (Phase 1 – Phase 8)  
-**Date:** 2026-07-05  
-**Tests:** 636 total (634 passing, 2 Redis skipped) — Phase 8 added 3 tests  
+**Status:** Complete (Phase 1 – Phase 9)  
+**Date:** 2026-07-06  
+**Tests:** 637 total (635 passing, 2 Redis skipped) — Phase 9 added 2 tests  
 **PHPStan:** Level 8 — 0 errors  
 **Pint:** Clean  
 **Frontend build:** 0 errors  
@@ -733,3 +733,61 @@ Previously `pipeline_stalled` required `last_run_at` to be set — but with the 
 | Worker running (`composer dev`) | N/A (inline) | Worker processes crawl + AI; status page fills in progress steps as they complete |
 | No worker running | Inline run masked the problem (until it 502'd) | "Atlas is waiting for a queue worker" card after 90 s, with the `composer dev` hint |
 | Onboarding crawl errors | Caught inline in the controller | `SyncIntegration::failed()` marks the integration `error` (overload still exempt); status page shows the crawl-failure card |
+
+---
+
+## Phase 9 — CommitDecision Fails in 19 ms (Cached Business Brain Rejected as Incomplete Class)
+
+### Problem
+
+With the pipeline finally reaching the decision stage (Phase 7 + 8), `CommitDecision` failed almost instantly:
+
+```
+2026-07-06 07:00:16 App\Jobs\CommitDecision ....... RUNNING
+2026-07-06 07:00:16 App\Jobs\CommitDecision .. 19.58ms FAIL
+```
+
+19 ms is far too fast for any AI call — the job died before reaching the rationale prompt. The pipeline stopped at decisions, so no campaign and no recommendation followed.
+
+### Root Cause
+
+**`BusinessBrainService::for()` cached the assembled Business Brain in Redis, and Laravel 13's cache hardening refused to unserialize it back.**
+
+`config/cache.php` sets `'serializable_classes' => false`. Laravel's `RedisStore::unserialize()` passes that through to PHP's `unserialize($value, ['allowed_classes' => false])`, which turns **every** serialized object into `__PHP_Incomplete_Class`. The Brain is a graph of Eloquent models (`Company`, `DigitalTwin`, `Collection<Fact>`, `Collection<Knowledge>`, …), so:
+
+1. First call (during fact extraction / opportunity scan) assembled a real `BusinessBrain` and wrote it to Redis.
+2. `CommitDecision` ran in a **separate worker process** and read the key back. `allowed_classes => false` decoded it to `__PHP_Incomplete_Class`.
+3. `for()` is typed `: BusinessBrain`, so returning the incomplete object threw a `TypeError` immediately — 19 ms, before any AI work:
+
+```
+App\Services\Brain\BusinessBrainService::for(): Return value must be of type
+App\Domain\BusinessBrain\BusinessBrain, __PHP_Incomplete_Class returned
+```
+
+Why it hid until now: earlier phases ran the whole chain in **one** `dispatchSync` process, where `Cache::remember`'s return value came straight from the in-memory closure result — the poisoned Redis round-trip never happened. Phase 8 moved the pipeline onto the queue, so `CommitDecision` became the first consumer to read the Brain back out of Redis in a fresh process.
+
+### Fix
+
+**Replace the external cache with a per-process in-memory memo.** The Brain is a request/job-scoped value object assembled from the database; it never needed to cross process boundaries, and it must not be serialized under the hardened cache policy.
+
+`BusinessBrainService` now keeps a `static array $memo` keyed by company id, each entry holding the `BusinessBrain` and an `expires_at` timestamp. `for()` returns the memo when present and unexpired (same 300 s window as before), otherwise assembles and stores it. `invalidate()` unsets the entry. The `FactExtracted` / `KnowledgeSynthesized` listeners call `invalidate()` exactly as before, so freshness semantics are unchanged within a process. The public `cacheKey()` method was removed (no external key exists any more); `isMemoized()` and `flush()` were added for tests.
+
+Trade-off: the memo no longer shares across processes, so each worker assembles the Brain at most once per 300 s instead of reusing a peer's copy. That is cheap (a handful of indexed queries) and correct, versus a shared cache that cannot be safely deserialized.
+
+### Tests Added (Phase 9)
+
+| Test | File |
+|------|------|
+| `test_brain_is_never_written_to_the_shared_cache_store` | `BusinessBrainCacheTest` — **the regression test**: after `for()`, `Cache::get("brain:{id}")` is `null`; the object graph never enters an external store |
+| `test_memo_expires_after_ttl` | `BusinessBrainCacheTest` — travels 6 minutes, asserts a fresh Brain instance is assembled |
+
+The rest of `BusinessBrainCacheTest` was migrated from Redis-cache assertions (`Cache::has`) to memo assertions (`BusinessBrainService::isMemoized`), covering population, staleness within TTL, explicit invalidation, event-driven invalidation, and per-company isolation.
+
+### Behaviour Comparison (Phase 9)
+
+| Scenario | Before Phase 9 | After Phase 9 |
+|----------|---------------|---------------|
+| `CommitDecision` on the queue reads the Brain | Redis round-trip → `__PHP_Incomplete_Class` → `TypeError` in 19 ms | In-process memo (or fresh assemble) returns a real `BusinessBrain`; decision proceeds |
+| Whole pipeline in one sync process (pre-Phase 8) | Worked by luck — closure result, no Redis read-back | Still works — same memo |
+| Brain reuse across workers | Shared via Redis (but broken) | Assembled once per process per 300 s (cheap, correct) |
+| Freshness after new facts/knowledge | `invalidate()` cleared the Redis key | `invalidate()` clears the memo — unchanged semantics |

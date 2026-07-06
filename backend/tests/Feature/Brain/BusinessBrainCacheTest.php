@@ -26,6 +26,8 @@ class BusinessBrainCacheTest extends TestCase
     {
         parent::setUp();
 
+        BusinessBrainService::flush();
+
         $this->service = $this->app->make(BusinessBrainService::class);
 
         $this->company = Company::withoutGlobalScopes()->create([
@@ -44,33 +46,24 @@ class BusinessBrainCacheTest extends TestCase
         ]);
     }
 
-    // --- Cache key format ---
+    // --- Memoization ---
 
-    public function test_cache_key_format(): void
+    public function test_result_is_memoized_after_first_call(): void
     {
-        $key = BusinessBrainService::cacheKey('01HZ123');
-
-        $this->assertSame('brain:01HZ123', $key);
-    }
-
-    // --- Cache population ---
-
-    public function test_result_is_stored_in_cache_after_first_call(): void
-    {
-        $this->assertFalse(Cache::has(BusinessBrainService::cacheKey($this->company->id)));
+        $this->assertFalse(BusinessBrainService::isMemoized($this->company->id));
 
         $this->service->for($this->company);
 
-        $this->assertTrue(Cache::has(BusinessBrainService::cacheKey($this->company->id)));
+        $this->assertTrue(BusinessBrainService::isMemoized($this->company->id));
     }
 
-    public function test_second_call_returns_cached_result(): void
+    public function test_second_call_returns_memoized_result(): void
     {
-        // First call — assembles and caches
+        // First call — assembles and memoizes
         $brain1 = $this->service->for($this->company);
         $factCount = $brain1->activeFacts->count();
 
-        // Add a new fact AFTER the cache is populated
+        // Add a new fact AFTER the memo is populated
         Fact::withoutGlobalScopes()->create([
             'company_id' => $this->company->id,
             'key' => 'business.name',
@@ -81,27 +74,55 @@ class BusinessBrainCacheTest extends TestCase
             'valid_from' => now(),
         ]);
 
-        // Second call — should still return the cached (stale) result
+        // Second call — should still return the memoized (stale) result
         $brain2 = $this->service->for($this->company);
 
         $this->assertSame($factCount, $brain2->activeFacts->count());
+        $this->assertSame($brain1, $brain2);
     }
 
-    // --- Cache invalidation via static method ---
+    public function test_memo_expires_after_ttl(): void
+    {
+        $brain1 = $this->service->for($this->company);
 
-    public function test_invalidate_clears_cache_key(): void
+        $this->travel(6)->minutes();
+
+        $this->assertFalse(BusinessBrainService::isMemoized($this->company->id));
+
+        $brain2 = $this->service->for($this->company);
+
+        $this->assertNotSame($brain1, $brain2);
+    }
+
+    // --- Regression: the brain must never enter an external cache store ---
+
+    public function test_brain_is_never_written_to_the_shared_cache_store(): void
+    {
+        // The brain is a graph of Eloquent models. Laravel's cache hardening
+        // (`serializable_classes => false` in config/cache.php) refuses to
+        // unserialize objects from external stores — a Redis-cached brain came
+        // back as __PHP_Incomplete_Class and every consumer crashed with a
+        // TypeError (P0: CommitDecision failed before any AI call).
+        $this->service->for($this->company);
+
+        $this->assertNull(Cache::get("brain:{$this->company->id}"));
+    }
+
+    // --- Invalidation via static method ---
+
+    public function test_invalidate_clears_memo(): void
     {
         $this->service->for($this->company);
-        $this->assertTrue(Cache::has(BusinessBrainService::cacheKey($this->company->id)));
+        $this->assertTrue(BusinessBrainService::isMemoized($this->company->id));
 
         BusinessBrainService::invalidate($this->company->id);
 
-        $this->assertFalse(Cache::has(BusinessBrainService::cacheKey($this->company->id)));
+        $this->assertFalse(BusinessBrainService::isMemoized($this->company->id));
     }
 
     public function test_after_invalidation_fresh_data_is_assembled(): void
     {
-        // Populate cache
+        // Populate memo
         $brain1 = $this->service->for($this->company);
         $this->assertCount(0, $brain1->activeFacts);
 
@@ -124,12 +145,12 @@ class BusinessBrainCacheTest extends TestCase
         $this->assertCount(1, $brain2->activeFacts);
     }
 
-    // --- Cache invalidation via FactExtracted event ---
+    // --- Invalidation via events ---
 
-    public function test_fact_extracted_event_invalidates_cache(): void
+    public function test_fact_extracted_event_invalidates_memo(): void
     {
         $this->service->for($this->company);
-        $this->assertTrue(Cache::has(BusinessBrainService::cacheKey($this->company->id)));
+        $this->assertTrue(BusinessBrainService::isMemoized($this->company->id));
 
         $fact = Fact::withoutGlobalScopes()->create([
             'company_id' => $this->company->id,
@@ -143,13 +164,13 @@ class BusinessBrainCacheTest extends TestCase
 
         FactExtracted::dispatch($fact);
 
-        $this->assertFalse(Cache::has(BusinessBrainService::cacheKey($this->company->id)));
+        $this->assertFalse(BusinessBrainService::isMemoized($this->company->id));
     }
 
-    public function test_knowledge_synthesized_event_invalidates_cache(): void
+    public function test_knowledge_synthesized_event_invalidates_memo(): void
     {
         $this->service->for($this->company);
-        $this->assertTrue(Cache::has(BusinessBrainService::cacheKey($this->company->id)));
+        $this->assertTrue(BusinessBrainService::isMemoized($this->company->id));
 
         $knowledge = Knowledge::withoutGlobalScopes()->create([
             'company_id' => $this->company->id,
@@ -163,12 +184,12 @@ class BusinessBrainCacheTest extends TestCase
 
         KnowledgeSynthesized::dispatch($knowledge);
 
-        $this->assertFalse(Cache::has(BusinessBrainService::cacheKey($this->company->id)));
+        $this->assertFalse(BusinessBrainService::isMemoized($this->company->id));
     }
 
-    // --- Event from a different company does not invalidate this company's cache ---
+    // --- Event from a different company does not invalidate this company's memo ---
 
-    public function test_fact_extracted_from_other_company_does_not_invalidate_cache(): void
+    public function test_fact_extracted_from_other_company_does_not_invalidate_memo(): void
     {
         $this->service->for($this->company);
 
@@ -194,7 +215,7 @@ class BusinessBrainCacheTest extends TestCase
 
         FactExtracted::dispatch($fact);
 
-        // This company's cache must still be populated
-        $this->assertTrue(Cache::has(BusinessBrainService::cacheKey($this->company->id)));
+        // This company's memo must still be populated
+        $this->assertTrue(BusinessBrainService::isMemoized($this->company->id));
     }
 }

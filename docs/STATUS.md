@@ -23,12 +23,12 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. |
-| Tests             | ✅ Strong | 636 tests (634 passing, 2 Redis skipped); PHPStan level 8 — 0 errors; Pint clean. Phase 8: onboarding submit queues the crawl instead of running crawl + 5 AI calls inline (fixed 502s); local dev uses the database queue via `composer dev`. |
+| Tests             | ✅ Strong | 637 tests (635 passing, 2 Redis skipped); PHPStan level 8 — 0 errors; Pint clean. Phase 9: Business Brain is memoized in-process instead of cached in Redis — fixes the `__PHP_Incomplete_Class` TypeError that failed `CommitDecision` on the queue. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
 
-**Overall:** Milestone 10 complete + full P0 onboarding pipeline fixed (Phase 1–8). Users flow correctly from registration → company creation → website connection → analysis → first recommendation. Phase 8 fixed the 502 on website submit: the request had grown to run the crawl plus five sequential Anthropic calls inline (a leftover of the Phase 1 `dispatchSync` + Phase 3 `QUEUE_CONNECTION=sync` workarounds), blowing past the PHP-FPM/Herd gateway timeout. The submit now queues `SyncIntegration` and returns immediately; local dev uses `QUEUE_CONNECTION=database` with the worker started by `composer dev`; the status page detects a queued-but-never-started sync and shows the queue-worker card. 636 tests (634 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean.
+**Overall:** Milestone 10 complete + full P0 onboarding pipeline fixed (Phase 1–9). Users flow correctly from registration → company creation → website connection → analysis → first recommendation. Phase 9 fixed `CommitDecision` failing in 19 ms once the pipeline moved onto the queue: `BusinessBrainService` cached the assembled Business Brain (a graph of Eloquent models) in Redis, and Laravel 13's `serializable_classes => false` cache hardening decoded it back as `__PHP_Incomplete_Class`, throwing a `TypeError` before any AI call. The Brain is now memoized per-process (same 300 s window, same event-driven invalidation) and never serialized to an external store. 637 tests (635 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean.
 
 ---
 

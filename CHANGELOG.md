@@ -6,6 +6,22 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [P0 — CommitDecision Fails in 19 ms (Cached Business Brain Rejected as Incomplete Class)] — 2026-07-06
+
+### Fixed
+
+- **`CommitDecision` failed instantly once the pipeline ran on the queue** — `BusinessBrainService::for()` cached the assembled Business Brain in Redis via `Cache::remember`. Laravel 13's `config/cache.php` sets `serializable_classes => false`, so `RedisStore::unserialize()` decoded the object back as `__PHP_Incomplete_Class`. Because `for()` is typed `: BusinessBrain`, returning the incomplete object threw a `TypeError` in ~19 ms — before any AI call — so no decision, campaign, or recommendation was produced. It was hidden until Phase 8 moved the pipeline off the single `dispatchSync` process (where the closure result was returned directly, never round-tripping through Redis).
+
+### Changed
+
+- `BusinessBrainService` now memoizes the Brain in a per-process `static array` (keyed by company id, with a 300 s `expires_at`) instead of writing it to the shared cache store. The Brain is a job/request-scoped value object assembled from the database — it never needed to cross process boundaries and must not be serialized under the hardened cache policy. `invalidate()` (called by the `FactExtracted` / `KnowledgeSynthesized` listeners) unsets the memo entry, so freshness semantics are unchanged within a process. The public `cacheKey()` method was removed; `isMemoized()` and `flush()` were added for tests.
+
+### Added
+
+- 2 tests in `BusinessBrainCacheTest`: `test_brain_is_never_written_to_the_shared_cache_store` (regression — `Cache::get("brain:{id}")` is `null` after `for()`) and `test_memo_expires_after_ttl` (fresh instance assembled after 6 minutes). The remaining cache tests were migrated from `Cache::has` assertions to `BusinessBrainService::isMemoized`, still covering population, TTL staleness, explicit + event-driven invalidation, and per-company isolation.
+
+---
+
 ## [P0 — Onboarding Website Submit Causes 502 Bad Gateway] — 2026-07-05
 
 ### Fixed

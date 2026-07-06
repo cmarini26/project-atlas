@@ -10,16 +10,25 @@ use App\Models\Company;
 use App\Models\DigitalTwin;
 use App\Models\Observation;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 
 class BusinessBrainService
 {
     private const TTL_SECONDS = 300;
 
-    public static function cacheKey(string $companyId): string
-    {
-        return "brain:{$companyId}";
-    }
+    /**
+     * In-process memo of assembled brains, keyed by company id.
+     *
+     * The brain is a graph of Eloquent models and MUST NOT be written to an
+     * external cache store: Laravel's `serializable_classes => false` cache
+     * hardening (config/cache.php) refuses to unserialize objects, so a
+     * Redis-cached brain came back as __PHP_Incomplete_Class and crashed
+     * every consumer with a TypeError (P0: CommitDecision failed in 19 ms).
+     * A per-process memo keeps the same 300 s reuse window without ever
+     * serializing the object graph.
+     *
+     * @var array<string, array{brain: BusinessBrain, expires_at: int}>
+     */
+    private static array $memo = [];
 
     public function __construct(
         private readonly FactRepository $facts,
@@ -28,16 +37,42 @@ class BusinessBrainService
 
     public function for(Company $company): BusinessBrain
     {
-        return Cache::remember(
-            self::cacheKey($company->id),
-            self::TTL_SECONDS,
-            fn () => $this->assemble($company),
-        );
+        $entry = self::$memo[$company->id] ?? null;
+
+        if ($entry !== null && $entry['expires_at'] > now()->getTimestamp()) {
+            return $entry['brain'];
+        }
+
+        $brain = $this->assemble($company);
+
+        self::$memo[$company->id] = [
+            'brain' => $brain,
+            'expires_at' => now()->getTimestamp() + self::TTL_SECONDS,
+        ];
+
+        return $brain;
     }
 
     public static function invalidate(string $companyId): void
     {
-        Cache::forget(self::cacheKey($companyId));
+        unset(self::$memo[$companyId]);
+    }
+
+    /**
+     * Whether a non-expired brain is memoized for the company. Test helper —
+     * the memo is an implementation detail everywhere else.
+     */
+    public static function isMemoized(string $companyId): bool
+    {
+        $entry = self::$memo[$companyId] ?? null;
+
+        return $entry !== null && $entry['expires_at'] > now()->getTimestamp();
+    }
+
+    /** Drop all memoized brains (test isolation). */
+    public static function flush(): void
+    {
+        self::$memo = [];
     }
 
     private function assemble(Company $company): BusinessBrain
