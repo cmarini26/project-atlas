@@ -9,6 +9,7 @@ use App\Models\DigitalTwin;
 use App\Models\Fact;
 use App\Models\Knowledge;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 class KnowledgeService
 {
@@ -44,6 +45,12 @@ class KnowledgeService
             $entries->push($entry);
             KnowledgeSynthesized::dispatch($entry);
         }
+
+        Log::info('KnowledgeService: knowledge synthesis complete.', [
+            'company_id' => $company->id,
+            'fact_count' => $facts->count(),
+            'knowledge_entries' => $entries->count(),
+        ]);
 
         $this->updateTwin($company);
 
@@ -124,6 +131,11 @@ class KnowledgeService
         $twin->update($updates);
 
         if (isset($updates['status'])) {
+            Log::info('KnowledgeService: digital twin activated.', [
+                'company_id' => $company->id,
+                'twin_id' => $twin->id,
+            ]);
+
             DigitalTwinActivated::dispatch($twin);
         }
     }

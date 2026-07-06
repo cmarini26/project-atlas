@@ -72,7 +72,6 @@ class ProcessObservation implements ShouldQueue
             }
 
             $observation->markProcessed();
-            ObservationProcessed::dispatch($observation);
 
             Log::info('ProcessObservation: observation processed successfully.', [
                 'observation_id' => $observation->id,
@@ -111,6 +110,22 @@ class ProcessObservation implements ShouldQueue
 
             $observation->markFailed();
             throw $e;
+        }
+
+        // The downstream pipeline (opportunities → decision → campaign →
+        // recommendation) is triggered by ObservationProcessed and runs inline
+        // under the sync queue. The observation itself succeeded — a downstream
+        // failure must not flip it back to 'failed' or abort the sync request,
+        // so it is contained and reported here instead of propagating.
+        try {
+            ObservationProcessed::dispatch($observation);
+        } catch (Throwable $e) {
+            Log::error('ProcessObservation: downstream pipeline failed after observation was processed.', [
+                'observation_id' => $observation->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            report($e);
         }
     }
 }

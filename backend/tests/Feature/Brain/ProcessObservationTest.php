@@ -7,6 +7,7 @@ use App\AI\Exceptions\AiProviderOverloadedException;
 use App\AI\Testing\FakeAiProvider;
 use App\Events\DigitalTwinActivated;
 use App\Events\ObservationProcessed;
+use App\Jobs\DetectOpportunities;
 use App\Jobs\ProcessObservation;
 use App\Models\Catalog;
 use App\Models\Company;
@@ -20,6 +21,7 @@ use App\Services\Analyst\WebsiteAnalyst;
 use App\Services\Brain\FactService;
 use App\Services\Brain\KnowledgeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
@@ -236,6 +238,42 @@ class ProcessObservationTest extends TestCase
                 'ai_failed' => true,
                 'fact_count' => 0,
             ]);
+    }
+
+    public function test_dispatches_opportunity_detection_after_processing(): void
+    {
+        Bus::fake([DetectOpportunities::class]);
+        $this->fake->queueFixture('website-facts');
+
+        (new ProcessObservation($this->observation))->handle(
+            $this->app->make(WebsiteAnalyst::class),
+            $this->app->make(FactService::class),
+            $this->app->make(KnowledgeService::class),
+        );
+
+        Bus::assertDispatched(
+            DetectOpportunities::class,
+            fn (DetectOpportunities $job): bool => $job->company->id === $this->company->id,
+        );
+    }
+
+    public function test_downstream_failure_does_not_mark_observation_failed(): void
+    {
+        // Only the fact-extraction fixture is queued; the opportunity scan
+        // triggered by ObservationProcessed hits an empty FakeAiProvider queue
+        // and throws. That downstream failure is contained — the observation
+        // itself was processed successfully and must stay that way.
+        $this->fake->queueFixture('website-facts');
+
+        (new ProcessObservation($this->observation))->handle(
+            $this->app->make(WebsiteAnalyst::class),
+            $this->app->make(FactService::class),
+            $this->app->make(KnowledgeService::class),
+        );
+
+        $this->observation->refresh();
+        $this->assertEquals('processed', $this->observation->status);
+        $this->assertDatabaseCount('facts', 4);
     }
 
     public function test_marks_observation_retrying_when_provider_overloaded(): void

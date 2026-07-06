@@ -11,6 +11,7 @@ interface StatusData {
   pipeline_stalled: boolean
   ai_failed: boolean
   ai_retrying: boolean
+  no_opportunities: boolean
   fact_count: number
   opportunity_count: number
   recommendation_count: number
@@ -25,6 +26,7 @@ const status = ref<StatusData>({
   pipeline_stalled: false,
   ai_failed: false,
   ai_retrying: false,
+  no_opportunities: false,
   fact_count: 0,
   opportunity_count: 0,
   recommendation_count: 0,
@@ -40,6 +42,7 @@ const isFailed = computed(() => status.value.integration_status === 'error')
 const isAiFailed = computed(() => status.value.ai_failed)
 const isAiRetrying = computed(() => status.value.ai_retrying && !isFailed.value && !isAiFailed.value)
 const isStalled = computed(() => status.value.pipeline_stalled && !isFailed.value && !isAiFailed.value && !isAiRetrying.value)
+const isNoOpportunities = computed(() => status.value.no_opportunities && !isFailed.value && !isAiFailed.value && !isAiRetrying.value && !isStalled.value)
 
 async function fetchStatus(): Promise<void> {
   if (Date.now() - startTime > 10 * 60 * 1000) {
@@ -55,7 +58,7 @@ async function fetchStatus(): Promise<void> {
       status.value = await response.json() as StatusData
       loading.value = false
 
-      if (isFailed.value || isAiFailed.value) {
+      if (isFailed.value || isAiFailed.value || isNoOpportunities.value) {
         if (intervalId) clearInterval(intervalId)
         return
       }
@@ -169,6 +172,36 @@ onUnmounted(() => {
         >
           Go to dashboard
         </a>
+      </div>
+
+      <!-- Facts learned, but no campaign opportunity found (legitimate outcome) -->
+      <div v-else-if="isNoOpportunities">
+        <div class="mb-5 flex items-center justify-center">
+          <div class="size-12 rounded-full bg-[var(--color-accent-50)] flex items-center justify-center">
+            <svg class="size-6 text-[var(--color-accent-600)]" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" /></svg>
+          </div>
+        </div>
+        <h1 class="text-base font-semibold text-[var(--color-text-primary)] mb-2">Atlas learned your business — no campaign opportunity yet</h1>
+        <p class="text-sm text-[var(--color-text-muted)] mb-3">
+          Atlas gathered {{ status.fact_count }} facts about your business, but didn't find a strong enough campaign opportunity from this first scan.
+        </p>
+        <p class="text-xs text-[var(--color-text-muted)] mb-6">
+          Next steps: review what Atlas learned in the Business Brain, connect more channels or add catalog items in Settings, and Atlas will keep scanning on future syncs.
+        </p>
+        <div class="flex items-center justify-center gap-3">
+          <a
+            href="/app"
+            class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] transition-colors duration-[var(--duration-fast)]"
+          >
+            Go to dashboard
+          </a>
+          <a
+            href="/app/brain"
+            class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-raised)] transition-colors duration-[var(--duration-fast)]"
+          >
+            See what Atlas learned
+          </a>
+        </div>
       </div>
 
       <!-- Timeout message (no error, but no recommendation after 5 min) -->

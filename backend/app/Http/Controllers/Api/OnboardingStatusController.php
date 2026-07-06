@@ -37,6 +37,7 @@ class OnboardingStatusController extends Controller
                 'pipeline_stalled' => false,
                 'ai_failed' => false,
                 'ai_retrying' => false,
+                'no_opportunities' => false,
                 'fact_count' => 0,
                 'opportunity_count' => 0,
                 'recommendation_count' => 0,
@@ -89,6 +90,26 @@ class OnboardingStatusController extends Controller
             && $integration->status !== 'error'
             && Carbon::parse($integration->last_run_at)->lt(now()->subSeconds(90));
 
+        $opportunityCount = Opportunity::where('company_id', $companyId)->where('status', 'open')->count();
+        $recommendationCount = Recommendation::where('company_id', $companyId)->where('status', 'pending')->count();
+
+        // No opportunities: Atlas learned the business (facts exist) but the
+        // scan legitimately produced nothing to act on, so no recommendation
+        // will appear. Only asserted once the last processed observation is
+        // > 90 s old — before that, the scan/decision chain may still be running.
+        $lastProcessedAt = Observation::withoutGlobalScopes()
+            ->where('company_id', $companyId)
+            ->where('status', 'processed')
+            ->max('processed_at');
+
+        $noOpportunities = $factCount > 0
+            && $opportunityCount === 0
+            && $recommendationCount === 0
+            && ! $aiFailed
+            && ! $aiRetrying
+            && $lastProcessedAt !== null
+            && Carbon::parse($lastProcessedAt)->lt(now()->subSeconds(90));
+
         return response()->json([
             'twin_status' => $twin?->status,
             'integration_status' => $integration?->status,
@@ -97,9 +118,10 @@ class OnboardingStatusController extends Controller
             'pipeline_stalled' => $pipelineStalled,
             'ai_failed' => $aiFailed,
             'ai_retrying' => $aiRetrying,
+            'no_opportunities' => $noOpportunities,
             'fact_count' => $factCount,
-            'opportunity_count' => Opportunity::where('company_id', $companyId)->where('status', 'open')->count(),
-            'recommendation_count' => Recommendation::where('company_id', $companyId)->where('status', 'pending')->count(),
+            'opportunity_count' => $opportunityCount,
+            'recommendation_count' => $recommendationCount,
             'first_recommendation_id' => $pendingRecommendation?->id,
         ]);
     }

@@ -6,6 +6,22 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [P0 — Facts Created But No Opportunities Or Recommendations] — 2026-07-05
+
+### Fixed
+
+- **Opportunity detection triggered only by a once-per-lifetime event** — `TriggerOpportunityDetection` listened to `DigitalTwinActivated`, which fires only on the twin's `initializing → active` transition. Any company whose twin was already active (retried onboarding, recurring sync, earlier partial run) extracted facts and dead-ended with 0 opportunities and 0 recommendations forever. The listener now runs on `ObservationProcessed` — every successfully processed observation with current facts dispatches a scan. `DetectOpportunities` is now `ShouldBeUnique` per company so crawl bursts collapse to one queued scan; the engine's dedupe keeps repeat scans safe.
+- **Downstream failures corrupted observation status** — `ObservationProcessed` was dispatched inside `ProcessObservation`'s try/catch, so an inline downstream failure (sync queue) flipped an already-processed observation to `failed` and, combined with the trigger bug, permanently killed the pipeline. The event now dispatches after the try/catch with its own containment: downstream failures are logged and reported, never alter observation status.
+
+### Added
+
+- `no_opportunities` field in `GET /api/onboarding/status` — `true` when facts exist but the scan legitimately produced no open opportunities and no pending recommendation, asserted only once the last processed observation is > 90 s old.
+- "Atlas learned your business — no campaign opportunity yet" card in `Status.vue` — shows the fact count and next steps (review the Business Brain, connect channels or add catalog items, Atlas keeps scanning on future syncs); links to the dashboard and Brain page; polling stops.
+- Structured logging across Facts → Knowledge → Opportunity → Recommendation: knowledge synthesis complete (fact/entry counts), twin activation, scan trigger/skip decisions, scan start, drop-reason counters (`dropped_duplicate`, `dropped_below_threshold`), explicit no-opportunities-persisted line, and decision evaluated/committed/skipped.
+- 6 tests: full pipeline with an already-active twin still produces a recommendation (regression test for this P0), legitimate empty scan leaves everything healthy, `DetectOpportunities` dispatched after processing, downstream failure containment, and both sides of the `no_opportunities` API flag.
+
+---
+
 ## [P0 — Anthropic overloaded_error Treated as Permanent Failure] — 2026-07-05
 
 ### Fixed

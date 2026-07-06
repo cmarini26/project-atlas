@@ -1,8 +1,8 @@
 # P0 — Onboarding Website Submission Does Not Start Analysis
 
-**Status:** Complete (Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5 + Phase 6)  
+**Status:** Complete (Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5 + Phase 6 + Phase 7)  
 **Date:** 2026-07-05  
-**Tests:** 627 total (625 passing, 2 Redis skipped) — Phase 6 added 9 tests  
+**Tests:** 633 total (631 passing, 2 Redis skipped) — Phase 7 added 6 tests  
 **PHPStan:** Level 8 — 0 errors  
 **Pint:** Clean  
 **Frontend build:** 0 errors  
@@ -621,3 +621,66 @@ New amber card when `ai_retrying` is true: **"Atlas is waiting for the AI provid
 | Overload recovery (sync queue) | Never — user had to restart onboarding | Status poll re-dispatches after 30 s; analysis resumes automatically |
 | Overload recovery (async queue) | Job retried but observation flickered `failed` | Job retries with 30 s / 120 s backoff; observation shows `retrying`; only the final attempt marks `failed` |
 | Debugging an Anthropic incident | No request correlation | `request-id` logged on every retry/error and embedded in exception messages |
+
+---
+
+## Phase 7 — Facts Created But No Opportunities Or Recommendations
+
+### Problem
+
+A real crawl extracted 37 facts, but opportunity count and recommendation count stayed at 0 forever. No errors anywhere; onboarding spun until timeout.
+
+### Root Causes
+
+**Root cause 1 — Opportunity detection was triggered only by a once-per-company-lifetime event.** `TriggerOpportunityDetection` listened to `DigitalTwinActivated`, which `KnowledgeService::updateTwin()` fires only on the `initializing → active` transition. Any company whose twin was already active — a retried onboarding, a recurring sync, or an earlier run whose downstream chain failed after activation — extracted facts and then dead-ended: nothing ever dispatched `DetectOpportunities` again. No scheduled job re-scans either.
+
+**Root cause 2 — Downstream chain coupled to observation status.** `ObservationProcessed` was dispatched *inside* `ProcessObservation`'s try/catch. Under the sync queue the entire opportunities → decision → campaign → recommendation cascade ran inline there, so any downstream failure (e.g. AI overload during the opportunity prompt on a first run) marked the already-successful observation `failed` — and on retry the twin was already active, so the scan never re-fired (root cause 1).
+
+**Root cause 3 — Legitimate "no opportunities" was silent.** When a scan found nothing (0 candidates, or all candidates deduped/below the composite threshold of 30), the log recorded it but the status page had no corresponding state — the spinner ran to the generic timeout.
+
+**Checked and not the cause:** queue names (all jobs run on `ai`/`default`, both included in the documented worker command); `BusinessBrainService::for()` cache (invalidated on `FactExtracted` and `KnowledgeSynthesized`); DecisionEngine guards (onboarding seeds the blog channel).
+
+### Fixes
+
+#### 1. Opportunity scans now run after every processed observation
+
+`TriggerOpportunityDetection` listens to `ObservationProcessed` instead of `DigitalTwinActivated`, guarded on the company having current facts. Repeat scans are safe: `DetectOpportunities` is now `ShouldBeUnique` per company (a multi-page crawl's burst of observations collapses to one queued scan) and the `OpportunityEngine` already deduplicates candidates against existing opportunities. `DigitalTwinActivated` still fires; it just no longer gates the pipeline.
+
+#### 2. Downstream chain decoupled from observation status
+
+`ProcessObservation` dispatches `ObservationProcessed` *after* the try/catch, wrapped in its own containment: a downstream failure is logged (`ProcessObservation: downstream pipeline failed after observation was processed.`) and reported, but never flips the processed observation to `failed` or aborts the sync request.
+
+#### 3. `no_opportunities` state (API + UI)
+
+`GET /api/onboarding/status` returns `no_opportunities: true` when facts exist, there are no open opportunities and no pending recommendations, no AI failure/retry is in flight, and the last processed observation is > 90 s old (before that the scan/decision chain may still be running). `Status.vue` renders a friendly terminal card: **"Atlas learned your business — no campaign opportunity yet"** with the fact count, next steps (review the Business Brain, connect channels / add catalog items, Atlas keeps scanning on future syncs), and links to the dashboard and Brain page. Polling stops on this state.
+
+#### 4. Structured logging across the chain
+
+| Stage | Log |
+|-------|-----|
+| Facts | `ProcessObservation: facts extracted.` (existing, with count) |
+| Knowledge | `KnowledgeService: knowledge synthesis complete.` (fact_count, knowledge_entries) + `digital twin activated.` |
+| Trigger | `TriggerOpportunityDetection: dispatching opportunity scan.` / `no current facts yet, skipping scan.` |
+| Scan | `DetectOpportunities: starting opportunity scan.`; `OpportunityEngine: scan complete.` now includes `dropped_duplicate` and `dropped_below_threshold`; explicit `no opportunities persisted from this scan.` |
+| Decision | `CommitDecision: evaluating decision.` / `decision committed.` / `no decision committed (engine guards not satisfied).` |
+| Recommendation | `CreateRecommendation: recommendation created.` (existing) |
+
+### Tests Added (Phase 7)
+
+| Test | File |
+|------|------|
+| `test_pipeline_produces_recommendation_when_twin_already_active` | `OnboardingPipelineTest` — **the regression test**: twin pre-set to `active`, full sync still produces an opportunity and a pending recommendation (5 AI calls) |
+| `test_no_opportunities_from_scan_is_legitimate_and_observation_stays_processed` | `OnboardingPipelineTest` — AI returns `{"opportunities": []}`: observation `processed`, integration `active`, 0 opportunities/recommendations, exactly 2 AI calls |
+| `test_dispatches_opportunity_detection_after_processing` | `ProcessObservationTest` — `DetectOpportunities` dispatched for the observation's company |
+| `test_downstream_failure_does_not_mark_observation_failed` | `ProcessObservationTest` — downstream AI failure contained; observation stays `processed` with its 4 facts |
+| `test_no_opportunities_true_when_facts_exist_but_scan_found_nothing` | `OnboardingStatusControllerTest` — flag asserted with 2-minute-old processed observation |
+| `test_no_opportunities_false_while_scan_may_still_be_running` | `OnboardingStatusControllerTest` — freshly processed observation does not assert the state |
+
+### Behaviour Comparison (Phase 7)
+
+| Scenario | Before Phase 7 | After Phase 7 |
+|----------|---------------|---------------|
+| Twin already active (retry / re-crawl / prior run) | Facts extracted, pipeline dead-ends; 0 opportunities forever | Scan runs after every processed observation; recommendation produced |
+| Downstream failure after facts persisted | Observation flipped to `failed`; retry re-extracted facts but never scanned | Observation stays `processed`; failure logged + reported; next sync re-scans |
+| Scan legitimately finds nothing | Spinner until generic 5-minute timeout | "Atlas learned your business — no campaign opportunity yet" card with fact count and next steps |
+| Diagnosing where the chain stopped | Log gap between facts and (maybe) scan | Every stage logs: facts → knowledge → trigger → scan (with drop reasons) → decision → recommendation |

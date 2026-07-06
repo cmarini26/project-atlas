@@ -8,10 +8,10 @@ use App\AI\Providers\LocalAiProvider;
 use App\AI\Testing\FakeAiProvider;
 use App\Events\CampaignAssetsReady;
 use App\Events\DecisionCommitted;
-use App\Events\DigitalTwinActivated;
 use App\Events\ExecutionCompleted;
 use App\Events\FactExtracted;
 use App\Events\KnowledgeSynthesized;
+use App\Events\ObservationProcessed;
 use App\Events\ObservationRecorded;
 use App\Events\OpportunityDetected;
 use App\Events\RecommendationApproved;
@@ -85,7 +85,10 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Event::listen(ObservationRecorded::class, DispatchObservationProcessing::class);
-        Event::listen(DigitalTwinActivated::class, TriggerOpportunityDetection::class);
+        // Opportunity scans run after every processed observation — not on the
+        // one-time DigitalTwinActivated event — so re-crawls and retried
+        // onboardings still reach opportunities → decisions → recommendations.
+        Event::listen(ObservationProcessed::class, TriggerOpportunityDetection::class);
         Event::listen(OpportunityDetected::class, TriggerDecisionEvaluation::class);
         Event::listen(DecisionCommitted::class, DispatchCampaignPreparation::class);
         Event::listen(CampaignAssetsReady::class, TriggerRecommendationCreation::class);

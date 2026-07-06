@@ -67,6 +67,9 @@ class OpportunityEngine
 
         $typeModifiers = $weights?->typeModifiers();
 
+        $droppedAsDuplicate = 0;
+        $droppedBelowThreshold = 0;
+
         foreach ($candidates as $candidate) {
             if ($this->repository->hasDuplicate(
                 $company->id,
@@ -74,12 +77,16 @@ class OpportunityEngine
                 $candidate->subjectType,
                 $candidate->subjectId,
             )) {
+                $droppedAsDuplicate++;
+
                 continue;
             }
 
             $scores = $this->scorer->score($candidate, $typeModifiers);
 
             if ($scores === null) {
+                $droppedBelowThreshold++;
+
                 continue;
             }
 
@@ -110,7 +117,18 @@ class OpportunityEngine
             'company_id' => $company->id,
             'candidates' => $candidates->count(),
             'persisted' => $persisted->count(),
+            'dropped_duplicate' => $droppedAsDuplicate,
+            'dropped_below_threshold' => $droppedBelowThreshold,
         ]);
+
+        if ($persisted->isEmpty()) {
+            // Legitimate outcome (nothing new to act on), but load-bearing for
+            // onboarding: with no opportunity there will be no decision and no
+            // recommendation, and the status page surfaces the no-opportunity state.
+            Log::info('OpportunityEngine: no opportunities persisted from this scan.', [
+                'company_id' => $company->id,
+            ]);
+        }
 
         return $persisted;
     }

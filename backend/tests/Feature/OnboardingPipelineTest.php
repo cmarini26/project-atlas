@@ -186,6 +186,91 @@ class OnboardingPipelineTest extends TestCase
         Event::assertNotDispatched(RecommendationApproved::class);
     }
 
+    public function test_pipeline_produces_recommendation_when_twin_already_active(): void
+    {
+        // Regression for the P0 where a company whose DigitalTwin was already
+        // 'active' (retried onboarding, recurring sync, earlier run) extracted
+        // facts but never scanned for opportunities: the scan used to be
+        // triggered only by the one-time DigitalTwinActivated event. It now
+        // runs after every processed observation.
+        Event::fake([RecommendationApproved::class]);
+
+        DigitalTwin::withoutGlobalScopes()
+            ->where('company_id', $this->company->id)
+            ->update(['status' => 'active']);
+
+        $this->fake
+            ->queueFixture('website-facts')
+            ->queueFixture('opportunity-detection')
+            ->queueFixture('rationale-generation')
+            ->queueFixture('campaign-blueprint')
+            ->queueFixture('blog-content');
+
+        $integration = Integration::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id,
+            'type' => 'website_crawl',
+            'name' => 'Website',
+            'config' => ['url' => 'https://cbb-auctions.example.com'],
+            'status' => 'active',
+        ]);
+
+        SyncIntegration::dispatchSync($integration);
+
+        $this->assertGreaterThan(
+            0,
+            Opportunity::withoutGlobalScopes()->where('company_id', $this->company->id)->count(),
+            'Expected an Opportunity even though the twin was already active.',
+        );
+
+        $this->assertNotNull(
+            Recommendation::withoutGlobalScopes()
+                ->where('company_id', $this->company->id)
+                ->where('status', 'pending')
+                ->first(),
+            'Expected a pending Recommendation even though the twin was already active.',
+        );
+
+        $this->assertSame(5, $this->fake->sentCount());
+    }
+
+    public function test_no_opportunities_from_scan_is_legitimate_and_observation_stays_processed(): void
+    {
+        // The AI finds facts but no opportunity candidates — a legitimate
+        // outcome, not a failure. The observation stays processed, nothing
+        // downstream runs, and the status endpoint surfaces no_opportunities.
+        $this->fake
+            ->queueFixture('website-facts')
+            ->queueResponse('{"opportunities": []}');
+
+        $integration = Integration::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id,
+            'type' => 'website_crawl',
+            'name' => 'Website',
+            'config' => ['url' => 'https://cbb-auctions.example.com'],
+            'status' => 'active',
+        ]);
+
+        SyncIntegration::dispatchSync($integration);
+
+        $this->assertDatabaseHas('observations', [
+            'company_id' => $this->company->id,
+            'status' => 'processed',
+        ]);
+
+        $this->assertGreaterThan(0, Fact::withoutGlobalScopes()->where('company_id', $this->company->id)->count());
+        $this->assertSame(0, Opportunity::withoutGlobalScopes()->where('company_id', $this->company->id)->count());
+        $this->assertSame(0, Recommendation::withoutGlobalScopes()->where('company_id', $this->company->id)->count());
+
+        // Integration is healthy — no error state for a legitimate no-result scan.
+        $this->assertDatabaseHas('integrations', [
+            'id' => $integration->id,
+            'status' => 'active',
+        ]);
+
+        // Exactly 2 AI calls: fact extraction + opportunity detection.
+        $this->assertSame(2, $this->fake->sentCount());
+    }
+
     public function test_overloaded_ai_provider_leaves_integration_active_and_marks_observation_retrying(): void
     {
         // The crawl succeeds, but the AI provider reports overloaded_error.
