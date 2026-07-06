@@ -4,6 +4,7 @@ namespace Tests\Unit\AI;
 
 use App\AI\AiResponse;
 use App\AI\Contracts\AiProvider;
+use App\AI\Prompts\FactExtractionPrompt;
 use App\AI\Prompts\Prompt;
 use App\AI\Providers\AnthropicProvider;
 use App\AI\Testing\FakeAiProvider;
@@ -111,7 +112,7 @@ class AnthropicProviderTest extends TestCase
         ]);
     }
 
-    private function toolUseResponseBody(mixed $input, string $toolName = 'TestSchemaPrompt', string $model = 'claude-test-model'): string
+    private function toolUseResponseBody(mixed $input, string $toolName = 'TestSchemaPrompt', string $model = 'claude-test-model', string $stopReason = 'tool_use'): string
     {
         return json_encode([
             'id' => 'msg_test',
@@ -122,7 +123,7 @@ class AnthropicProviderTest extends TestCase
                 ['type' => 'tool_use', 'id' => 'toolu_01', 'name' => $toolName, 'input' => $input],
             ],
             'usage' => ['input_tokens' => 20, 'output_tokens' => 8],
-            'stop_reason' => 'tool_use',
+            'stop_reason' => $stopReason,
         ]);
     }
 
@@ -375,20 +376,141 @@ class AnthropicProviderTest extends TestCase
         ));
     }
 
-    // --- Empty content blocks ---
+    // --- Abnormal structured responses ---
 
-    public function test_returns_empty_string_when_no_matching_content_block(): void
+    public function test_throws_when_schema_prompt_response_has_no_tool_use_block(): void
     {
-        // A text response body but we're using a schema prompt — no tool_use block
+        // tool_choice is forced for schema prompts, so a text-only response is
+        // abnormal (refusal or API change) and must not be treated as valid output.
         $history = [];
         $provider = $this->makeProvider(
             [new Response(200, [], $this->textResponseBody('oops'))],
             $history,
         );
 
-        // Schema prompt expects tool_use — text block is ignored → empty string
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('no tool_use block');
+
+        $provider->complete($this->makeSchemaPrompt());
+    }
+
+    public function test_throws_when_structured_response_truncated_at_max_tokens(): void
+    {
+        // Truncated tool-use input comes back empty — previously this silently
+        // became zero facts. It must fail loudly instead.
+        $history = [];
+        $provider = $this->makeProvider(
+            [new Response(200, [], $this->toolUseResponseBody([], stopReason: 'max_tokens'))],
+            $history,
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('truncated at max_tokens');
+
+        $provider->complete($this->makeSchemaPrompt());
+    }
+
+    public function test_max_tokens_stop_reason_is_fine_for_plain_text_prompt(): void
+    {
+        $body = json_decode($this->textResponseBody('partial answer'), true);
+        $body['stop_reason'] = 'max_tokens';
+
+        $provider = $this->makeProvider([new Response(200, [], (string) json_encode($body))]);
+
+        $result = $provider->complete($this->makePlainPrompt());
+
+        $this->assertSame('partial answer', $result->content);
+        $this->assertSame('max_tokens', $result->stopReason);
+    }
+
+    public function test_empty_tool_input_serializes_as_json_object(): void
+    {
+        // Claude's empty tool input {} decodes to [] in PHP; re-encoding must
+        // produce "{}" so downstream parsers see an object, not a list.
+        $provider = $this->makeProvider(
+            [new Response(200, [], $this->toolUseResponseBody([]))],
+        );
+
         $result = $provider->complete($this->makeSchemaPrompt());
 
-        $this->assertSame('', $result->content);
+        $this->assertSame('{}', $result->content);
+    }
+
+    // --- Request parameters ---
+
+    public function test_sends_prompt_temperature(): void
+    {
+        $history = [];
+        $provider = $this->makeProvider(
+            [new Response(200, [], $this->textResponseBody('hi'))],
+            $history,
+        );
+
+        $provider->complete($this->makePlainPrompt());
+
+        $body = json_decode((string) $history[0]['request']->getBody(), true);
+        $this->assertSame(0.2, $body['temperature']);
+    }
+
+    public function test_captures_stop_reason_on_response(): void
+    {
+        $provider = $this->makeProvider(
+            [new Response(200, [], $this->toolUseResponseBody(['name' => 'Alice']))],
+        );
+
+        $result = $provider->complete($this->makeSchemaPrompt());
+
+        $this->assertSame('tool_use', $result->stopReason);
+    }
+
+    // --- Realistic Anthropic fact-extraction payload ---
+
+    public function test_parses_realistic_fact_extraction_response(): void
+    {
+        // Mirrors a real Messages API response for FactExtractionPrompt: forced
+        // tool call, multiple content-ordering quirks, realistic usage numbers.
+        $body = json_encode([
+            'id' => 'msg_01XFDUDYJgAACzvnptvVoYEL',
+            'type' => 'message',
+            'role' => 'assistant',
+            'model' => 'claude-sonnet-4-6',
+            'content' => [
+                ['type' => 'tool_use', 'id' => 'toolu_01A09q90qw90lq917835lq9', 'name' => 'FactExtractionPrompt', 'input' => [
+                    'facts' => [
+                        ['key' => 'business.name', 'value' => 'Velocity Exotics', 'data_type' => 'string', 'confidence' => 95],
+                        ['key' => 'business.industry', 'value' => 'exotic used car dealership', 'data_type' => 'string', 'confidence' => 90],
+                        ['key' => 'services.primary', 'value' => '["vehicle sales","financing","trade-ins"]', 'data_type' => 'json', 'confidence' => 85],
+                        ['key' => 'contact.phone', 'value' => '(555) 010-4477', 'data_type' => 'string', 'confidence' => 90],
+                        ['key' => 'brand.positioning', 'value' => 'curated high-end inventory with white-glove service', 'data_type' => 'string', 'confidence' => 70],
+                    ],
+                ]],
+            ],
+            'stop_reason' => 'tool_use',
+            'stop_sequence' => null,
+            'usage' => [
+                'input_tokens' => 2841,
+                'output_tokens' => 412,
+                'cache_creation_input_tokens' => 0,
+                'cache_read_input_tokens' => 0,
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $provider = $this->makeProvider([new Response(200, [], $body)]);
+
+        $prompt = new FactExtractionPrompt(
+            pageUrl: 'https://velocityexotics.example',
+            pageTitle: 'Velocity Exotics — Exotic & Luxury Used Cars',
+            bodyText: 'Velocity Exotics is a family-owned exotic car dealership…',
+        );
+
+        $result = $provider->complete($prompt);
+
+        $decoded = json_decode($result->content, true);
+        $this->assertCount(5, $decoded['facts']);
+        $this->assertSame('business.name', $decoded['facts'][0]['key']);
+        $this->assertSame('Velocity Exotics', $decoded['facts'][0]['value']);
+        $this->assertSame('tool_use', $result->stopReason);
+        $this->assertSame(2841, $result->inputTokens);
+        $this->assertSame(412, $result->outputTokens);
     }
 }

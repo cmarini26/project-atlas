@@ -7,6 +7,7 @@ use App\AI\Contracts\AiProvider;
 use App\AI\Prompts\Prompt;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -60,6 +61,7 @@ final class AnthropicProvider implements AiProvider
         $payload = [
             'model' => $this->model,
             'max_tokens' => $prompt->maxTokens(),
+            'temperature' => $prompt->temperature(),
             'system' => $prompt->system(),
             'messages' => [
                 ['role' => 'user', 'content' => $prompt->user()],
@@ -108,8 +110,16 @@ final class AnthropicProvider implements AiProvider
             throw new RuntimeException("Anthropic API request failed: {$body}", 0, $e);
         }
 
+        $body = (string) $response->getBody();
+
+        // Raw response logging for local/debug troubleshooting only — the body can
+        // contain crawled page content and must not be logged in production.
+        if (config('app.debug')) {
+            Log::debug('AnthropicProvider: raw API response.', ['body' => $body]);
+        }
+
         /** @var array<string, mixed> $data */
-        $data = json_decode((string) $response->getBody(), true);
+        $data = json_decode($body, true);
 
         return $data;
     }
@@ -122,8 +132,21 @@ final class AnthropicProvider implements AiProvider
         $model = (string) ($data['model'] ?? $this->model);
         $inputTokens = (int) ($data['usage']['input_tokens'] ?? 0);
         $outputTokens = (int) ($data['usage']['output_tokens'] ?? 0);
+        $stopReason = isset($data['stop_reason']) ? (string) $data['stop_reason'] : null;
+
+        // When generation is cut off at max_tokens during a forced tool call, the
+        // API cannot return the partial JSON input — tool_use.input comes back empty
+        // or incomplete. Treating that as a valid (empty) result silently produces
+        // zero facts downstream, so fail loudly instead.
+        if ($expectToolUse && $stopReason === 'max_tokens') {
+            throw new RuntimeException(
+                'Anthropic response was truncated at max_tokens before the structured '
+                ."output completed (output_tokens={$outputTokens}). Increase the prompt's maxTokens()."
+            );
+        }
 
         $content = '';
+        $foundToolUse = false;
 
         foreach ((array) ($data['content'] ?? []) as $block) {
             if (! is_array($block)) {
@@ -135,7 +158,9 @@ final class AnthropicProvider implements AiProvider
             if ($expectToolUse && $type === 'tool_use') {
                 // tool_use.input is already a decoded array — re-encode to JSON string
                 // so callers receive a consistent JSON string from all providers.
-                $content = json_encode($block['input'] ?? [], JSON_THROW_ON_ERROR);
+                // Force an object so an empty input serializes as {} rather than [].
+                $content = json_encode((object) ($block['input'] ?? []), JSON_THROW_ON_ERROR);
+                $foundToolUse = true;
                 break;
             }
 
@@ -145,11 +170,21 @@ final class AnthropicProvider implements AiProvider
             }
         }
 
+        // tool_choice is forced when a schema is set, so a missing tool_use block is
+        // an abnormal response (refusal, filter, or API change) — not an empty result.
+        if ($expectToolUse && ! $foundToolUse) {
+            throw new RuntimeException(
+                'Anthropic response contained no tool_use block despite forced tool_choice '
+                ."(stop_reason={$stopReason})."
+            );
+        }
+
         return new AiResponse(
             content: $content,
             model: $model,
             inputTokens: $inputTokens,
             outputTokens: $outputTokens,
+            stopReason: $stopReason,
         );
     }
 

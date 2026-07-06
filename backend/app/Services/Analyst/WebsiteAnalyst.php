@@ -7,9 +7,11 @@ use App\AI\Prompts\FactExtractionPrompt;
 use App\AI\StructuredResponseParser;
 use App\Models\Observation;
 use App\Services\Analyst\Contracts\Analyst;
+use App\Services\Analyst\Exceptions\FactExtractionFailedException;
 use App\Services\Brain\Data\FactData;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 
 class WebsiteAnalyst implements Analyst
 {
@@ -45,21 +47,72 @@ class WebsiteAnalyst implements Analyst
         );
 
         $response = $this->ai->complete($prompt);
-        $data = $this->parser->parse($response);
 
-        /** @var array<int, array{key: string, value: string, data_type: string, confidence: int}> $rawFacts */
-        $rawFacts = $data['facts'] ?? [];
+        // Raw response logging for local/debug troubleshooting only.
+        if (config('app.debug')) {
+            Log::debug('WebsiteAnalyst: raw AI response content.', [
+                'observation_id' => $observation->id,
+                'model' => $response->model,
+                'stop_reason' => $response->stopReason,
+                'content' => $response->content,
+            ]);
+        }
+
+        try {
+            $data = $this->parser->parse($response);
+        } catch (InvalidArgumentException $e) {
+            throw new FactExtractionFailedException(
+                "AI returned unparseable output for observation {$observation->id}: {$e->getMessage()}",
+                previous: $e,
+            );
+        }
+
+        if (! isset($data['facts']) || ! is_array($data['facts'])) {
+            throw new FactExtractionFailedException(
+                "AI response for observation {$observation->id} is missing the required 'facts' array. "
+                .'Got keys: ['.implode(', ', array_keys($data)).']',
+            );
+        }
+
+        $facts = collect($data['facts'])
+            ->filter(function (mixed $fact) use ($observation): bool {
+                $valid = is_array($fact)
+                    && isset($fact['key'], $fact['value'], $fact['data_type'], $fact['confidence'])
+                    && is_string($fact['key'])
+                    && is_scalar($fact['value']);
+
+                if (! $valid) {
+                    Log::warning('WebsiteAnalyst: skipping malformed fact entry.', [
+                        'observation_id' => $observation->id,
+                        'entry' => $fact,
+                    ]);
+                }
+
+                return $valid;
+            })
+            ->values()
+            ->map(fn (array $fact): FactData => new FactData(
+                key: $fact['key'],
+                value: (string) $fact['value'],
+                dataType: (string) $fact['data_type'],
+                confidence: (int) $fact['confidence'],
+            ));
+
+        // The page had analyzable content, so zero facts means the analysis failed —
+        // marking the observation processed here would leave onboarding spinning
+        // with nothing to show. Fail so the UI can surface a clear AI error.
+        if ($facts->isEmpty()) {
+            throw new FactExtractionFailedException(
+                "AI analysis produced zero usable facts for observation {$observation->id} "
+                .'despite the page having body text.',
+            );
+        }
 
         Log::info('WebsiteAnalyst: fact extraction complete.', [
             'observation_id' => $observation->id,
-            'fact_count' => count($rawFacts),
+            'fact_count' => $facts->count(),
         ]);
 
-        return collect($rawFacts)->map(fn (array $fact): FactData => new FactData(
-            key: $fact['key'],
-            value: $fact['value'],
-            dataType: $fact['data_type'],
-            confidence: (int) $fact['confidence'],
-        ));
+        return $facts;
     }
 }

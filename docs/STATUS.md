@@ -23,12 +23,12 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. |
-| Tests             | ✅ Strong | 603 tests (601 passing, 2 Redis skipped); PHPStan level 8 — 0 errors; Pint clean. Phase 4: bodyText→body_text fix unblocks real fact extraction. |
+| Tests             | ✅ Strong | 618 tests (616 passing, 2 Redis skipped); PHPStan level 8 — 0 errors; Pint clean. Phase 5: max_tokens truncation fix + zero-fact AI responses now fail loudly. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
 
-**Overall:** Milestone 10 complete + full P0 onboarding pipeline fixed (Phase 1–4). Users flow correctly from registration → company creation → website connection → analysis → first recommendation. Phase 4 fixed the critical `bodyText`→`body_text` key mismatch in `WebsiteAnalyst` that silently returned 0 facts on every real crawl. Anthropic is now used when `ANTHROPIC_API_KEY` is set in local env; `LocalAiProvider` is the fallback when no key. Status page has new AI failure card distinct from crawl failure. 603 tests (601 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean.
+**Overall:** Milestone 10 complete + full P0 onboarding pipeline fixed (Phase 1–5). Users flow correctly from registration → company creation → website connection → analysis → first recommendation. Phase 5 fixed real Anthropic responses producing 0 facts: `FactExtractionPrompt` max_tokens raised 1024→4096 (truncated forced tool calls returned empty input), `AnthropicProvider` now throws on `stop_reason=max_tokens`/missing tool_use for structured prompts, and `WebsiteAnalyst` throws `FactExtractionFailedException` on invalid/empty AI output instead of marking observations processed — surfacing as the `ai_failed` card in onboarding. 618 tests (616 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean.
 
 ---
 

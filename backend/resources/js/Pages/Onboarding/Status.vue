@@ -114,14 +114,22 @@ onUnmounted(() => {
           </div>
         </div>
         <h1 class="text-base font-semibold text-[var(--color-text-primary)] mb-2">AI analysis encountered an error</h1>
-        <p class="text-sm text-[var(--color-text-muted)] mb-3">Your website was scanned successfully, but Atlas ran into a problem during analysis. This is usually caused by an invalid or missing AI provider configuration.</p>
-        <p class="text-xs text-[var(--color-text-muted)] mb-6">Check that <code class="font-mono bg-[var(--color-surface-raised)] px-1 rounded">ANTHROPIC_API_KEY</code> is set correctly in your <code class="font-mono bg-[var(--color-surface-raised)] px-1 rounded">.env</code> file and restart the server.</p>
-        <a
-          href="/app"
-          class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] transition-colors duration-[var(--duration-fast)]"
-        >
-          Go to dashboard
-        </a>
+        <p class="text-sm text-[var(--color-text-muted)] mb-3">Your website was scanned successfully, but Atlas couldn't extract usable business facts from it. This can happen when the AI provider is misconfigured, or when the page doesn't contain enough readable text about your business.</p>
+        <p class="text-xs text-[var(--color-text-muted)] mb-6">Check that <code class="font-mono bg-[var(--color-surface-raised)] px-1 rounded">ANTHROPIC_API_KEY</code> is set correctly in <code class="font-mono bg-[var(--color-surface-raised)] px-1 rounded">.env</code>, or try a page with more content about your business (like an About page).</p>
+        <div class="flex items-center justify-center gap-3">
+          <a
+            href="/onboarding"
+            class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] transition-colors duration-[var(--duration-fast)]"
+          >
+            Try a different URL
+          </a>
+          <a
+            href="/app"
+            class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-raised)] transition-colors duration-[var(--duration-fast)]"
+          >
+            Go to dashboard
+          </a>
+        </div>
       </div>
 
       <!-- Pipeline stalled — queue worker not processing jobs -->

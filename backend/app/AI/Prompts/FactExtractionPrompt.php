@@ -87,7 +87,10 @@ class FactExtractionPrompt extends Prompt
 
     public function maxTokens(): int
     {
-        return 1024;
+        // A real page yields dozens of facts; the structured tool-use JSON for them
+        // easily exceeds 1024 tokens, and truncation makes the API return an empty
+        // tool input — which surfaced as "zero facts" during onboarding.
+        return 4096;
     }
 
     public function temperature(): float

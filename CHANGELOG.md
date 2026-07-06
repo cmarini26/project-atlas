@@ -6,6 +6,29 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [P0 — Real Anthropic Responses Produce 0 Facts (max_tokens Truncation + Silent Empty Success)] — 2026-07-05
+
+### Fixed
+
+- **`FactExtractionPrompt::maxTokens()` too small (1024 → 4096)** — a real page yields dozens of facts and the structured tool-use JSON easily exceeds 1024 output tokens. When the Messages API hits `max_tokens` mid-way through a forced tool call it cannot return the partial JSON, so `tool_use.input` came back empty and the pipeline saw 0 facts with no error. Root cause of the "AI call completes but fact_count=0" P0.
+- **`AnthropicProvider` ignored `stop_reason`** — a truncated structured response was indistinguishable from a valid one. The provider now throws when a schema prompt's response has `stop_reason=max_tokens`, or contains no `tool_use` block despite forced `tool_choice` (previously returned `''`, surfacing later as a confusing JSON parse error). `AiResponse` gained a nullable `stopReason` field.
+- **`WebsiteAnalyst` treated empty/invalid AI output as success** — missing `facts` key, empty facts array, or unparseable JSON now throws the new `FactExtractionFailedException` instead of marking the observation `processed` with 0 facts. `ProcessObservation`'s existing failure path marks the observation `failed`, which the onboarding API already surfaces as `ai_failed=true`.
+- **Empty tool input re-encoded as `[]`** — PHP array cast turned Claude's empty `{}` input into a JSON list; now object-cast so downstream parsers see the correct shape.
+- **Prompt `temperature()` never sent to the Anthropic API** — now included in every request (fact extraction runs at 0.1).
+
+### Added
+
+- `app/Services/Analyst/Exceptions/FactExtractionFailedException.php` — thrown when AI output cannot be turned into facts; flows into the existing `ai_failed` onboarding signal.
+- Malformed fact entries (missing `key`/`value`/`data_type`/`confidence`) are skipped with a `Log::warning()`; valid entries in the same response are kept.
+- Debug-only raw AI response logging — `AnthropicProvider` logs the raw API body and `WebsiteAnalyst` logs the response content at `debug` level when `APP_DEBUG=true` (never in production; bodies can contain crawled page content).
+- 15 tests: realistic Anthropic Messages API payload through the real provider + parser (`AnthropicProviderTest`, `WebsiteAnalystTest`), truncation/no-tool_use/temperature/stop_reason coverage, invalid JSON / empty facts / all-malformed failure paths, and an end-to-end `ProcessObservationTest` asserting empty facts → observation `failed` → `GET /api/onboarding/status` returns `ai_failed=true`.
+
+### Changed
+
+- `Status.vue` AI-failure card copy broadened — zero-fact extractions also land here, so it now explains both provider misconfiguration and pages without enough readable business text, and offers "Try a different URL" alongside "Go to dashboard".
+
+---
+
 ## [P0 — Real Crawls Produce 0 Facts (body_text Key Mismatch)] — 2026-06-29
 
 ### Fixed

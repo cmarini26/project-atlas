@@ -9,5 +9,6 @@ readonly class AiResponse
         public string $model,
         public int $inputTokens,
         public int $outputTokens,
+        public ?string $stopReason = null,
     ) {}
 }

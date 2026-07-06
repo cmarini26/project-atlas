@@ -9,9 +9,12 @@ use App\Events\ObservationProcessed;
 use App\Jobs\ProcessObservation;
 use App\Models\Catalog;
 use App\Models\Company;
+use App\Models\CompanyMembership;
 use App\Models\DigitalTwin;
 use App\Models\Integration;
 use App\Models\Observation;
+use App\Models\User;
+use App\Services\Analyst\Exceptions\FactExtractionFailedException;
 use App\Services\Analyst\WebsiteAnalyst;
 use App\Services\Brain\FactService;
 use App\Services\Brain\KnowledgeService;
@@ -157,6 +160,81 @@ class ProcessObservationTest extends TestCase
         );
 
         Event::assertDispatched(ObservationProcessed::class);
+    }
+
+    public function test_marks_failed_when_ai_returns_empty_facts(): void
+    {
+        $this->fake->queueResponse('{"facts": []}');
+
+        try {
+            (new ProcessObservation($this->observation))->handle(
+                $this->app->make(WebsiteAnalyst::class),
+                $this->app->make(FactService::class),
+                $this->app->make(KnowledgeService::class),
+            );
+            $this->fail('Expected FactExtractionFailedException was not thrown.');
+        } catch (FactExtractionFailedException) {
+            // expected
+        }
+
+        $this->observation->refresh();
+        $this->assertEquals('failed', $this->observation->status);
+        $this->assertDatabaseCount('facts', 0);
+    }
+
+    public function test_marks_failed_when_ai_returns_invalid_json(): void
+    {
+        $this->fake->queueResponse('not-json');
+
+        try {
+            (new ProcessObservation($this->observation))->handle(
+                $this->app->make(WebsiteAnalyst::class),
+                $this->app->make(FactService::class),
+                $this->app->make(KnowledgeService::class),
+            );
+            $this->fail('Expected FactExtractionFailedException was not thrown.');
+        } catch (FactExtractionFailedException) {
+            // expected
+        }
+
+        $this->observation->refresh();
+        $this->assertEquals('failed', $this->observation->status);
+    }
+
+    public function test_failed_ai_analysis_surfaces_as_ai_failed_in_onboarding_status(): void
+    {
+        $this->fake->queueResponse('{"facts": []}');
+
+        try {
+            (new ProcessObservation($this->observation))->handle(
+                $this->app->make(WebsiteAnalyst::class),
+                $this->app->make(FactService::class),
+                $this->app->make(KnowledgeService::class),
+            );
+        } catch (FactExtractionFailedException) {
+            // expected
+        }
+
+        $user = User::create([
+            'name' => 'Owner',
+            'email' => 'owner@cbbauctions.com',
+            'password' => 'secret-password',
+        ]);
+
+        CompanyMembership::create([
+            'user_id' => $user->id,
+            'company_id' => $this->company->id,
+            'role' => 'owner',
+        ]);
+
+        $response = $this->actingAs($user)->getJson('/api/onboarding/status');
+
+        $response->assertOk()
+            ->assertJson([
+                'crawl_succeeded' => true,
+                'ai_failed' => true,
+                'fact_count' => 0,
+            ]);
     }
 
     public function test_marks_failed_when_ai_provider_throws(): void

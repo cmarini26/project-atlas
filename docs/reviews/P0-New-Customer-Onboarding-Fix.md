@@ -1,8 +1,8 @@
 # P0 — Onboarding Website Submission Does Not Start Analysis
 
-**Status:** Complete (Phase 1 + Phase 2 + Phase 3 + Phase 4)  
-**Date:** 2026-06-29  
-**Tests:** 603 total (601 passing, 2 Redis skipped) — Phase 4 fixed 5 tests  
+**Status:** Complete (Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5)  
+**Date:** 2026-07-05  
+**Tests:** 618 total (616 passing, 2 Redis skipped) — Phase 5 added 15 tests  
 **PHPStan:** Level 8 — 0 errors  
 **Pint:** Clean  
 **Frontend build:** 0 errors  
@@ -459,3 +459,90 @@ New error card shown when `ai_failed` is true:
 | `ANTHROPIC_API_KEY` set in local env | `LocalAiProvider` used regardless; stub responses | `AnthropicProvider` used; real Anthropic API called |
 | AI provider throws / returns invalid JSON | Observation stays `pending` or `failed`; status page spins | `ai_failed=true` in API; status page shows "AI analysis encountered an error" card |
 | `SettingsController::syncIntegration()` test | 500 from empty `FakeAiProvider` queue | `Bus::fake()` prevents job execution; test passes cleanly |
+
+---
+
+## Phase 5 — Real Anthropic Responses Produce 0 Facts (max_tokens Truncation + Silent Empty Success)
+
+### Problem
+
+After Phase 4, real crawls with `ANTHROPIC_API_KEY` set reached the AI, the call completed, and the pipeline logged:
+
+- `WebsiteAnalyst: starting fact extraction.` ✓
+- Anthropic call completes ✓
+- `WebsiteAnalyst: fact extraction complete. fact_count=0` ✗
+- Observation marked `processed` successfully ✗
+
+Zero facts, zero opportunities, zero recommendations — but no error anywhere. Onboarding spun until timeout.
+
+### Root Causes
+
+**Root cause 1 — `FactExtractionPrompt::maxTokens()` was 1024.** A real page yields dozens of facts; the structured tool-use JSON for them easily exceeds 1024 output tokens. When the Messages API hits `max_tokens` mid-way through a forced tool call, it cannot return the partial JSON — `tool_use.input` comes back empty (or the block is dropped). Fixture-driven tests never hit this because fixtures bypass the provider entirely.
+
+**Root cause 2 — `AnthropicProvider` ignored `stop_reason`.** A truncated response (`stop_reason=max_tokens`) was indistinguishable from a valid one. The empty `input` was re-encoded (as `[]`, not even `{}` — PHP array cast) and handed to the parser as if it were the model's answer.
+
+**Root cause 3 — `WebsiteAnalyst` treated a missing/empty `facts` array as success.** `$data['facts'] ?? []` silently produced an empty collection, the observation was marked `processed`, and the onboarding UI had nothing to key an error state off.
+
+**Secondary issues found:** `temperature` from prompts was never sent to the API; a schema-prompt response with no `tool_use` block returned `''` content, which surfaced later as a confusing "not valid JSON" parse error.
+
+### Fixes
+
+#### 1. `FactExtractionPrompt::maxTokens()` — 1024 → 4096
+
+Headroom for dozens of facts in the structured tool call output.
+
+#### 2. `AnthropicProvider` — stop_reason handling + hard failures on abnormal structured responses
+
+- `AiResponse` gained a nullable `stopReason` field, populated from the API response.
+- When a schema prompt's response has `stop_reason=max_tokens`, the provider now **throws** — truncated structured output is never treated as data.
+- When a schema prompt's response contains no `tool_use` block despite forced `tool_choice` (refusal, filter, API change), the provider now **throws** instead of returning `''`.
+- Empty tool input is re-encoded as `{}` (object cast) rather than `[]`, so downstream parsing sees the correct JSON shape.
+- `temperature` from the prompt is now sent with every request (fact extraction runs at 0.1).
+- The raw API response body is logged at `debug` level **only when `app.debug` is true** — raw bodies can contain crawled page content and must not be logged in production.
+
+#### 3. `WebsiteAnalyst` — invalid/empty AI output is now a failure
+
+New exception: `App\Services\Analyst\Exceptions\FactExtractionFailedException`. Thrown when:
+
+- the parser rejects the response (invalid JSON) — wrapped with observation context
+- the decoded payload has no `facts` array (e.g. `{}` from a truncated tool call)
+- the facts array is empty, or every entry is malformed, despite the page having body text
+
+Malformed individual entries (missing `key`/`value`/`data_type`/`confidence`) are skipped with a `Log::warning()` while valid ones are kept. The raw AI response content is debug-logged when `app.debug` is true.
+
+`ProcessObservation` already catches any throwable, marks the observation `failed`, and rethrows — so `FactExtractionFailedException` flows into the existing `ai_failed` signal in `GET /api/onboarding/status` with no job changes.
+
+#### 4. `Status.vue` — broader AI-failure copy + retry action
+
+The `ai_failed` card previously blamed only API-key configuration. Since a zero-fact extraction now also lands here, the copy explains both causes (provider misconfiguration or a page without enough readable business text) and offers **Try a different URL** alongside **Go to dashboard**.
+
+### Tests Added (Phase 5)
+
+| Test | File |
+|------|------|
+| `test_throws_when_schema_prompt_response_has_no_tool_use_block` | `AnthropicProviderTest` — replaces old empty-string behavior |
+| `test_throws_when_structured_response_truncated_at_max_tokens` | `AnthropicProviderTest` |
+| `test_max_tokens_stop_reason_is_fine_for_plain_text_prompt` | `AnthropicProviderTest` — truncation only fatal for structured output |
+| `test_empty_tool_input_serializes_as_json_object` | `AnthropicProviderTest` — `{}` not `[]` |
+| `test_sends_prompt_temperature` | `AnthropicProviderTest` |
+| `test_captures_stop_reason_on_response` | `AnthropicProviderTest` |
+| `test_parses_realistic_fact_extraction_response` | `AnthropicProviderTest` — full realistic Messages API payload (real IDs, usage block, forced tool call) |
+| `test_throws_when_ai_returns_invalid_json` | `WebsiteAnalystTest` |
+| `test_throws_when_ai_returns_empty_facts_array` | `WebsiteAnalystTest` |
+| `test_throws_when_ai_response_is_missing_facts_key` | `WebsiteAnalystTest` |
+| `test_skips_malformed_fact_entries_but_keeps_valid_ones` | `WebsiteAnalystTest` |
+| `test_throws_when_all_fact_entries_are_malformed` | `WebsiteAnalystTest` |
+| `test_extracts_facts_from_realistic_anthropic_response` | `WebsiteAnalystTest` — end-to-end through real `AnthropicProvider` + `StructuredResponseParser`, HTTP mocked |
+| `test_marks_failed_when_ai_returns_empty_facts` / `test_marks_failed_when_ai_returns_invalid_json` | `ProcessObservationTest` — observation ends `failed`, no facts persisted |
+| `test_failed_ai_analysis_surfaces_as_ai_failed_in_onboarding_status` | `ProcessObservationTest` — full loop: empty facts → observation `failed` → API returns `ai_failed=true` |
+
+### Behaviour Comparison (Phase 5)
+
+| Scenario | Before Phase 5 | After Phase 5 |
+|----------|---------------|---------------|
+| Fact extraction output exceeds 1024 tokens | Truncated → empty tool input → 0 facts, observation `processed`, UI spins | 4096-token budget; if still truncated, provider throws → `ai_failed` card |
+| AI returns `{"facts": []}` or `{}` | 0 facts, observation `processed` successfully | `FactExtractionFailedException` → observation `failed` → `ai_failed=true` |
+| AI returns invalid JSON | Generic `InvalidArgumentException` with no context | Wrapped in `FactExtractionFailedException` with observation ID |
+| Refusal / no tool_use block | `''` content → confusing "not valid JSON" error | Provider throws with `stop_reason` in the message |
+| Debugging a bad AI response locally | No visibility into raw output | Raw response logged at debug level when `APP_DEBUG=true` (provider + analyst) |
+| Prompt temperature | Never sent (API default used) | Sent per prompt (0.1 for fact extraction) |
