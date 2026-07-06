@@ -6,6 +6,24 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [P0 — Onboarding Website Submit Causes 502 Bad Gateway] — 2026-07-05
+
+### Fixed
+
+- **Submit ran the entire pipeline inline** — `OnboardingController::createIntegration()` used `SyncIntegration::dispatchSync()` (Phase 1) combined with `QUEUE_CONNECTION=sync` (Phase 3), so by Phase 7 the request executed crawl + five sequential Anthropic calls (facts, opportunity, rationale, campaign, content) plus overload backoff — minutes of work, past Herd/PHP-FPM's gateway timeout → 502. The controller now queues the job (`dispatch()`) and redirects immediately; the try/catch remains only for sync-driver environments.
+- **Stall detection missed the pre-crawl window** — with the sync queued, a missing worker leaves `last_run_at` null and the old `pipeline_stalled` heuristic (which required a started sync) never fired. The status endpoint now also flags an integration that was queued > 90 s ago and never started.
+
+### Changed
+
+- `QUEUE_CONNECTION` local default: `sync` → `database` in `.env.example` (jobs table ships with Laravel's base migrations). Local dev runs via `composer dev`, which already starts a worker on all Atlas queues alongside the scheduler, pail, and Vite. Env comments warn that `sync` blocks the onboarding request for minutes.
+- `Status.vue` stalled card generalized — "Atlas is waiting for a queue worker" now covers both pre-crawl and post-crawl stalls and suggests `composer dev` first, with the full `queue:work` command as fallback.
+
+### Added
+
+- 4 tests: submit queues the job and never dispatches it synchronously (`Bus::assertNotDispatchedSync`), submit records no observations and makes no AI calls, queued-but-never-started sync surfaces `pipeline_stalled`, and a status-progression walk from queued → started → facts.
+
+---
+
 ## [P0 — Facts Created But No Opportunities Or Recommendations] — 2026-07-05
 
 ### Fixed

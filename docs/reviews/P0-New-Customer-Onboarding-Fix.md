@@ -1,8 +1,8 @@
 # P0 — Onboarding Website Submission Does Not Start Analysis
 
-**Status:** Complete (Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5 + Phase 6 + Phase 7)  
+**Status:** Complete (Phase 1 – Phase 8)  
 **Date:** 2026-07-05  
-**Tests:** 633 total (631 passing, 2 Redis skipped) — Phase 7 added 6 tests  
+**Tests:** 636 total (634 passing, 2 Redis skipped) — Phase 8 added 3 tests  
 **PHPStan:** Level 8 — 0 errors  
 **Pint:** Clean  
 **Frontend build:** 0 errors  
@@ -684,3 +684,52 @@ A real crawl extracted 37 facts, but opportunity count and recommendation count 
 | Downstream failure after facts persisted | Observation flipped to `failed`; retry re-extracted facts but never scanned | Observation stays `processed`; failure logged + reported; next sync re-scans |
 | Scan legitimately finds nothing | Spinner until generic 5-minute timeout | "Atlas learned your business — no campaign opportunity yet" card with fact count and next steps |
 | Diagnosing where the chain stopped | Log gap between facts and (maybe) scan | Every stage logs: facts → knowledge → trigger → scan (with drop reasons) → decision → recommendation |
+
+---
+
+## Phase 8 — Website Submit Causes 502 Bad Gateway
+
+### Problem
+
+Submitting the website URL during onboarding returned **502 Bad Gateway**. The company step worked; the integration step died at the gateway.
+
+### Root Cause
+
+**The entire pipeline ran inline inside the submit request.** Phase 1 introduced `SyncIntegration::dispatchSync()` so onboarding worked without a queue worker, and Phase 3 set `QUEUE_CONNECTION=sync` as the local default. Individually reasonable at the time — but by Phase 7 the inline chain had grown to: crawl (up to ~15 s) → fact extraction (real Anthropic call, plus up to ~5 s of overload backoff) → knowledge synthesis → opportunity scan (AI) → rationale (AI) → campaign blueprint (AI) → content generation (AI). With a real `ANTHROPIC_API_KEY`, that's five sequential AI calls — comfortably past Herd/PHP-FPM's gateway timeout, hence the 502. The work generally *completed* server-side after the gateway gave up, which also explains "company created, then 502."
+
+### Fixes
+
+#### 1. Submit queues the sync — never runs it inline
+
+`OnboardingController::createIntegration()` uses `SyncIntegration::dispatch()` (queued). The submit now does: validate → create integration → seed blog channel → queue job → redirect. Milliseconds, no crawl, no AI. The try/catch remains only as protection for environments still running `QUEUE_CONNECTION=sync`.
+
+#### 2. Local default queue: `sync` → `database`
+
+`.env.example` (and the local `.env`) now default to `QUEUE_CONNECTION=database` — the jobs table ships with Laravel's base migrations, so no new infrastructure. `composer dev` already runs a worker on all Atlas queues (`high,ai,default,observations,publishing,analytics,maintenance`) alongside the scheduler, pail, and Vite, so local dev keeps working — start the stack with `composer dev` instead of a bare `php artisan serve`. The env comments now warn explicitly that `sync` blocks the onboarding request for minutes.
+
+#### 3. Stall detection covers the pre-crawl window
+
+Previously `pipeline_stalled` required `last_run_at` to be set — but with the submit queuing the job, a missing worker means the sync *never starts* and `last_run_at` stays null, which used to fall through to the generic timeout. The status endpoint now flags two stall shapes:
+
+- **queued but never started** — integration `active`, created > 90 s ago, `last_run_at` null;
+- **ran but no facts** — the pre-existing shape.
+
+`Status.vue`'s stalled card copy was generalized ("Atlas is waiting for a queue worker", works pre- or post-crawl) and now suggests `composer dev` first, with the full `queue:work` command as the alternative.
+
+### Tests Added (Phase 8)
+
+| Test | File |
+|------|------|
+| `test_integration_step_queues_sync_job_instead_of_running_it_inline` | `OnboardingControllerTest` — `Bus::assertDispatched` + **`Bus::assertNotDispatchedSync`**: the job is queued, never executed in-request |
+| `test_integration_step_does_not_block_on_crawl_or_ai` | `OnboardingControllerTest` — submit redirects with zero observations recorded and zero AI calls made |
+| `test_pipeline_stalled_when_queued_sync_never_starts` | `OnboardingStatusControllerTest` — integration queued 2 min ago, `last_run_at` null → `pipeline_stalled: true` |
+| `test_status_progresses_from_queued_to_started_to_facts` | `OnboardingStatusControllerTest` — walks queued (not stalled) → sync started → facts extracted through the API |
+
+### Behaviour Comparison (Phase 8)
+
+| Scenario | Before Phase 8 | After Phase 8 |
+|----------|---------------|---------------|
+| Website submit with real Anthropic key | Request runs crawl + 5 AI calls inline → 502 at the gateway | Returns in milliseconds; redirect to status page |
+| Worker running (`composer dev`) | N/A (inline) | Worker processes crawl + AI; status page fills in progress steps as they complete |
+| No worker running | Inline run masked the problem (until it 502'd) | "Atlas is waiting for a queue worker" card after 90 s, with the `composer dev` hint |
+| Onboarding crawl errors | Caught inline in the controller | `SyncIntegration::failed()` marks the integration `error` (overload still exempt); status page shows the crawl-failure card |

@@ -165,6 +165,81 @@ class OnboardingStatusControllerTest extends TestCase
         ]);
     }
 
+    public function test_pipeline_stalled_when_queued_sync_never_starts(): void
+    {
+        // The onboarding submit queues the crawl. If no worker picks it up,
+        // last_run_at stays null — after 90 s that must surface as stalled.
+        $user = User::factory()->create();
+        $company = Company::withoutGlobalScopes()->create(['name' => 'Acme', 'slug' => 'acme']);
+        CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => 'owner']);
+        $integration = Integration::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'website_crawl',
+            'name' => 'Website',
+            'config' => ['url' => 'https://acme.com'],
+            'status' => 'active',
+        ]);
+
+        Integration::withoutGlobalScopes()
+            ->whereKey($integration->id)
+            ->update(['created_at' => now()->subMinutes(2)]);
+
+        $this->actingAs($user)
+            ->getJson('/api/onboarding/status')
+            ->assertOk()
+            ->assertJson([
+                'sync_started' => false,
+                'pipeline_stalled' => true,
+            ]);
+    }
+
+    public function test_status_progresses_from_queued_to_started_to_facts(): void
+    {
+        $user = User::factory()->create();
+        $company = Company::withoutGlobalScopes()->create(['name' => 'Acme', 'slug' => 'acme']);
+        CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => 'owner']);
+        $integration = Integration::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'website_crawl',
+            'name' => 'Website',
+            'config' => ['url' => 'https://acme.com'],
+            'status' => 'active',
+        ]);
+
+        // Stage 1 — just queued: not started, and not yet considered stalled.
+        $this->actingAs($user)
+            ->getJson('/api/onboarding/status')
+            ->assertOk()
+            ->assertJson([
+                'sync_started' => false,
+                'pipeline_stalled' => false,
+                'fact_count' => 0,
+            ]);
+
+        // Stage 2 — worker picked the job up and the crawl ran.
+        $integration->update(['last_run_at' => now()]);
+
+        $this->actingAs($user)
+            ->getJson('/api/onboarding/status')
+            ->assertOk()
+            ->assertJson([
+                'sync_started' => true,
+                'pipeline_stalled' => false,
+            ]);
+
+        // Stage 3 — facts extracted from the processed observation.
+        $this->makeProcessedObservationWithFact($company, processedAt: now());
+
+        $this->actingAs($user)
+            ->getJson('/api/onboarding/status')
+            ->assertOk()
+            ->assertJson([
+                'sync_started' => true,
+                'fact_count' => 1,
+                'pipeline_stalled' => false,
+            ]);
+    }
+
     public function test_returns_error_status_when_integration_failed(): void
     {
         $user = User::factory()->create();

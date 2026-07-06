@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\App;
 
+use App\AI\Contracts\AiProvider;
+use App\AI\Testing\FakeAiProvider;
 use App\Jobs\SyncIntegration;
 use App\Models\Company;
 use App\Models\CompanyMembership;
@@ -118,7 +120,7 @@ class OnboardingControllerTest extends TestCase
         ]);
     }
 
-    public function test_integration_step_dispatches_sync_job_synchronously(): void
+    public function test_integration_step_queues_sync_job_instead_of_running_it_inline(): void
     {
         $user = User::factory()->create();
         $company = Company::withoutGlobalScopes()->create(['name' => 'My Co', 'slug' => 'my-co']);
@@ -134,6 +136,33 @@ class OnboardingControllerTest extends TestCase
         Bus::assertDispatched(SyncIntegration::class, function (SyncIntegration $job) use ($company): bool {
             return $job->integration->company_id === $company->id;
         });
+
+        // The crawl + AI pipeline must never run inside the HTTP request —
+        // an inline run blocked the submit for minutes and caused 502s.
+        Bus::assertNotDispatchedSync(SyncIntegration::class);
+    }
+
+    public function test_integration_step_does_not_block_on_crawl_or_ai(): void
+    {
+        $user = User::factory()->create();
+        $company = Company::withoutGlobalScopes()->create(['name' => 'My Co', 'slug' => 'my-co']);
+        CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => 'owner']);
+
+        $fakeAi = new FakeAiProvider();
+        $this->app->instance(AiProvider::class, $fakeAi);
+
+        Bus::fake();
+
+        $this->actingAs($user)
+            ->post('/onboarding/integration', [
+                'website_url' => 'https://example.com',
+            ])
+            ->assertRedirect(route('onboarding.status'));
+
+        // No crawl work happened during the request: no observations recorded,
+        // no AI calls made. All of that belongs to the queue worker.
+        $this->assertDatabaseMissing('observations', ['company_id' => $company->id]);
+        $fakeAi->assertNothingSent();
     }
 
     public function test_integration_step_marks_error_when_sync_fails(): void

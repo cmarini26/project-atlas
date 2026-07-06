@@ -112,11 +112,14 @@ class OnboardingController extends Controller
             ]);
         }
 
-        // Run the first sync inline so observations are recorded immediately,
-        // before the user reaches the status page. Subsequent scheduled syncs
-        // are dispatched via the queue and processed by workers.
+        // Queue the first sync — never run it inline. The crawl plus the AI
+        // pipeline (facts → opportunity → rationale → campaign → content) can
+        // take minutes with a real provider; running it in the request caused
+        // 502s behind PHP-FPM/Herd. The status page polls progress while the
+        // worker processes it. The try/catch only matters for environments
+        // still using QUEUE_CONNECTION=sync, where dispatch() runs inline.
         try {
-            SyncIntegration::dispatchSync($integration);
+            SyncIntegration::dispatch($integration);
         } catch (AiProviderOverloadedException $e) {
             // The crawl succeeded — only the AI analysis is waiting on the
             // provider. The observation is left in 'retrying' and the status

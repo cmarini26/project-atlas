@@ -80,15 +80,26 @@ class OnboardingStatusController extends Controller
             ->where('status', 'failed')
             ->exists();
 
-        // Stalled: sync ran > 90 s ago but no facts were extracted. Most likely
-        // cause is a queue worker that is not running (QUEUE_CONNECTION=redis with
-        // no active worker). Surfaced to the UI so the user gets actionable feedback.
-        $pipelineStalled = $syncStarted
+        // Stalled: no queue worker is processing the pipeline. Two shapes:
+        // - the sync job was queued > 90 s ago and never started (last_run_at
+        //   still null) — the onboarding submit queues the crawl instead of
+        //   running it inline, so a missing worker now stalls before the crawl;
+        // - the sync ran > 90 s ago but no facts were extracted afterwards.
+        // Surfaced to the UI so the user gets actionable feedback.
+        $syncQueuedButNeverStarted = ! $syncStarted
+            && $integration !== null
+            && $integration->status === 'active'
+            && $integration->created_at !== null
+            && Carbon::parse($integration->created_at)->lt(now()->subSeconds(90));
+
+        $syncRanButNoFacts = $syncStarted
             && $factCount === 0
-            && ! $aiFailed
-            && ! $aiRetrying
             && $integration->status !== 'error'
             && Carbon::parse($integration->last_run_at)->lt(now()->subSeconds(90));
+
+        $pipelineStalled = ($syncQueuedButNeverStarted || $syncRanButNoFacts)
+            && ! $aiFailed
+            && ! $aiRetrying;
 
         $opportunityCount = Opportunity::where('company_id', $companyId)->where('status', 'open')->count();
         $recommendationCount = Recommendation::where('company_id', $companyId)->where('status', 'pending')->count();

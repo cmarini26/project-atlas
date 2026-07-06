@@ -163,9 +163,9 @@ onUnmounted(() => {
             <svg class="size-6 text-amber-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
           </div>
         </div>
-        <h1 class="text-base font-semibold text-[var(--color-text-primary)] mb-2">AI pipeline is waiting for a queue worker</h1>
-        <p class="text-sm text-[var(--color-text-muted)] mb-3">Your website was scanned, but the AI analysis is queued and no worker is processing it.</p>
-        <p class="text-xs text-[var(--color-text-muted)] font-mono bg-[var(--color-surface-raised)] rounded px-3 py-2 mb-6 text-left">php artisan queue:work --queue=high,ai,default,observations,maintenance</p>
+        <h1 class="text-base font-semibold text-[var(--color-text-primary)] mb-2">Atlas is waiting for a queue worker</h1>
+        <p class="text-sm text-[var(--color-text-muted)] mb-3">Your analysis is queued, but no worker is processing jobs. Start the dev stack with <code class="font-mono bg-[var(--color-surface-raised)] px-1 rounded">composer dev</code>, or run a worker directly:</p>
+        <p class="text-xs text-[var(--color-text-muted)] font-mono bg-[var(--color-surface-raised)] rounded px-3 py-2 mb-6 text-left">php artisan queue:work --queue=high,ai,default,observations,publishing,analytics,maintenance</p>
         <a
           href="/app"
           class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] transition-colors duration-[var(--duration-fast)]"
