@@ -16,7 +16,7 @@ return new class() extends Migration
             $table->string('source_identifier');
             $table->longText('raw_payload')->nullable();
             $table->string('raw_payload_ref')->nullable();
-            $table->enum('status', ['pending', 'processing', 'processed', 'failed'])->default('pending');
+            $table->enum('status', ['pending', 'processing', 'processed', 'failed', 'retrying'])->default('pending');
             $table->timestamp('observed_at');
             $table->timestamp('processed_at')->nullable();
             $table->timestamps();

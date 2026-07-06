@@ -4,6 +4,7 @@ namespace Tests\Unit\AI;
 
 use App\AI\AiResponse;
 use App\AI\Contracts\AiProvider;
+use App\AI\Exceptions\AiProviderOverloadedException;
 use App\AI\Prompts\FactExtractionPrompt;
 use App\AI\Prompts\Prompt;
 use App\AI\Providers\AnthropicProvider;
@@ -81,8 +82,9 @@ class AnthropicProviderTest extends TestCase
      *
      * @param  Response[]  $responses
      * @param  array<int, mixed>  &$history
+     * @param  array<int, int>|null  $retryDelaysMs
      */
-    private function makeProvider(array $responses, array &$history = []): AnthropicProvider
+    private function makeProvider(array $responses, array &$history = [], ?array $retryDelaysMs = null): AnthropicProvider
     {
         $mock = new MockHandler($responses);
         $stack = HandlerStack::create($mock);
@@ -94,7 +96,16 @@ class AnthropicProviderTest extends TestCase
             http: $http,
             apiKey: 'test-key',
             model: 'claude-test-model',
+            retryDelaysMs: $retryDelaysMs,
         );
+    }
+
+    private function overloadedResponseBody(): string
+    {
+        return (string) json_encode([
+            'type' => 'error',
+            'error' => ['type' => 'overloaded_error', 'message' => 'Overloaded'],
+        ]);
     }
 
     private function textResponseBody(string $text, string $model = 'claude-test-model'): string
@@ -270,6 +281,102 @@ class AnthropicProviderTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessageMatches('/authentication_error|Invalid API key/');
+
+        $provider->complete($this->makePlainPrompt());
+    }
+
+    // --- Overloaded error retry behavior ---
+
+    public function test_retries_overloaded_error_then_succeeds(): void
+    {
+        $history = [];
+        $provider = $this->makeProvider(
+            [
+                new Response(529, [], $this->overloadedResponseBody()),
+                new Response(529, [], $this->overloadedResponseBody()),
+                new Response(200, [], $this->toolUseResponseBody(['name' => 'Alice'])),
+            ],
+            $history,
+            retryDelaysMs: [0, 0, 0],
+        );
+
+        $result = $provider->complete($this->makeSchemaPrompt());
+
+        $this->assertSame(['name' => 'Alice'], json_decode($result->content, true));
+        $this->assertCount(3, $history, 'Expected two retries before the successful attempt.');
+    }
+
+    public function test_throws_overloaded_exception_after_retries_exhausted(): void
+    {
+        $history = [];
+        $overloaded = new Response(529, ['request-id' => 'req_test_529'], $this->overloadedResponseBody());
+        $provider = $this->makeProvider(
+            [$overloaded, $overloaded, $overloaded, $overloaded],
+            $history,
+            retryDelaysMs: [0, 0, 0],
+        );
+
+        try {
+            $provider->complete($this->makeSchemaPrompt());
+            $this->fail('Expected AiProviderOverloadedException was not thrown.');
+        } catch (AiProviderOverloadedException $e) {
+            $this->assertSame('req_test_529', $e->requestId);
+            $this->assertStringContainsString('overloaded', $e->getMessage());
+            $this->assertStringContainsString('req_test_529', $e->getMessage());
+        }
+
+        $this->assertCount(4, $history, 'Expected all retry attempts to be used.');
+    }
+
+    public function test_overloaded_error_type_detected_regardless_of_status_code(): void
+    {
+        // Some proxies rewrite the status code; the error body type is
+        // authoritative for retryability.
+        $history = [];
+        $provider = $this->makeProvider(
+            [
+                new Response(503, [], $this->overloadedResponseBody()),
+                new Response(200, [], $this->toolUseResponseBody(['name' => 'Alice'])),
+            ],
+            $history,
+            retryDelaysMs: [0],
+        );
+
+        $result = $provider->complete($this->makeSchemaPrompt());
+
+        $this->assertSame(['name' => 'Alice'], json_decode($result->content, true));
+        $this->assertCount(2, $history);
+    }
+
+    public function test_non_overloaded_errors_are_not_retried(): void
+    {
+        $history = [];
+        $errorBody = (string) json_encode(['type' => 'error', 'error' => ['type' => 'authentication_error', 'message' => 'Invalid API key']]);
+        $provider = $this->makeProvider(
+            [new Response(401, [], $errorBody)],
+            $history,
+            retryDelaysMs: [0, 0, 0],
+        );
+
+        try {
+            $provider->complete($this->makePlainPrompt());
+            $this->fail('Expected RuntimeException was not thrown.');
+        } catch (RuntimeException $e) {
+            $this->assertNotInstanceOf(AiProviderOverloadedException::class, $e);
+        }
+
+        $this->assertCount(1, $history, 'Non-overloaded errors must fail immediately without retries.');
+    }
+
+    public function test_api_error_message_includes_request_id_when_present(): void
+    {
+        $errorBody = (string) json_encode(['type' => 'error', 'error' => ['type' => 'invalid_request_error', 'message' => 'bad request']]);
+        $provider = $this->makeProvider(
+            [new Response(400, ['request-id' => 'req_test_400'], $errorBody)],
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessageMatches('/req_test_400/');
 
         $provider->complete($this->makePlainPrompt());
     }

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Brain;
 
 use App\AI\Contracts\AiProvider;
+use App\AI\Exceptions\AiProviderOverloadedException;
 use App\AI\Testing\FakeAiProvider;
 use App\Events\DigitalTwinActivated;
 use App\Events\ObservationProcessed;
@@ -235,6 +236,100 @@ class ProcessObservationTest extends TestCase
                 'ai_failed' => true,
                 'fact_count' => 0,
             ]);
+    }
+
+    public function test_marks_observation_retrying_when_provider_overloaded(): void
+    {
+        $this->fake->queueException(
+            new AiProviderOverloadedException('Anthropic API is overloaded', requestId: 'req_test')
+        );
+
+        try {
+            (new ProcessObservation($this->observation))->handle(
+                $this->app->make(WebsiteAnalyst::class),
+                $this->app->make(FactService::class),
+                $this->app->make(KnowledgeService::class),
+            );
+            $this->fail('Expected AiProviderOverloadedException was not thrown.');
+        } catch (AiProviderOverloadedException) {
+            // expected — rethrown so queued workers can retry
+        }
+
+        $this->observation->refresh();
+        $this->assertEquals('retrying', $this->observation->status);
+        $this->assertDatabaseCount('facts', 0);
+    }
+
+    public function test_overloaded_provider_surfaces_as_ai_retrying_in_onboarding_status(): void
+    {
+        $this->fake->queueException(
+            new AiProviderOverloadedException('Anthropic API is overloaded')
+        );
+
+        try {
+            (new ProcessObservation($this->observation))->handle(
+                $this->app->make(WebsiteAnalyst::class),
+                $this->app->make(FactService::class),
+                $this->app->make(KnowledgeService::class),
+            );
+        } catch (AiProviderOverloadedException) {
+            // expected
+        }
+
+        $response = $this->actingAs($this->makeOwner())->getJson('/api/onboarding/status');
+
+        // Freshly marked 'retrying' (< 30 s ago) — reported as waiting, no
+        // re-dispatch yet, and not confused with failed or stalled states.
+        $response->assertOk()
+            ->assertJson([
+                'crawl_succeeded' => true,
+                'ai_retrying' => true,
+                'ai_failed' => false,
+                'pipeline_stalled' => false,
+                'fact_count' => 0,
+            ]);
+    }
+
+    public function test_status_endpoint_redispatches_stale_retrying_observation(): void
+    {
+        // Observation parked in 'retrying' 2 minutes ago — past the 30 s
+        // re-dispatch throttle. The provider has recovered (valid fixture).
+        Observation::withoutGlobalScopes()
+            ->whereKey($this->observation->id)
+            ->update(['status' => 'retrying', 'updated_at' => now()->subMinutes(2)]);
+
+        $this->fake->queueFixture('website-facts');
+
+        $response = $this->actingAs($this->makeOwner())->getJson('/api/onboarding/status');
+
+        // The sync-queue re-dispatch ran inline: facts extracted, observation
+        // processed, and this same poll already reflects the recovery.
+        $response->assertOk()
+            ->assertJson([
+                'ai_retrying' => false,
+                'ai_failed' => false,
+                'fact_count' => 4,
+            ]);
+
+        $this->observation->refresh();
+        $this->assertEquals('processed', $this->observation->status);
+    }
+
+    private function makeOwner(): User
+    {
+        $user = User::create([
+            'name' => 'Owner',
+            'email' => 'owner@cbbauctions.com',
+            'password' => 'secret-password',
+        ]);
+
+        CompanyMembership::create([
+            'user_id' => $user->id,
+            'company_id' => $this->company->id,
+            'role' => 'owner',
+        ]);
+
+        return $user;
     }
 
     public function test_marks_failed_when_ai_provider_throws(): void

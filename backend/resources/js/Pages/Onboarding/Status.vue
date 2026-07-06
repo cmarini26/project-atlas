@@ -10,6 +10,7 @@ interface StatusData {
   crawl_succeeded: boolean
   pipeline_stalled: boolean
   ai_failed: boolean
+  ai_retrying: boolean
   fact_count: number
   opportunity_count: number
   recommendation_count: number
@@ -23,6 +24,7 @@ const status = ref<StatusData>({
   crawl_succeeded: false,
   pipeline_stalled: false,
   ai_failed: false,
+  ai_retrying: false,
   fact_count: 0,
   opportunity_count: 0,
   recommendation_count: 0,
@@ -36,7 +38,8 @@ let intervalId: ReturnType<typeof setInterval> | null = null
 const isTimedOut = computed(() => Date.now() - startTime > 5 * 60 * 1000)
 const isFailed = computed(() => status.value.integration_status === 'error')
 const isAiFailed = computed(() => status.value.ai_failed)
-const isStalled = computed(() => status.value.pipeline_stalled && !isFailed.value && !isAiFailed.value)
+const isAiRetrying = computed(() => status.value.ai_retrying && !isFailed.value && !isAiFailed.value)
+const isStalled = computed(() => status.value.pipeline_stalled && !isFailed.value && !isAiFailed.value && !isAiRetrying.value)
 
 async function fetchStatus(): Promise<void> {
   if (Date.now() - startTime > 10 * 60 * 1000) {
@@ -130,6 +133,24 @@ onUnmounted(() => {
             Go to dashboard
           </a>
         </div>
+      </div>
+
+      <!-- AI provider temporarily overloaded — retrying automatically -->
+      <div v-else-if="isAiRetrying">
+        <div class="mb-5 flex items-center justify-center">
+          <div class="size-12 rounded-full bg-amber-50 flex items-center justify-center">
+            <svg class="size-6 text-amber-500 animate-spin" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+          </div>
+        </div>
+        <h1 class="text-base font-semibold text-[var(--color-text-primary)] mb-2">Atlas is waiting for the AI provider</h1>
+        <p class="text-sm text-[var(--color-text-muted)] mb-3">Your website was scanned successfully, but the AI provider is temporarily overloaded. Atlas will retry automatically — no action needed.</p>
+        <p class="text-xs text-[var(--color-text-muted)] mb-6">You can stay on this page or come back later. Analysis will resume as soon as the provider is available.</p>
+        <a
+          href="/app"
+          class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-raised)] transition-colors duration-[var(--duration-fast)]"
+        >
+          Go to dashboard
+        </a>
       </div>
 
       <!-- Pipeline stalled — queue worker not processing jobs -->

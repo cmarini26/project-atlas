@@ -23,12 +23,12 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. |
-| Tests             | ✅ Strong | 618 tests (616 passing, 2 Redis skipped); PHPStan level 8 — 0 errors; Pint clean. Phase 5: max_tokens truncation fix + zero-fact AI responses now fail loudly. |
+| Tests             | ✅ Strong | 627 tests (625 passing, 2 Redis skipped); PHPStan level 8 — 0 errors; Pint clean. Phase 6: Anthropic overloaded_error is now retryable with backoff instead of a permanent failure. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
 
-**Overall:** Milestone 10 complete + full P0 onboarding pipeline fixed (Phase 1–5). Users flow correctly from registration → company creation → website connection → analysis → first recommendation. Phase 5 fixed real Anthropic responses producing 0 facts: `FactExtractionPrompt` max_tokens raised 1024→4096 (truncated forced tool calls returned empty input), `AnthropicProvider` now throws on `stop_reason=max_tokens`/missing tool_use for structured prompts, and `WebsiteAnalyst` throws `FactExtractionFailedException` on invalid/empty AI output instead of marking observations processed — surfacing as the `ai_failed` card in onboarding. 618 tests (616 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean.
+**Overall:** Milestone 10 complete + full P0 onboarding pipeline fixed (Phase 1–6). Users flow correctly from registration → company creation → website connection → analysis → first recommendation. Phase 6 made Anthropic `overloaded_error` retryable: the provider retries with backoff (logging `request-id`), observations park in the new `retrying` status instead of `failed`, the integration is no longer marked `error` for transient provider capacity issues, and the status page shows "Atlas is waiting for the AI provider" while retries continue automatically (poll-driven re-dispatch in sync mode, job backoff with a worker). 627 tests (625 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean.
 
 ---
 

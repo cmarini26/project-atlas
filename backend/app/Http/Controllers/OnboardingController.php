@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\AI\Exceptions\AiProviderOverloadedException;
 use App\Jobs\SyncIntegration;
 use App\Models\Channel;
 use App\Models\Company;
@@ -116,6 +117,11 @@ class OnboardingController extends Controller
         // are dispatched via the queue and processed by workers.
         try {
             SyncIntegration::dispatchSync($integration);
+        } catch (AiProviderOverloadedException $e) {
+            // The crawl succeeded — only the AI analysis is waiting on the
+            // provider. The observation is left in 'retrying' and the status
+            // endpoint re-dispatches it, so don't mark the integration error.
+            report($e);
         } catch (Throwable $e) {
             $integration->markAsError($e->getMessage());
             report($e);

@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\AI\Exceptions\AiProviderOverloadedException;
 use App\Events\IntegrationSyncCompleted;
 use App\Events\IntegrationSyncStarted;
 use App\Models\Integration;
@@ -56,6 +57,14 @@ class SyncIntegration implements ShouldBeUnique, ShouldQueue
 
     public function failed(Throwable $exception): void
     {
+        // A temporarily overloaded AI provider is not an integration failure —
+        // the crawl succeeded and the observation is queued for retry. Marking
+        // the integration 'error' here would show the "couldn't reach your
+        // website" card for a transient provider issue.
+        if ($exception instanceof AiProviderOverloadedException) {
+            return;
+        }
+
         $this->integration->markAsError($exception->getMessage());
     }
 }

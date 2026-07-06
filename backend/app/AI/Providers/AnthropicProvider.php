@@ -4,6 +4,7 @@ namespace App\AI\Providers;
 
 use App\AI\AiResponse;
 use App\AI\Contracts\AiProvider;
+use App\AI\Exceptions\AiProviderOverloadedException;
 use App\AI\Prompts\Prompt;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
@@ -31,20 +32,35 @@ final class AnthropicProvider implements AiProvider
 
     private const DEFAULT_BASE_URL = 'https://api.anthropic.com';
 
+    /**
+     * Backoff delays (ms) between retries of transient overloaded_error
+     * responses. Three retries = four attempts, ~5s worst-case wait — short
+     * enough to run inline during the onboarding request.
+     */
+    private const DEFAULT_RETRY_DELAYS_MS = [500, 1500, 3000];
+
     private Client $http;
 
     private string $model;
 
     private string $apiKey;
 
+    /** @var array<int, int> */
+    private array $retryDelaysMs;
+
+    /**
+     * @param  array<int, int>|null  $retryDelaysMs
+     */
     public function __construct(
         ?Client $http = null,
         ?string $apiKey = null,
         ?string $model = null,
         ?string $baseUrl = null,
+        ?array $retryDelaysMs = null,
     ) {
         $this->apiKey = $apiKey ?? (string) config('services.anthropic.api_key', '');
         $this->model = $model ?? (string) config('services.anthropic.model', self::DEFAULT_MODEL);
+        $this->retryDelaysMs = $retryDelaysMs ?? self::DEFAULT_RETRY_DELAYS_MS;
         $url = $baseUrl ?? (string) config('services.anthropic.base_url', self::DEFAULT_BASE_URL);
 
         $this->http = $http ?? new Client([
@@ -94,20 +110,66 @@ final class AnthropicProvider implements AiProvider
      */
     private function post(string $path, array $payload): array
     {
-        try {
-            $response = $this->http->post($path, [
-                'json' => $payload,
-                'headers' => [
-                    'x-api-key' => $this->apiKey,
-                    'anthropic-version' => self::API_VERSION,
-                    'content-type' => 'application/json',
-                ],
-            ]);
-        } catch (RequestException $e) {
-            $body = $e->hasResponse()
-                ? (string) $e->getResponse()?->getBody()
-                : $e->getMessage();
-            throw new RuntimeException("Anthropic API request failed: {$body}", 0, $e);
+        $maxAttempts = count($this->retryDelaysMs) + 1;
+
+        for ($attempt = 1; ; $attempt++) {
+            try {
+                $response = $this->http->post($path, [
+                    'json' => $payload,
+                    'headers' => [
+                        'x-api-key' => $this->apiKey,
+                        'anthropic-version' => self::API_VERSION,
+                        'content-type' => 'application/json',
+                    ],
+                ]);
+
+                break;
+            } catch (RequestException $e) {
+                $requestId = $this->requestIdFrom($e);
+
+                if (! $this->isOverloaded($e)) {
+                    $body = $e->hasResponse()
+                        ? (string) $e->getResponse()?->getBody()
+                        : $e->getMessage();
+
+                    Log::error('AnthropicProvider: API request failed.', [
+                        'request_id' => $requestId,
+                        'status' => $e->getResponse()?->getStatusCode(),
+                    ]);
+
+                    throw new RuntimeException(
+                        'Anthropic API request failed'
+                        .($requestId !== null ? " (request_id: {$requestId})" : '')
+                        .": {$body}", 0, $e,
+                    );
+                }
+
+                if ($attempt >= $maxAttempts) {
+                    Log::error('AnthropicProvider: API overloaded, retries exhausted.', [
+                        'attempts' => $attempt,
+                        'request_id' => $requestId,
+                    ]);
+
+                    throw new AiProviderOverloadedException(
+                        "Anthropic API is overloaded (overloaded_error) after {$attempt} attempts"
+                        .($requestId !== null ? " (request_id: {$requestId})" : '').'.',
+                        requestId: $requestId,
+                    );
+                }
+
+                $delayMs = $this->retryDelaysMs[$attempt - 1];
+
+                Log::warning('AnthropicProvider: API overloaded, retrying.', [
+                    'attempt' => $attempt,
+                    'max_attempts' => $maxAttempts,
+                    'delay_ms' => $delayMs,
+                    'request_id' => $requestId,
+                ]);
+
+                if ($delayMs > 0) {
+                    usleep($delayMs * 1000);
+                }
+            }
         }
 
         $body = (string) $response->getBody();
@@ -115,13 +177,47 @@ final class AnthropicProvider implements AiProvider
         // Raw response logging for local/debug troubleshooting only — the body can
         // contain crawled page content and must not be logged in production.
         if (config('app.debug')) {
-            Log::debug('AnthropicProvider: raw API response.', ['body' => $body]);
+            Log::debug('AnthropicProvider: raw API response.', [
+                'request_id' => $response->getHeaderLine('request-id') ?: null,
+                'body' => $body,
+            ]);
         }
 
         /** @var array<string, mixed> $data */
         $data = json_decode($body, true);
 
         return $data;
+    }
+
+    /**
+     * Anthropic signals temporary capacity issues with HTTP 529 and an
+     * error body of type "overloaded_error". Both are transient and safe
+     * to retry.
+     */
+    private function isOverloaded(RequestException $e): bool
+    {
+        $response = $e->getResponse();
+
+        if ($response === null) {
+            return false;
+        }
+
+        if ($response->getStatusCode() === 529) {
+            return true;
+        }
+
+        /** @var array<string, mixed>|null $decoded */
+        $decoded = json_decode((string) $response->getBody(), true);
+
+        return is_array($decoded)
+            && (($decoded['error']['type'] ?? null) === 'overloaded_error');
+    }
+
+    private function requestIdFrom(RequestException $e): ?string
+    {
+        $requestId = $e->getResponse()?->getHeaderLine('request-id');
+
+        return ($requestId !== null && $requestId !== '') ? $requestId : null;
     }
 
     /**

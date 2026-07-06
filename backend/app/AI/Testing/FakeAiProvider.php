@@ -7,10 +7,11 @@ use App\AI\Contracts\AiProvider;
 use App\AI\Prompts\Prompt;
 use PHPUnit\Framework\Assert;
 use RuntimeException;
+use Throwable;
 
 class FakeAiProvider implements AiProvider
 {
-    /** @var AiResponse[] */
+    /** @var array<int, AiResponse|Throwable> */
     private array $queue = [];
 
     /** @var array<int, array{prompt: Prompt, response: AiResponse}> */
@@ -46,6 +47,17 @@ class FakeAiProvider implements AiProvider
         return $this->queueResponse((string) file_get_contents($path));
     }
 
+    /**
+     * Queue an exception to be thrown on the next complete() call — used to
+     * simulate provider failures like AiProviderOverloadedException.
+     */
+    public function queueException(Throwable $exception): static
+    {
+        $this->queue[] = $exception;
+
+        return $this;
+    }
+
     public function complete(Prompt $prompt): AiResponse
     {
         if (empty($this->queue)) {
@@ -55,6 +67,10 @@ class FakeAiProvider implements AiProvider
         }
 
         $response = array_shift($this->queue);
+
+        if ($response instanceof Throwable) {
+            throw $response;
+        }
 
         $this->recorded[] = ['prompt' => $prompt, 'response' => $response];
 

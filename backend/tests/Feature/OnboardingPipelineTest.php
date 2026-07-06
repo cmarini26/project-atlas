@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\AI\Contracts\AiProvider;
+use App\AI\Exceptions\AiProviderOverloadedException;
 use App\AI\Testing\FakeAiProvider;
 use App\Events\RecommendationApproved;
 use App\Jobs\SyncIntegration;
@@ -183,6 +184,47 @@ class OnboardingPipelineTest extends TestCase
             'Expected exactly 5 AI calls across the onboarding pipeline.');
 
         Event::assertNotDispatched(RecommendationApproved::class);
+    }
+
+    public function test_overloaded_ai_provider_leaves_integration_active_and_marks_observation_retrying(): void
+    {
+        // The crawl succeeds, but the AI provider reports overloaded_error.
+        // This is transient: the integration must NOT be marked 'error'
+        // (the website was reachable) and the observation must be parked in
+        // 'retrying' rather than 'failed'.
+        $this->fake->queueException(
+            new AiProviderOverloadedException('Anthropic API is overloaded (overloaded_error) after 4 attempts', requestId: 'req_test')
+        );
+
+        $integration = Integration::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id,
+            'type' => 'website_crawl',
+            'name' => 'Website',
+            'config' => ['url' => 'https://cbb-auctions.example.com'],
+            'status' => 'active',
+        ]);
+
+        try {
+            SyncIntegration::dispatchSync($integration);
+            $this->fail('Expected AiProviderOverloadedException was not thrown.');
+        } catch (AiProviderOverloadedException) {
+            // Expected — propagates so OnboardingController can skip markAsError.
+        }
+
+        // SyncIntegration::failed() must not have marked the integration error.
+        $this->assertDatabaseHas('integrations', [
+            'id' => $integration->id,
+            'status' => 'active',
+        ]);
+
+        // The observation exists and is waiting for a retry.
+        $this->assertDatabaseHas('observations', [
+            'company_id' => $this->company->id,
+            'source_type' => 'crawl',
+            'status' => 'retrying',
+        ]);
+
+        $this->assertSame(0, Fact::withoutGlobalScopes()->where('company_id', $this->company->id)->count());
     }
 
     public function test_failed_crawl_marks_integration_as_error(): void

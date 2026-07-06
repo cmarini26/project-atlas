@@ -77,4 +77,13 @@ class Observation extends Model
     {
         $this->update(['status' => 'failed']);
     }
+
+    /**
+     * Processing hit a transient AI provider error (e.g. overloaded) and
+     * will be retried — distinct from 'failed', which is permanent.
+     */
+    public function markRetrying(): void
+    {
+        $this->update(['status' => 'retrying']);
+    }
 }

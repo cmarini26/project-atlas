@@ -1,8 +1,8 @@
 # P0 — Onboarding Website Submission Does Not Start Analysis
 
-**Status:** Complete (Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5)  
+**Status:** Complete (Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5 + Phase 6)  
 **Date:** 2026-07-05  
-**Tests:** 618 total (616 passing, 2 Redis skipped) — Phase 5 added 15 tests  
+**Tests:** 627 total (625 passing, 2 Redis skipped) — Phase 6 added 9 tests  
 **PHPStan:** Level 8 — 0 errors  
 **Pint:** Clean  
 **Frontend build:** 0 errors  
@@ -546,3 +546,78 @@ The `ai_failed` card previously blamed only API-key configuration. Since a zero-
 | Refusal / no tool_use block | `''` content → confusing "not valid JSON" error | Provider throws with `stop_reason` in the message |
 | Debugging a bad AI response locally | No visibility into raw output | Raw response logged at debug level when `APP_DEBUG=true` (provider + analyst) |
 | Prompt temperature | Never sent (API default used) | Sent per prompt (0.1 for fact extraction) |
+
+---
+
+## Phase 6 — Anthropic overloaded_error Treated as Permanent Failure
+
+### Problem
+
+When Anthropic returned `overloaded_error` (HTTP 529) during onboarding — a temporary capacity condition on Anthropic's side — the exception propagated up the inline sync chain and the integration was marked `error` immediately. The user saw "Atlas couldn't reach your website" (wrong: the crawl succeeded) for an issue that resolves itself within seconds to minutes.
+
+### Root Causes
+
+1. **No retryability classification.** `AnthropicProvider` threw the same generic `RuntimeException` for every API error; callers could not distinguish "invalid API key" (permanent) from "overloaded" (transient).
+2. **Two paths marked the integration `error`.** Both `SyncIntegration::failed()` (invoked by the sync queue driver before rethrowing) and `OnboardingController::createIntegration()`'s catch called `markAsError()` on any throwable.
+3. **No retry state.** Observations only had `pending`/`processing`/`processed`/`failed` — nothing to represent "waiting for the provider, will retry".
+
+### Fixes
+
+#### 1. `AiProviderOverloadedException` + in-provider retry/backoff
+
+New `App\AI\Exceptions\AiProviderOverloadedException` (carries a `requestId`). `AnthropicProvider::post()` now:
+
+- classifies a response as overloaded when the HTTP status is **529** or the error body type is **`overloaded_error`** (authoritative even if a proxy rewrites the status);
+- retries with backoff — default delays `[500 ms, 1500 ms, 3000 ms]` (4 attempts, ~5 s worst case, short enough to run inline during the onboarding request); delays are constructor-injectable for tests;
+- logs each retry (`attempt`, `delay_ms`, `request_id`) and logs + throws `AiProviderOverloadedException` when retries are exhausted;
+- logs and embeds the **`request-id` response header** in all API error logs and exception messages (also included in the debug raw-response log).
+
+Non-overloaded errors are never retried and still throw `RuntimeException` immediately.
+
+#### 2. New `retrying` observation status
+
+- `Observation::markRetrying()`; base `create_observations_table` migration now includes `'retrying'` in the status enum (fresh databases, including sqlite test DBs).
+- New migration `2026_07_05_000100_add_retrying_status_to_observations` rewrites the Postgres check constraint on existing databases (no-op on other drivers).
+
+#### 3. `ProcessObservation` — overload is not a failure
+
+A dedicated catch for `AiProviderOverloadedException` marks the observation **`retrying`** and rethrows. Only the *final queued attempt* (a real worker, `attempts() >= tries`) downgrades to `failed`. Added `$backoff = [30, 120]` so queued retries space out. Sync-mode runs (inline, no worker) always park in `retrying` — the status endpoint drives further retries (below).
+
+#### 4. Integration is not marked `error` for overload
+
+- `SyncIntegration::failed()` returns early for `AiProviderOverloadedException` — the crawl succeeded; only analysis is deferred.
+- `OnboardingController::createIntegration()` catches `AiProviderOverloadedException` separately: `report()` only, no `markAsError()`.
+
+#### 5. Status endpoint — `ai_retrying` + sync-mode self-healing retry
+
+`GET /api/onboarding/status` now returns `ai_retrying: true` while an observation is in `retrying`, and `pipeline_stalled` excludes that state. With `QUEUE_CONNECTION=sync` (no worker to resume the job), the endpoint **re-dispatches stale retrying observations inline** — throttled to one attempt per 30 s per observation — since the status page polls every 5 s anyway. A successful inline retry is reflected in the same poll's response. With an async queue the job's own `$tries`/`$backoff` handle retries and the endpoint only reports the state.
+
+#### 6. `Status.vue` — waiting state
+
+New amber card when `ai_retrying` is true: **"Atlas is waiting for the AI provider"** — explains the provider is temporarily overloaded, Atlas will retry automatically, no action needed. Polling continues (unlike the failure cards, which stop it).
+
+### Tests Added (Phase 6)
+
+| Test | File |
+|------|------|
+| `test_retries_overloaded_error_then_succeeds` | `AnthropicProviderTest` — 529, 529, success → 3 requests |
+| `test_throws_overloaded_exception_after_retries_exhausted` | `AnthropicProviderTest` — asserts `requestId` from the `request-id` header and 4 attempts |
+| `test_overloaded_error_type_detected_regardless_of_status_code` | `AnthropicProviderTest` — 503 + `overloaded_error` body still retried |
+| `test_non_overloaded_errors_are_not_retried` | `AnthropicProviderTest` — 401 fails immediately, 1 request |
+| `test_api_error_message_includes_request_id_when_present` | `AnthropicProviderTest` |
+| `test_marks_observation_retrying_when_provider_overloaded` | `ProcessObservationTest` — status `retrying`, not `failed` |
+| `test_overloaded_provider_surfaces_as_ai_retrying_in_onboarding_status` | `ProcessObservationTest` — `ai_retrying=true`, `ai_failed=false`, `pipeline_stalled=false` |
+| `test_status_endpoint_redispatches_stale_retrying_observation` | `ProcessObservationTest` — stale retrying observation reprocessed inline by the poll; facts appear in the same response |
+| `test_overloaded_ai_provider_leaves_integration_active_and_marks_observation_retrying` | `OnboardingPipelineTest` — full inline chain: integration stays `active`, observation parked `retrying` |
+
+`FakeAiProvider` gained `queueException(Throwable)` to simulate provider failures.
+
+### Behaviour Comparison (Phase 6)
+
+| Scenario | Before Phase 6 | After Phase 6 |
+|----------|---------------|---------------|
+| Anthropic returns overloaded_error once | Integration marked `error`; "couldn't reach your website" card | Provider retries inline (~0.5–5 s backoff); usually succeeds transparently |
+| Overload persists through all provider retries | Same permanent failure | Observation parked `retrying`; integration stays `active`; status page shows "Atlas is waiting for the AI provider" and keeps polling |
+| Overload recovery (sync queue) | Never — user had to restart onboarding | Status poll re-dispatches after 30 s; analysis resumes automatically |
+| Overload recovery (async queue) | Job retried but observation flickered `failed` | Job retries with 30 s / 120 s backoff; observation shows `retrying`; only the final attempt marks `failed` |
+| Debugging an Anthropic incident | No request correlation | `request-id` logged on every retry/error and embedded in exception messages |
