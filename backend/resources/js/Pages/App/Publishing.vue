@@ -4,6 +4,9 @@ import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
 
+// Persistent layout: the sidebar/toast shell survives Inertia visits.
+defineOptions({ layout: AppLayout })
+
 interface ExecutionItem {
   id: string
   status: string
@@ -51,47 +54,45 @@ function formatDate(date: string | null): string {
 
 <template>
   <Head><title>Publishing — Atlas</title></Head>
-  <AppLayout>
-    <div class="max-w-3xl">
-      <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-6">Publishing Activity</h1>
+  <div class="max-w-3xl">
+    <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-6">Publishing Activity</h1>
 
-      <EmptyState
-        v-if="executions.data.length === 0"
-        title="No publishing activity yet"
-        description="Content executions appear here once campaigns are approved and running."
-      />
+    <EmptyState
+      v-if="executions.data.length === 0"
+      title="No publishing activity yet"
+      description="Content executions appear here once campaigns are approved and running."
+    />
 
-      <div v-else>
-        <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl divide-y divide-[var(--color-border)] mb-4">
-          <div
-            v-for="execution in executions.data"
-            :key="execution.id"
-            class="px-4 py-4"
-          >
-            <div class="flex items-start justify-between gap-3 mb-2">
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 mb-1">
-                  <span class="text-sm font-medium text-[var(--color-text-primary)]">
-                    {{ execution.channel?.type ?? 'Unknown channel' }}
-                  </span>
-                  <Badge :variant="statusVariants[execution.status] ?? 'muted'">
-                    {{ statusLabels[execution.status] ?? execution.status }}
-                  </Badge>
-                </div>
-                <p v-if="execution.content_asset?.body" class="text-sm text-[var(--color-text-secondary)] line-clamp-2">
-                  {{ execution.content_asset.body }}
-                </p>
-                <p v-if="execution.last_error" class="text-xs text-rose-600 mt-1">{{ execution.last_error }}</p>
+    <div v-else>
+      <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl divide-y divide-[var(--color-border)] mb-4">
+        <div
+          v-for="execution in executions.data"
+          :key="execution.id"
+          class="px-4 py-4"
+        >
+          <div class="flex items-start justify-between gap-3 mb-2">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-sm font-medium text-[var(--color-text-primary)]">
+                  {{ execution.channel?.type ?? 'Unknown channel' }}
+                </span>
+                <Badge :variant="statusVariants[execution.status] ?? 'muted'">
+                  {{ statusLabels[execution.status] ?? execution.status }}
+                </Badge>
               </div>
+              <p v-if="execution.content_asset?.body" class="text-sm text-[var(--color-text-secondary)] line-clamp-2">
+                {{ execution.content_asset.body }}
+              </p>
+              <p v-if="execution.last_error" class="text-xs text-rose-600 mt-1">{{ execution.last_error }}</p>
             </div>
-            <p class="text-xs text-[var(--color-text-muted)]">{{ formatDate(execution.scheduled_at) }}</p>
           </div>
+          <p class="text-xs text-[var(--color-text-muted)]">{{ formatDate(execution.scheduled_at) }}</p>
         </div>
-
-        <p v-if="executions.total > executions.data.length" class="text-sm text-center text-[var(--color-text-muted)]">
-          Showing {{ executions.data.length }} of {{ executions.total }} executions
-        </p>
       </div>
+
+      <p v-if="executions.total > executions.data.length" class="text-sm text-center text-[var(--color-text-muted)]">
+        Showing {{ executions.data.length }} of {{ executions.total }} executions
+      </p>
     </div>
-  </AppLayout>
+  </div>
 </template>

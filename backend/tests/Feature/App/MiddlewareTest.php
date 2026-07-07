@@ -62,6 +62,50 @@ class MiddlewareTest extends TestCase
             ->assertOk();
     }
 
+    public function test_shared_companies_prop_lists_all_memberships_for_switcher(): void
+    {
+        $user = User::factory()->create();
+        $companies = [];
+
+        foreach (['co-x', 'co-y'] as $slug) {
+            $company = Company::withoutGlobalScopes()->create(['name' => $slug, 'slug' => $slug]);
+            CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => 'owner']);
+            $this->createIntegration($company);
+            $companies[] = $company;
+        }
+
+        $this->actingAs($user)
+            ->withSession(['selected_company_id' => $companies[0]->id])
+            ->get('/app')
+            ->assertInertia(fn ($page) => $page
+                ->has('companies', 2)
+                ->where('companies.0.name', 'co-x')
+                ->where('companies.1.name', 'co-y')
+            );
+    }
+
+    public function test_shared_companies_prop_is_a_single_entry_for_single_membership_user(): void
+    {
+        [$user] = $this->userWithCompanyAndIntegration();
+
+        $this->actingAs($user)
+            ->get('/app')
+            ->assertInertia(fn ($page) => $page->has('companies', 1));
+    }
+
+    public function test_shared_company_prop_reflects_the_current_tenant(): void
+    {
+        // Regression: HandleInertiaRequests is global 'web' middleware and
+        // runs before route-level 'company' middleware sets the request
+        // attribute, so an eagerly-computed 'company' prop always resolved
+        // to null. It must be a closure, resolved when the response is built.
+        [$user, $company] = $this->userWithCompanyAndIntegration();
+
+        $this->actingAs($user)
+            ->get('/app')
+            ->assertInertia(fn ($page) => $page->where('company.name', $company->name));
+    }
+
     /** @return array{User, Company} */
     private function userWithCompanyAndIntegration(string $role = 'owner'): array
     {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Link } from '@inertiajs/vue3'
 import { computed } from 'vue'
 
 interface Health {
@@ -44,7 +45,7 @@ const healthLabelColor = computed(() => {
   <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-sm font-semibold text-[var(--color-text-primary)]">Business Brain</h2>
-      <a href="/app/brain" class="text-xs text-[var(--color-text-link)] hover:underline">View all</a>
+      <Link href="/app/brain" class="text-xs text-[var(--color-text-link)] hover:underline">View all</Link>
     </div>
 
     <div class="flex items-center justify-between mb-4">

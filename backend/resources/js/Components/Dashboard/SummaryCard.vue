@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { Link } from '@inertiajs/vue3'
+
 defineProps<{
   label: string
   value: number | string
@@ -8,7 +10,7 @@ defineProps<{
 
 <template>
   <component
-    :is="href ? 'a' : 'div'"
+    :is="href ? Link : 'div'"
     :href="href"
     :class="[
       'block bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5',

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useForm } from '@inertiajs/vue3'
+import { useForm, Link } from '@inertiajs/vue3'
 import AuthLayout from '@/Layouts/AuthLayout.vue'
 
 interface CompanyOption {
@@ -48,7 +48,7 @@ function select(id: string): void {
 
     <div v-if="companies.length === 0" class="text-center py-4">
       <p class="text-sm text-[var(--color-text-muted)]">No workspaces found.</p>
-      <a href="/onboarding" class="mt-2 inline-block text-sm text-[var(--color-text-link)] hover:underline">Set one up</a>
+      <Link href="/onboarding" class="mt-2 inline-block text-sm text-[var(--color-text-link)] hover:underline">Set one up</Link>
     </div>
   </AuthLayout>
 </template>

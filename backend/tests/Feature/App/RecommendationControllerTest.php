@@ -3,8 +3,10 @@
 namespace Tests\Feature\App;
 
 use App\Models\Campaign;
+use App\Models\Channel;
 use App\Models\Company;
 use App\Models\CompanyMembership;
+use App\Models\ContentAsset;
 use App\Models\Decision;
 use App\Models\Opportunity;
 use App\Models\Recommendation;
@@ -70,6 +72,40 @@ class RecommendationControllerTest extends TestCase
             ->get("/app/recommendations/{$rec->id}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page->component('App/Recommendations/Show'));
+    }
+
+    public function test_show_includes_content_asset_channel_for_approval_confirmation(): void
+    {
+        // The frontend approval confirmation dialog names the content and its
+        // destination channel — the show payload must carry the channel type
+        // for every content asset, not just the campaign.
+        [$user, $company] = $this->userWithCompany();
+
+        $channel = Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'blog',
+            'name' => 'Blog',
+            'is_active' => true,
+        ]);
+
+        $rec = $this->pendingRecommendation($company);
+
+        ContentAsset::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_id' => $rec->campaign_id,
+            'channel_id' => $channel->id,
+            'type' => 'blog_post',
+            'title' => 'Rare finds this week',
+            'body' => 'Body copy',
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs($user)
+            ->get("/app/recommendations/{$rec->id}")
+            ->assertInertia(fn ($page) => $page
+                ->where('content_assets.0.title', 'Rare finds this week')
+                ->where('content_assets.0.channel.type', 'blog')
+            );
     }
 
     public function test_show_returns_404_for_other_company_recommendation(): void

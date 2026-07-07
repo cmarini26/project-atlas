@@ -6,6 +6,31 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [P1 Customer Trust & Navigation — Approval Confirmation, Company Switcher, Persistent Layout, Toasts] — 2026-07-07
+
+Implements P1 items 8–11 from [Product-Polish-Audit.md](docs/reviews/Product-Polish-Audit.md). Details in [P1-Customer-Trust-Navigation-Review.md](docs/reviews/P1-Customer-Trust-Navigation-Review.md). Email notifications, Sentry, and Channels UI (items 7, 12–14) intentionally not implemented in this slice.
+
+### Added
+
+- **Approval confirmation** — `ConfirmDialog.vue` (new, teleported, focus-managed, Escape-to-cancel) gates recommendation approval. The dialog lists exactly what will publish and to which channel per content asset, falling back to a generic explanation when there are none. Only confirming submits; cancelling does not.
+- **Company switcher** — `CompanySwitcher.vue` in the sidebar header, shown only for users with more than one company membership. Posts to the existing `/company/select` endpoint. Tenant-switching safety (rejecting a company the user doesn't belong to, and that a switch actually re-scopes subsequent requests) is covered by new tests, not just assumed from existing code.
+- **Toast primitive** — `composables/useToasts.ts` (module-scoped stack, auto-dismiss, `clearToasts`) + `ToastStack.vue` (dismissible, `aria-live`, animated) replace the static, non-dismissible flash banners. New semantic design tokens (`--color-success-*`, `--color-danger-*`) back the toasts instead of hardcoded Tailwind palette classes.
+- **Vitest test infrastructure** — the project's first JS test runner (`happy-dom` environment, `vitest.config.ts`, `npm test`). 13 new tests across `ApproveActions.spec.ts`, `CompanySwitcher.spec.ts`, `useToasts.spec.ts`.
+- 9 new PHP tests: `CompanySelectorControllerTest` (index listing, select success, **select rejects a foreign company id — 404**, validation, end-to-end tenant switch), `MiddlewareTest` (+3: shared `companies` prop, and the regression test below), `RecommendationControllerTest` (+1: `content_assets` carry channel data for the confirmation dialog).
+
+### Fixed
+
+- **The shared Inertia `company` prop had always resolved to `null`.** `HandleInertiaRequests` is registered as global `web` middleware and therefore runs *before* the route-level `EnsureCompanyMembership` middleware sets the `company` request attribute — the prop was computed eagerly at share-time, when the attribute didn't exist yet. This silently broke the sidebar's company-name display (and would have broken the new switcher) on every request. Fixed by making `company` a lazy closure, same pattern as the new `companies` prop, deferring evaluation until the Inertia response is actually built.
+
+### Changed
+
+- **Persistent layout** — all 12 `Pages/App/**` pages now use `defineOptions({ layout: AppLayout })` instead of wrapping their template in `<AppLayout>`. The sidebar, mobile drawer state, and toast stack survive Inertia navigations instead of remounting per page.
+- **Active-nav-link detection** — replaced `window.location.pathname` (which only worked because of the remount the persistent layout just removed) with a reactive `usePage().url`-derived computed.
+- **`<Link>` sweep** — 18 raw `<a href="/app/...">` internal navigations across 10 files converted to Inertia `<Link>`, including `SummaryCard.vue`'s dynamic `<component :is>` tag resolution. No visual redesign — markup and styling otherwise unchanged.
+- `ApproveActions.vue` now receives `content_assets` as a prop (already returned by `RecommendationController::show()`) to build the confirmation copy — no new request needed.
+
+---
+
 ## [P0 Product Polish — Recurring Loop, Account Safety, Truthful Copy] — 2026-07-06
 
 Implements the P0 tier of [Product-Polish-Audit.md](docs/reviews/Product-Polish-Audit.md). Details in [P0-Product-Polish-Review.md](docs/reviews/P0-Product-Polish-Review.md).

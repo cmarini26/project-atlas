@@ -193,16 +193,18 @@ Decent base (labels, `aria-label`s, `role=alert/status`). Gaps worth closing for
 
 ### P1 — The polish sprint (≈1 week)
 
-| # | Item | Area |
-|---|------|------|
-| 7 | Email notifications: recommendation ready, sync failed (Postmark) | Flow |
-| 8 | Approve confirmation with concrete effect summary | Flow |
-| 9 | Persistent layout + `usePage().url` active state + `<Link>` sweep | UI |
-| 10 | Toast system replacing static flash banners | UI |
-| 11 | Company switcher in sidebar (multi-membership) | Flow |
-| 12 | Sentry + Filament failed-jobs page + Supervisor config | System |
-| 13 | Persist AI usage per call (tokens, prompt version, request_id) | System |
-| 14 | Icon component + Button/FormField/Card primitives | UI |
+> **Status (2026-07-07): Customer Trust & Navigation slice SHIPPED** — items 8, 9, 10, 11 implemented (see [P1-Customer-Trust-Navigation-Review.md](P1-Customer-Trust-Navigation-Review.md)). Items 7, 12, 13, 14 remain — explicitly deferred per scope (no email notifications, no Sentry, no Channels UI yet).
+
+| # | Item | Area | Status |
+|---|------|------|--------|
+| 7 | Email notifications: recommendation ready, sync failed (Postmark) | Flow | Not started |
+| 8 | Approve confirmation with concrete effect summary | Flow | ✅ Done |
+| 9 | Persistent layout + `usePage().url` active state + `<Link>` sweep | UI | ✅ Done |
+| 10 | Toast system replacing static flash banners | UI | ✅ Done |
+| 11 | Company switcher in sidebar (multi-membership) | Flow | ✅ Done |
+| 12 | Sentry + Filament failed-jobs page + Supervisor config | System | Not started |
+| 13 | Persist AI usage per call (tokens, prompt version, request_id) | System | Not started |
+| 14 | Icon component + Button/FormField/Card primitives | UI | Not started |
 
 ### P2 — Fast-follows
 

@@ -1,12 +1,28 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { usePage, Link, router } from '@inertiajs/vue3'
+import CompanySwitcher from '@/Components/App/CompanySwitcher.vue'
+import ToastStack from '@/Components/UI/ToastStack.vue'
+import { useToasts } from '@/composables/useToasts'
 import type { SharedProps } from '@/types'
 
 const page = usePage<SharedProps>()
 const company = computed(() => page.props.company)
+const companies = computed(() => page.props.companies ?? [])
 const user = computed(() => page.props.auth.user)
-const flash = computed(() => page.props.flash)
+
+// Flash messages surface as dismissible toasts. Watching the shared prop
+// (rather than rendering it inline) keeps working across Inertia visits
+// under the persistent layout.
+const { addToast } = useToasts()
+watch(
+  () => page.props.flash,
+  (flash) => {
+    if (flash?.success) addToast('success', flash.success)
+    if (flash?.error) addToast('error', flash.error)
+  },
+  { immediate: true, deep: true },
+)
 
 const sidebarOpen = ref(false)
 
@@ -21,11 +37,15 @@ const navLinks = [
   { name: 'Learning', href: '/app/learning', icon: 'academic-cap' },
 ]
 
+// page.props/url are reactive across Inertia visits — window.location is
+// not, and would leave stale active states under the persistent layout.
+const currentPath = computed(() => page.url.split('?')[0])
+
 function isActive(href: string): boolean {
   if (href === '/app') {
-    return window.location.pathname === '/app'
+    return currentPath.value === '/app'
   }
-  return window.location.pathname.startsWith(href)
+  return currentPath.value.startsWith(href)
 }
 
 function logout(): void {
@@ -70,10 +90,17 @@ function logout(): void {
       <!-- Logo -->
       <div class="flex items-center gap-2 px-4 h-16 border-b border-[var(--color-border)] shrink-0">
         <span class="font-semibold text-lg text-[var(--color-text-primary)] tracking-tight">Atlas</span>
-        <span
-          v-if="company"
-          class="ml-auto text-xs font-medium text-[var(--color-text-muted)] truncate max-w-24"
-        >{{ company.name }}</span>
+        <div v-if="company" class="ml-auto min-w-0">
+          <CompanySwitcher
+            v-if="companies.length > 1"
+            :company="company"
+            :companies="companies"
+          />
+          <span
+            v-else
+            class="text-xs font-medium text-[var(--color-text-muted)] truncate max-w-24 block"
+          >{{ company.name }}</span>
+        </div>
       </div>
 
       <!-- Navigation -->
@@ -139,29 +166,12 @@ function logout(): void {
 
     <!-- Main content -->
     <div class="lg:pl-60 min-h-screen flex flex-col">
-      <!-- Flash messages -->
-      <div v-if="flash.success || flash.error" class="px-4 lg:px-8 pt-4">
-        <div
-          v-if="flash.success"
-          class="flex items-start gap-3 p-4 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm"
-          role="status"
-        >
-          <svg class="size-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
-          {{ flash.success }}
-        </div>
-        <div
-          v-if="flash.error"
-          class="flex items-start gap-3 p-4 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-sm"
-          role="alert"
-        >
-          <svg class="size-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg>
-          {{ flash.error }}
-        </div>
-      </div>
-
       <main class="flex-1 px-4 py-6 lg:px-8">
         <slot />
       </main>
     </div>
+
+    <!-- Dismissible toasts (flash + programmatic) -->
+    <ToastStack />
   </div>
 </template>

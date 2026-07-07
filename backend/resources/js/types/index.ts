@@ -169,8 +169,14 @@ export interface AppliedEffect {
 }
 
 // Page prop shapes (Inertia shared data)
+export interface CompanyOption {
+    id: string
+    name: string
+}
+
 export interface SharedProps {
     auth: { user: AuthUser | null }
     company: Company | null
+    companies: CompanyOption[]
     flash: { success: string | null; error: string | null }
 }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Link } from '@inertiajs/vue3'
 import type { Recommendation } from '@/types'
 
 const props = defineProps<{
@@ -24,13 +25,13 @@ const whyNow = props.recommendation.rationale_display?.why_now
           {{ (recommendation.campaign_type ?? '').replace(/_/g, ' ') }} campaign
         </h3>
         <p v-if="whyNow" class="text-sm text-[var(--color-text-secondary)] line-clamp-2">{{ whyNow }}</p>
-        <a
+        <Link
           :href="`/app/recommendations/${recommendation.id}`"
           class="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-accent-600)] hover:text-[var(--color-accent-700)] transition-colors duration-[var(--duration-fast)]"
         >
           Review &amp; approve
           <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
-        </a>
+        </Link>
       </div>
     </div>
   </div>

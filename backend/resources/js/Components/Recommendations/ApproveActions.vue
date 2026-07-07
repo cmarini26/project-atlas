@@ -1,15 +1,19 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useForm } from '@inertiajs/vue3'
+import ConfirmDialog from '@/Components/UI/ConfirmDialog.vue'
+import type { ContentAsset } from '@/types'
 
 const props = defineProps<{
   recommendationId: string
+  contentAssets?: ContentAsset[]
 }>()
 
 const emit = defineEmits<{
   editAndApprove: []
 }>()
 
+const showConfirm = ref(false)
 const showRejectNote = ref(false)
 const rejectNote = ref('')
 const approveError = ref<string | null>(null)
@@ -18,11 +22,40 @@ const rejectError = ref<string | null>(null)
 const approveForm = useForm({})
 const rejectForm = useForm({ notes: '' })
 
+const assetTypeLabels: Record<string, string> = {
+  blog_post: 'blog post',
+  email: 'email',
+  social_post: 'social post',
+  sms: 'SMS message',
+  landing_page: 'landing page',
+}
+
+// Concrete "what will happen" lines shown in the confirmation dialog —
+// one per content asset, naming the content and its destination channel.
+const approvalEffects = computed(() =>
+  (props.contentAssets ?? []).map((asset) => {
+    const type = assetTypeLabels[asset.type] ?? asset.type.replace(/_/g, ' ')
+    const destination = asset.channel ? `your ${asset.channel.type} channel` : 'its channel'
+    const title = asset.title ? ` “${asset.title}”` : ''
+
+    return `Publish the ${type}${title} to ${destination}.`
+  }),
+)
+
+function requestApproval(): void {
+  approveError.value = null
+  showConfirm.value = true
+}
+
 function approve(): void {
   approveError.value = null
   approveForm.post(`/app/recommendations/${props.recommendationId}/approve`, {
     preserveScroll: true,
+    onSuccess: () => {
+      showConfirm.value = false
+    },
     onError: () => {
+      showConfirm.value = false
       approveError.value = 'Something went wrong. Please try again.'
     },
   })
@@ -47,7 +80,7 @@ function reject(): void {
         type="button"
         :disabled="approveForm.processing || rejectForm.processing"
         class="flex-1 py-2.5 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
-        @click="approve"
+        @click="requestApproval"
       >
         {{ approveForm.processing ? 'Approving…' : 'Approve' }}
       </button>
@@ -94,5 +127,23 @@ function reject(): void {
         {{ rejectForm.processing ? 'Passing…' : 'Confirm: not this time' }}
       </button>
     </div>
+
+    <!-- Approval confirmation: spells out exactly what approving will do -->
+    <ConfirmDialog
+      :open="showConfirm"
+      title="Approve this recommendation?"
+      :confirm-label="approveForm.processing ? 'Approving…' : 'Approve & publish'"
+      :processing="approveForm.processing"
+      @confirm="approve"
+      @cancel="showConfirm = false"
+    >
+      <ul v-if="approvalEffects.length > 0" class="list-disc pl-4 space-y-1 mb-3">
+        <li v-for="(effect, index) in approvalEffects" :key="index">{{ effect }}</li>
+      </ul>
+      <p v-else class="mb-3">Atlas will queue this campaign's content for publishing.</p>
+      <p class="text-xs text-[var(--color-text-muted)]">
+        Publishing starts right after you approve. You can follow progress on the Publishing page.
+      </p>
+    </ConfirmDialog>
   </div>
 </template>
