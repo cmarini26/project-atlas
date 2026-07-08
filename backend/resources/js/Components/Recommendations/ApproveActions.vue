@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useForm } from '@inertiajs/vue3'
 import ConfirmDialog from '@/Components/UI/ConfirmDialog.vue'
+import { CAPABILITY_LABELS, channelCapability, channelLabel } from '@/lib/channelCapability'
 import type { ContentAsset } from '@/types'
 
 const props = defineProps<{
@@ -30,15 +31,25 @@ const assetTypeLabels: Record<string, string> = {
   landing_page: 'landing page',
 }
 
-// Concrete "what will happen" lines shown in the confirmation dialog —
-// one per content asset, naming the content and its destination channel.
+// Concrete "what will happen" lines shown in the confirmation dialog — one
+// per content asset, naming the content, its destination channel, and that
+// channel's real capability today. No channel truly publishes externally
+// yet (see docs/reviews/Channel-Publishing-Reality-Audit.md), so this must
+// never read as "your content will go live" until that changes.
 const approvalEffects = computed(() =>
   (props.contentAssets ?? []).map((asset) => {
     const type = assetTypeLabels[asset.type] ?? asset.type.replace(/_/g, ' ')
-    const destination = asset.channel ? `your ${asset.channel.type} channel` : 'its channel'
     const title = asset.title ? ` “${asset.title}”` : ''
+    const channelType = asset.channel?.type
 
-    return `Publish the ${type}${title} to ${destination}.`
+    if (!channelType) {
+      return `Queue the ${type}${title} for delivery.`
+    }
+
+    const label = channelLabel(channelType)
+    const capabilityNote = CAPABILITY_LABELS[channelCapability(channelType)]
+
+    return `Queue the ${type}${title} for ${label} — ${capabilityNote}: logged internally, not yet sent live.`
   }),
 )
 
@@ -107,7 +118,7 @@ function reject(): void {
     <p v-if="approveError" class="text-sm text-rose-600" role="alert">{{ approveError }}</p>
 
     <p class="text-xs text-[var(--color-text-muted)]">
-      Approving queues this content for publishing. You can make edits before approving if anything needs changing.
+      Approving queues this content for delivery. Until a live channel is connected, delivery is simulated and logged internally — nothing is sent to a real platform yet. You can make edits before approving if anything needs changing.
     </p>
 
     <div v-if="showRejectNote" class="space-y-2">
@@ -132,7 +143,7 @@ function reject(): void {
     <ConfirmDialog
       :open="showConfirm"
       title="Approve this recommendation?"
-      :confirm-label="approveForm.processing ? 'Approving…' : 'Approve & publish'"
+      :confirm-label="approveForm.processing ? 'Approving…' : 'Approve'"
       :processing="approveForm.processing"
       @confirm="approve"
       @cancel="showConfirm = false"
@@ -140,9 +151,9 @@ function reject(): void {
       <ul v-if="approvalEffects.length > 0" class="list-disc pl-4 space-y-1 mb-3">
         <li v-for="(effect, index) in approvalEffects" :key="index">{{ effect }}</li>
       </ul>
-      <p v-else class="mb-3">Atlas will queue this campaign's content for publishing.</p>
+      <p v-else class="mb-3">Atlas will queue this campaign's content for internal processing. No live channels are connected yet, so nothing is sent externally.</p>
       <p class="text-xs text-[var(--color-text-muted)]">
-        Publishing starts right after you approve. You can follow progress on the Publishing page.
+        Processing starts right after you approve. You can follow progress on the Publishing page — entries there are currently simulated, not live sends.
       </p>
     </ConfirmDialog>
   </div>

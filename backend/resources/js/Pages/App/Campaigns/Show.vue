@@ -3,6 +3,8 @@ import { Head, Link } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
+import ChannelCapabilityBadge from '@/Components/UI/ChannelCapabilityBadge.vue'
+import { channelLabel } from '@/lib/channelCapability'
 import type { Campaign, ContentAsset, Execution, CampaignKpiSnapshot } from '@/types'
 
 // Persistent layout: the sidebar/toast shell survives Inertia visits.
@@ -100,7 +102,8 @@ function formatDate(date: string | null): string {
         >
           <div class="flex items-center gap-2 mb-2">
             <Badge variant="muted">{{ asset.type }}</Badge>
-            <span v-if="asset.channel?.type" class="text-xs text-[var(--color-text-muted)]">{{ asset.channel.type }}</span>
+            <span v-if="asset.channel?.type" class="text-xs text-[var(--color-text-muted)]">{{ channelLabel(asset.channel.type) }}</span>
+            <ChannelCapabilityBadge v-if="asset.channel?.type" :channel-type="asset.channel.type" />
           </div>
           <h3 v-if="asset.title" class="text-sm font-semibold text-[var(--color-text-primary)] mb-1">{{ asset.title }}</h3>
           <p class="text-sm text-[var(--color-text-secondary)] whitespace-pre-line">{{ asset.body }}</p>
@@ -115,7 +118,7 @@ function formatDate(date: string | null): string {
       <EmptyState
         v-if="executions.length === 0"
         title="No publishing activity"
-        description="Executions appear here as content is scheduled and published."
+        description="Executions appear here as content is scheduled and processed (simulated — not yet sent to a live channel)."
       />
 
       <div v-else class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl divide-y divide-[var(--color-border)]">
@@ -125,7 +128,10 @@ function formatDate(date: string | null): string {
           class="flex items-center gap-3 px-4 py-3"
         >
           <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-[var(--color-text-primary)] truncate">{{ execution.channel?.type ?? 'Unknown' }}</p>
+            <div class="flex items-center gap-2">
+              <p class="text-sm font-medium text-[var(--color-text-primary)] truncate">{{ execution.channel ? channelLabel(execution.channel.type) : 'Unknown' }}</p>
+              <ChannelCapabilityBadge v-if="execution.channel" :channel-type="execution.channel.type" />
+            </div>
             <p class="text-xs text-[var(--color-text-muted)]">{{ formatDate(execution.scheduled_at) }}</p>
           </div>
           <Badge :variant="executionStatusVariants[execution.status] ?? 'muted'">

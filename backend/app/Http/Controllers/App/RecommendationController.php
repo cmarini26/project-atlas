@@ -97,8 +97,11 @@ class RecommendationController extends Controller
 
         $this->approvalService->approve($recommendation, $user, $request->input('notes'));
 
+        // No channel truly publishes externally yet — see
+        // docs/reviews/Channel-Publishing-Reality-Audit.md. Keep this message
+        // honest until a real channel integration ships.
         return redirect()->route('app.recommendations.index')
-            ->with('success', 'Approved. Atlas will handle the publishing.');
+            ->with('success', 'Approved. Atlas will process this campaign — publishing is currently simulated until a live channel is connected.');
     }
 
     public function approveEdit(Request $request, Recommendation $recommendation): RedirectResponse

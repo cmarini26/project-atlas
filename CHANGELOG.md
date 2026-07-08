@@ -6,6 +6,35 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Channel Publishing Reality Audit — Honest Publishing Copy] — 2026-07-07
+
+Audits every UI claim of "publish," "published," "send," or a named channel (blog, email, Instagram, Facebook, LinkedIn, X, SMS, landing page) against what the backend actually does. Full findings and per-channel-type capability table in [Channel-Publishing-Reality-Audit.md](docs/reviews/Channel-Publishing-Reality-Audit.md). **No new publishers implemented** — this is a documentation and copy/labeling pass only.
+
+### Found
+
+- **No channel type currently publishes to a real external platform.** Tracing `ChannelPublisherRegistry` → `PublisherServiceProvider` shows every channel type (`facebook`, `instagram`, `linkedin`, `x`, `sms`, `blog`, `landing_page`) resolves to `LogChannelPublisher`, and `email` resolves to `EmailPublisher` → `EmailProviderRegistry`, where only `LogEmailProvider` is ever registered. Both terminal publishers only write a line to `storage/logs/publishing.log` and return a fake success result unconditionally — `ping()` on both always reports `reachable: true` too. The `Execution`, `ContentAsset`, and `Campaign` records still transition to `completed`/`published` as if a real send happened.
+- **Most channel types can't even be created today.** Only `blog` (auto-created at onboarding) and `email` (only via `DemoSeeder`, with `provider_type: 'log'`) ever become real `Channel` rows for a company. `facebook`, `instagram`, `linkedin`, `x`, `sms`, and `landing_page` have full AI content-drafting support (`ContentGenerationAnalyst` maps each to a real prompt) but no onboarding/Settings/seeder path ever creates a channel of these types — `DecisionEngine` only selects from a company's existing active channels, so they're structurally unreachable in production, not merely unpublished.
+
+### Fixed (copy)
+
+- `ApproveActions.vue` confirmation dialog: replaced *"Publish the X to your Y channel"* with a capability-aware line naming the channel's display name and real capability (e.g. *"Queue the blog post ... for Blog — Draft only: logged internally, not yet sent live."*). Confirm button relabeled `"Approve & publish"` → `"Approve"`. Helper text under the buttons, the no-content-assets fallback, and the dialog's footer note all reworded to state that delivery is simulated/logged, not sent externally.
+- `RecommendationController::approve()` flash message: *"Approved. Atlas will handle the publishing."* → *"Approved. Atlas will process this campaign — publishing is currently simulated until a live channel is connected."*
+- `Dashboard.vue` "Recent Publishing Activity" empty state, `Publishing.vue` (new page-level notice + empty state), `Campaigns/Show.vue` "Publishing" section empty state — all reworded to describe simulated/internal processing instead of implying a live send.
+
+### Added
+
+- `lib/channelCapability.ts` — friendly channel display names (`Blog`, `Instagram`, …) and a capability lookup implementing four states: **Connected** (live — unused today, no channel qualifies), **Draft only** (`blog`, `email` — content drafts and the pipeline completes, but delivery is simulated), **Coming later** (`facebook`, `instagram`, `linkedin`, `x`, `sms`, `landing_page` — no way to create this channel type yet), **Not configured** (reserved for a future supported-but-unconnected state).
+- `Components/UI/ChannelCapabilityBadge.vue` — renders the capability label next to a channel type; now shown in the approval confirmation dialog, `Campaigns/Show.vue`, `Publishing.vue`, and `Dashboard.vue`'s recent-executions list.
+- `ApproveActions.spec.ts` updated for the new copy: asserts the dialog names the channel and shows "Draft only" / "not yet sent live" rather than an unqualified publish claim.
+
+### Explicitly not done
+
+- No real publisher integrations (Postmark/Mailgun email sending, Facebook/Instagram/LinkedIn/X/SMS APIs) — tracked as a P1/P2 roadmap item in [Product-Polish-Audit.md](docs/reviews/Product-Polish-Audit.md).
+- No change to the `Execution`/`ContentAsset`/`Campaign` status machine — `completed`/`published` remain the correct *internal* state names; the fix is scoped to what the user is told, not to state names other code and tests depend on.
+- No Channels management UI (separate, larger P1 item).
+
+---
+
 ## [P1 Customer Trust & Navigation — Approval Confirmation, Company Switcher, Persistent Layout, Toasts] — 2026-07-07
 
 Implements P1 items 8–11 from [Product-Polish-Audit.md](docs/reviews/Product-Polish-Audit.md). Details in [P1-Customer-Trust-Navigation-Review.md](docs/reviews/P1-Customer-Trust-Navigation-Review.md). Email notifications, Sentry, and Channels UI (items 7, 12–14) intentionally not implemented in this slice.

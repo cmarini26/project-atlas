@@ -3,6 +3,8 @@ import { Head } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
+import ChannelCapabilityBadge from '@/Components/UI/ChannelCapabilityBadge.vue'
+import { channelLabel } from '@/lib/channelCapability'
 
 // Persistent layout: the sidebar/toast shell survives Inertia visits.
 defineOptions({ layout: AppLayout })
@@ -55,12 +57,15 @@ function formatDate(date: string | null): string {
 <template>
   <Head><title>Publishing — Atlas</title></Head>
   <div class="max-w-3xl">
-    <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-6">Publishing Activity</h1>
+    <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-2">Publishing Activity</h1>
+    <p class="text-sm text-[var(--color-text-muted)] mb-6">
+      Atlas doesn't publish to live external channels yet — every entry below is a simulated, internally logged send.
+    </p>
 
     <EmptyState
       v-if="executions.data.length === 0"
       title="No publishing activity yet"
-      description="Content executions appear here once campaigns are approved and running."
+      description="Simulated publishing activity appears here once campaigns are approved and running."
     />
 
     <div v-else>
@@ -74,8 +79,9 @@ function formatDate(date: string | null): string {
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-1">
                 <span class="text-sm font-medium text-[var(--color-text-primary)]">
-                  {{ execution.channel?.type ?? 'Unknown channel' }}
+                  {{ execution.channel ? channelLabel(execution.channel.type) : 'Unknown channel' }}
                 </span>
+                <ChannelCapabilityBadge v-if="execution.channel" :channel-type="execution.channel.type" />
                 <Badge :variant="statusVariants[execution.status] ?? 'muted'">
                   {{ statusLabels[execution.status] ?? execution.status }}
                 </Badge>

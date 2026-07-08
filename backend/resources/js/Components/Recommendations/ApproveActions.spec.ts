@@ -50,7 +50,7 @@ describe('ApproveActions', () => {
     wrapper.unmount()
   })
 
-  it('shows a confirmation dialog naming the content and destination channel', async () => {
+  it('shows a confirmation dialog naming the content, channel, and its real capability', async () => {
     const wrapper = mount(ApproveActions, {
       props: { recommendationId: 'rec-1', contentAssets: assets },
       attachTo: document.body,
@@ -62,7 +62,10 @@ describe('ApproveActions', () => {
     expect(dialogText).toContain('Approve this recommendation?')
     expect(dialogText).toContain('blog post')
     expect(dialogText).toContain('Rare finds this week')
-    expect(dialogText).toContain('blog channel')
+    expect(dialogText).toContain('Blog')
+    // Must never imply the content goes live — no channel truly publishes yet.
+    expect(dialogText).toContain('Draft only')
+    expect(dialogText).toContain('not yet sent live')
 
     wrapper.unmount()
   })
@@ -75,7 +78,7 @@ describe('ApproveActions', () => {
 
     await wrapper.find('button').trigger('click')
 
-    expect(document.body.textContent).toContain("Atlas will queue this campaign's content for publishing.")
+    expect(document.body.textContent).toContain('No live channels are connected yet, so nothing is sent externally.')
 
     wrapper.unmount()
   })
@@ -88,8 +91,11 @@ describe('ApproveActions', () => {
 
     await wrapper.find('button').trigger('click')
 
-    const confirmButton = Array.from(document.querySelectorAll('button')).find(
-      (b) => b.textContent?.trim() === 'Approve & publish',
+    // Scope to the dialog: both the trigger and the confirm button read
+    // "Approve" now that the misleading "Approve & publish" label is gone.
+    const dialog = document.querySelector('[role="dialog"]')
+    const confirmButton = Array.from(dialog?.querySelectorAll('button') ?? []).find(
+      (b) => b.textContent?.trim() === 'Approve',
     )
     expect(confirmButton).toBeTruthy()
 

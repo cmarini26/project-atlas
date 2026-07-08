@@ -6,6 +6,8 @@ import HealthCard from '@/Components/Dashboard/HealthCard.vue'
 import RecommendationPrompt from '@/Components/Dashboard/RecommendationPrompt.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
 import Badge from '@/Components/UI/Badge.vue'
+import ChannelCapabilityBadge from '@/Components/UI/ChannelCapabilityBadge.vue'
+import { channelLabel } from '@/lib/channelCapability'
 import type { Recommendation, Campaign } from '@/types'
 
 // Persistent layout: the sidebar/toast shell survives Inertia visits.
@@ -163,9 +165,12 @@ function formatDate(date: string | null): string {
           class="flex items-center gap-3"
         >
           <div class="flex-1 min-w-0">
-            <p class="text-sm text-[var(--color-text-secondary)] truncate">
-              {{ execution.channel?.type ?? 'Unknown channel' }}
-            </p>
+            <div class="flex items-center gap-2">
+              <p class="text-sm text-[var(--color-text-secondary)] truncate">
+                {{ execution.channel ? channelLabel(execution.channel.type) : 'Unknown channel' }}
+              </p>
+              <ChannelCapabilityBadge v-if="execution.channel" :channel-type="execution.channel.type" />
+            </div>
             <p class="text-xs text-[var(--color-text-muted)]">{{ formatDate(execution.scheduled_at) }}</p>
           </div>
           <Badge
@@ -176,7 +181,7 @@ function formatDate(date: string | null): string {
         </div>
       </div>
 
-      <EmptyState v-else title="No activity yet" description="Publishing activity appears here once campaigns are running." />
+      <EmptyState v-else title="No activity yet" description="Simulated publishing activity appears here once campaigns run — no live channels are connected yet." />
     </div>
   </div>
 </template>
