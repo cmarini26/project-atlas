@@ -6,6 +6,27 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 11 — Marketing Presence: Specification + Implementation Plan] — 2026-07-08
+
+Introduces Marketing Presence as a first-class Atlas domain concept: **specification and implementation plan only — no application code.**
+
+### Added
+
+- `specs/core/marketing-presence.md` — authoritative domain specification. Defines the `MarketingChannel` entity (fields: `company_id`, `channel_id`, `type`, `display_name`, `handle_or_url`, `status`, `importance`, `objective`, `audience`, `posting_frequency`, `notes`, `is_connected`, `supports_publishing`, `supports_analytics`, `metadata`); 12 channel types (Website, Email, Instagram, Facebook, LinkedIn, X, YouTube, TikTok, Google Business Profile, Events, Print, Other); channel lifecycle (Declared → Connected → Publishing enabled → Analytics enabled, derived from three independent booleans rather than a single enum); channel status (active/occasional/planned/inactive); importance (primary/secondary/experimental); and objective (awareness/leads/sales/retention/trust/seo/community, multi-valued). Specifies the relationship to the existing `Channel` model (business declaration vs. technical publishing capability — deliberately separate entities, not an extension of `Channel`), to `Integration` (no direct relationship), to `BusinessBrain` (new unfiltered `marketingPresence` collection, cache-invalidated via a new `MarketingPresenceUpdated` event mirroring the existing `FactExtracted`/`KnowledgeSynthesized` pattern), to the Opportunity/Decision Engine (channel-selection preference and exclusion rules — detection itself is unaffected), to Campaign Blueprint (no schema change), and to the existing publishing capability labels from the Channel Publishing Reality Audit (a per-`MarketingChannel` refinement of the current type-only lookup). Includes full acceptance criteria and a future-extensibility section.
+- `docs/plans/Milestone-11-Marketing-Presence.md` — implementation plan sequencing the spec into 8 phases: domain model (migration, model, factory, scopes, validation), service layer (`MarketingPresenceService`, capability resolver), onboarding ("Where do you market today?" step, zero API connection required), Settings UI (declared-channel CRUD with capability badges), Business Brain integration, Opportunity Engine integration (Decision Engine channel-selection preference/exclusion only — no new Opportunity type), Campaign/Recommendation UI (recommended channel mix, honest capability labeling), and a consolidated test plan (unit, feature, tenant isolation, onboarding, Business Brain, opportunity recommendation).
+
+### Explicitly not done (per task boundaries)
+
+- No Instagram, Facebook, or any other new publishing integration
+- No social OAuth
+- No analytics ingestion for any channel
+- No channel health dashboard
+- No change to existing publishing orchestration (`ChannelPublisherRegistry`, `PublishContent`, `ExecutionService`, `LogChannelPublisher`, `EmailPublisher` untouched)
+- No claim, anywhere in the spec or plan, that external publishing exists where it does not — every example and acceptance criterion is written consistent with the [Channel Publishing Reality Audit](docs/reviews/Channel-Publishing-Reality-Audit.md)
+- No code: no migration, no model, no controller, no Vue component was written as part of this task
+
+---
+
 ## [Channel Publishing Reality Audit — Honest Publishing Copy] — 2026-07-07
 
 Audits every UI claim of "publish," "published," "send," or a named channel (blog, email, Instagram, Facebook, LinkedIn, X, SMS, landing page) against what the backend actually does. Full findings and per-channel-type capability table in [Channel-Publishing-Reality-Audit.md](docs/reviews/Channel-Publishing-Reality-Audit.md). **No new publishers implemented** — this is a documentation and copy/labeling pass only.
