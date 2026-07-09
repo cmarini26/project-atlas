@@ -6,6 +6,7 @@ use App\Http\Controllers\App\CampaignController;
 use App\Http\Controllers\App\CompanySelectorController;
 use App\Http\Controllers\App\DashboardController;
 use App\Http\Controllers\App\LearningController;
+use App\Http\Controllers\App\MarketingPresenceController;
 use App\Http\Controllers\App\OpportunityController;
 use App\Http\Controllers\App\PublishingController;
 use App\Http\Controllers\App\RecommendationController;
@@ -83,4 +84,10 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings');
     Route::patch('/settings', [SettingsController::class, 'update'])->name('settings.update');
     Route::post('/settings/integrations/{integration}/sync', [SettingsController::class, 'syncIntegration'])->name('settings.integrations.sync');
+
+    // Marketing Presence
+    Route::get('/settings/marketing-presence', [MarketingPresenceController::class, 'index'])->name('settings.marketing-presence');
+    Route::post('/settings/marketing-presence', [MarketingPresenceController::class, 'store'])->name('settings.marketing-presence.store');
+    Route::patch('/settings/marketing-presence/{marketingChannel}', [MarketingPresenceController::class, 'update'])->name('settings.marketing-presence.update');
+    Route::delete('/settings/marketing-presence/{marketingChannel}', [MarketingPresenceController::class, 'destroy'])->name('settings.marketing-presence.destroy');
 });

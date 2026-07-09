@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { Head, useForm } from '@inertiajs/vue3'
 import AuthLayout from '@/Layouts/AuthLayout.vue'
+import { MARKETING_CHANNEL_TYPES } from '@/lib/marketingChannelTypes'
 
 const props = defineProps<{
   initial_step: 1 | 2 | 3 | 4
@@ -17,21 +18,6 @@ const companyForm = useForm({
 const integrationForm = useForm({
   website_url: '',
 })
-
-const MARKETING_CHANNELS: { type: string; label: string }[] = [
-  { type: 'website', label: 'Website' },
-  { type: 'email', label: 'Email Newsletter' },
-  { type: 'instagram', label: 'Instagram' },
-  { type: 'facebook', label: 'Facebook' },
-  { type: 'linkedin', label: 'LinkedIn' },
-  { type: 'x', label: 'X' },
-  { type: 'youtube', label: 'YouTube' },
-  { type: 'tiktok', label: 'TikTok' },
-  { type: 'google_business_profile', label: 'Google Business Profile' },
-  { type: 'events', label: 'Events' },
-  { type: 'print', label: 'Print' },
-  { type: 'other', label: 'Other' },
-]
 
 const marketingPresenceForm = useForm({
   channels: ['website'] as string[],
@@ -176,7 +162,7 @@ function submitMarketingPresence(): void {
       <form class="space-y-4" @submit.prevent="submitMarketingPresence">
         <div class="grid grid-cols-2 gap-2">
           <label
-            v-for="channel in MARKETING_CHANNELS"
+            v-for="channel in MARKETING_CHANNEL_TYPES"
             :key="channel.type"
             :class="[
               'flex items-center gap-2 px-3 py-2 text-sm rounded-lg border cursor-pointer transition-colors duration-[var(--duration-fast)]',

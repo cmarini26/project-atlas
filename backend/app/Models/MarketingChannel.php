@@ -20,6 +20,12 @@ use Illuminate\Validation\Rule;
  * A single declared marketing channel for a Company — a fact about where and
  * how the business markets, independent of Atlas's technical ability to act
  * on it. See specs/core/marketing-presence.md §2.
+ *
+ * @property MarketingChannelType $type
+ * @property MarketingChannelStatus $status
+ * @property MarketingChannelImportance $importance
+ * @property PostingFrequency|null $posting_frequency
+ * @property list<string> $objective
  */
 class MarketingChannel extends Model
 {

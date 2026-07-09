@@ -6,6 +6,32 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 11 Phase 4 — Marketing Presence Settings UI] — 2026-07-09
+
+Implements Phase 4 only of [Milestone-11-Marketing-Presence.md](docs/plans/Milestone-11-Marketing-Presence.md). Details in [Milestone-11-Phase-4-Review.md](docs/reviews/Milestone-11-Phase-4-Review.md). No Business Brain, Opportunity Engine, publishing, channel health dashboard, or external integration changes.
+
+### Added
+
+- `App\Http\Controllers\App\MarketingPresenceController` — thin CRUD controller delegating entirely to `MarketingPresenceService`/`MarketingChannelCapabilityResolver` (Phase 2): `index()` lists a company's declared channels (sorted by importance then status) with each row's resolved capability; `store()` declares a new channel; `update()` edits `status`/`importance`/`objective`; `destroy()` soft-disables (sets `status: inactive`, never deletes the row).
+- Routes: `GET/POST /app/settings/marketing-presence`, `PATCH/DELETE /app/settings/marketing-presence/{marketingChannel}`, under the existing `['auth', 'company']`-protected `/app` group.
+- `resources/js/Pages/App/Settings/MarketingPresence/Index.vue` — new Settings sub-page: view, add, edit status/importance/objectives, disable/reactivate, capability badges. Linked from a new "Marketing Presence" card on `Settings.vue`.
+- `resources/js/Components/UI/MarketingChannelCapabilityBadge.vue` + `resources/js/lib/marketingChannelCapability.ts` — a new badge for the four `MarketingChannelCapabilityResolver` values (Declared, Connected, Publishing enabled, Analytics enabled), reusing `Badge.vue`'s visual language. A sibling to the existing `ChannelCapabilityBadge.vue`, not an extension of it (see review's "Deviations").
+- `resources/js/lib/marketingChannelTypes.ts` — the 12 channel-type/label pairs, factored out of `Onboarding/Index.vue` into a shared module also used by the new Settings page.
+- `tests/Feature/App/MarketingPresenceControllerTest.php` — 21 tests: CRUD, capability values in the listing, tenant isolation (404 for another company's channel on both `update()` and `destroy()`), validation (missing/unknown type, unknown status, empty objective array), no `Channel` row created by `store()`.
+- `resources/js/Components/UI/MarketingChannelCapabilityBadge.spec.ts` — 4 Vitest tests, including an explicit check that the "Declared" badge's text never contains the word "publish."
+
+### Changed
+
+- `app/Models/MarketingChannel.php` — added `@property` PHPDoc annotations for the enum-cast attributes (`type`, `status`, `importance`, `posting_frequency`, `objective`), matching the existing precedent on `Integration`/`ChannelCredentials`. Needed because this phase is the first place in the codebase to read `$channel->importance->value` (etc.) directly, and Larastan doesn't infer enum-cast types from the model's `casts()` method by default.
+- `resources/js/Pages/Onboarding/Index.vue` — now imports its channel-type list from `lib/marketingChannelTypes.ts` instead of an inline array; no behavior change.
+
+### Notes
+
+- No owner/admin authorization gate was added — no `CompanyMembershipPolicy` (or any role-based policy) exists anywhere in this codebase, and no other Settings action is gated by role today. Tenant isolation (not role) is enforced identically to `SettingsController::syncIntegration()`.
+- A new sibling badge component was chosen over extending `ChannelCapabilityBadge.vue`, since that component derives its capability from a raw channel-type string client-side, while this phase's capability is always a value the server already resolved — mixing the two strategies behind one prop risked duplicating capability-derivation logic in Vue.
+
+---
+
 ## [Milestone 11 Phase 3 — Marketing Presence Onboarding] — 2026-07-09
 
 Implements Phase 3 only of [Milestone-11-Marketing-Presence.md](docs/plans/Milestone-11-Marketing-Presence.md). Details in [Milestone-11-Phase-3-Review.md](docs/reviews/Milestone-11-Phase-3-Review.md). No Business Brain, Opportunity Engine, publishing, channel configuration, or OAuth changes.
