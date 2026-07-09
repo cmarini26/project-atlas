@@ -95,4 +95,10 @@ class Company extends Model
     {
         return $this->hasMany(Decision::class);
     }
+
+    /** @return HasMany<MarketingChannel, $this> */
+    public function marketingChannels(): HasMany
+    {
+        return $this->hasMany(MarketingChannel::class);
+    }
 }

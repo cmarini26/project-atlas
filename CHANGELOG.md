@@ -6,6 +6,27 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 11 Phase 1 — Marketing Presence Domain Model] — 2026-07-08
+
+Implements Phase 1 only of [Milestone-11-Marketing-Presence.md](docs/plans/Milestone-11-Marketing-Presence.md). Details in [Milestone-11-Phase-1-Review.md](docs/reviews/Milestone-11-Phase-1-Review.md). No service layer, onboarding, Settings UI, Business Brain, Opportunity Engine, or publishing changes — those are Phases 2–8, not started.
+
+### Added
+
+- `marketing_channels` table — `company_id`/`channel_id` (nullable, FK → `channels.id`, `nullOnDelete`) FKs, 12-value `type` enum, `status`/`importance`/`posting_frequency` enums with defaults, required `objective` JSON array, `display_name`, nullable `handle_or_url`/`audience`/`notes`/`metadata`, three capability booleans (`is_connected`, `supports_publishing`, `supports_analytics`), composite indexes on `(company_id, status)`/`(company_id, importance)`/`(company_id, type)`. No soft deletes (per spec — `status: inactive` represents "no longer used"); no unique constraint on `(company_id, type)` (a company may declare a type more than once).
+- `App\Models\MarketingChannel` — `BelongsToCompany` + `HasUlids` + `HasFactory`; `belongsTo(Channel::class)` (nullable); native-enum casts for `type`/`status`/`importance`/`posting_frequency`; array casts for `objective`/`metadata`; `active()`/`primary()`/`connected()` query scopes (`connected()` requires both a linked `channel_id` **and** `is_connected = true`); a static `rules()` method providing structural validation (enum membership, required fields) — deliberately excludes the cross-row duplicate-`handle_or_url` check, which requires a query and belongs to Phase 2's `MarketingPresenceService`.
+- `App\Models\Company::marketingChannels()` — `hasMany` relationship, matching the existing relationship-listing convention already on the model.
+- Five backed PHP enums — `App\Enums\MarketingChannelType` (12 cases, plus a pure `hasChannelEquivalent(): bool` method encoding which types map onto `App\Models\Channel` today: `email`, `instagram`, `facebook`, `linkedin`, `x`), `MarketingChannelStatus` (4), `MarketingChannelImportance` (3), `MarketingChannelObjective` (7), `PostingFrequency` (7) — plus a shared `App\Enums\Concerns\EnumValues` trait. First use of native PHP enums in this codebase; introduced here because this one entity carries five distinct constrained vocabularies, more than any existing model.
+- `Database\Factories\MarketingChannelFactory` — auto-creates a parent `Company` via `Company::factory()` when none given; `primary()`/`inactive()` states. No `connected()` state: satisfying it requires a real linked `Channel` row, and no `ChannelFactory` exists in this codebase — tests needing a genuinely connected row create the `Channel` directly and pass `channel_id` explicitly.
+- 48 tests across `tests/Unit/MarketingPresence/` (enum values, `hasChannelEquivalent()` — framework-free) and `tests/Feature/MarketingPresence/` (migration shape and FK behavior, model casts/defaults, relationships, scopes, tenant isolation mirroring the existing `Tests\Feature\Discovery\TenantIsolationTest` pattern, factory behavior, validation rules).
+
+### Notes
+
+- Scope method return types are `void`, not `Builder` (the plan's illustrative snippet), to match this codebase's existing local-scope convention (`Fact::scopeCurrent()`, `Knowledge::scopeActive()`) and satisfy PHPStan level 8's generics check.
+- `posting_frequency` is `NOT NULL DEFAULT 'unknown'` rather than a nullable column, reconciling the plan's literal migration code with the spec's "nullable, default unknown" field description — `unknown` already is the null-sentinel value.
+- `DemoSeeder` was not modified — not required by the Phase 1 plan.
+
+---
+
 ## [Milestone 11 — Marketing Presence: Specification + Implementation Plan] — 2026-07-08
 
 Introduces Marketing Presence as a first-class Atlas domain concept: **specification and implementation plan only — no application code.**
