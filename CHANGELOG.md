@@ -6,6 +6,28 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 11 Phase 2 — Marketing Presence Service Layer] — 2026-07-09
+
+Implements Phase 2 only of [Milestone-11-Marketing-Presence.md](docs/plans/Milestone-11-Marketing-Presence.md). Details in [Milestone-11-Phase-2-Review.md](docs/reviews/Milestone-11-Phase-2-Review.md). No onboarding, Business Brain, Opportunity Engine, publishing, or UI changes — those are Phases 3–8, not started.
+
+### Added
+
+- `App\Services\MarketingPresence\MarketingPresenceService` — CRUD and reasoning over a company's declared marketing channels. `declare()` creates a new declaration (forces `company_id` from the caller's `Company` argument, fills in per-type `suggestedDefaults()` when omitted, always creates unlinked, validates the merged attributes against `MarketingChannel::rules()`, fires `MarketingPresenceUpdated`); `update()` partially updates the nine business-context fields only (strips `company_id`/`channel_id`/the three capability booleans, revalidates the full prospective state); `setStatus()`/`disable()`/`reactivate()` for status transitions; `link(MarketingChannel, Channel)` sets `channel_id` + `is_connected` only, throwing a new `ChannelBelongsToDifferentCompanyException` if the `Channel` belongs to a different company (including a company-less global template — `Channel` has no `BelongsToCompany` scope, so this check is explicit); `suggestedDefaults()` — a per-type `importance`/`objective`/`posting_frequency` table for all 12 `MarketingChannelType` cases; `wouldDuplicate()` — a soft, non-blocking `(company, type, handle_or_url)` collision check; `suggestChannels()` — read-only, non-persisting candidates from a connected `website_crawl` `Integration` and existing active `Channel` rows (filtered through `MarketingChannelType::tryFrom()` so `blog`/`sms`/`landing_page` are excluded rather than throwing).
+- `App\Services\MarketingPresence\MarketingChannelCapabilityResolver` — the single place that turns a `MarketingChannel`'s `is_connected`/`supports_publishing`/`supports_analytics` flags plus its linked `Channel`'s `is_active` state into one of four domain-level lifecycle results (`App\Enums\MarketingChannelCapability`: `Declared`, `Connected`, `PublishingEnabled`, `AnalyticsEnabled`). A missing or inactive linked `Channel` can never yield `PublishingEnabled`/`AnalyticsEnabled`, regardless of the `MarketingChannel`'s own flags.
+- `App\Enums\MarketingChannelCapability` — the four-case lifecycle enum above (spec §5's vocabulary — distinct from spec §11's four UI-facing capability labels, which remain Phase 7 work).
+- `App\Events\MarketingPresenceUpdated` — one coarse event, fired by every mutating `MarketingPresenceService` method. No listener registered yet (Business Brain cache invalidation is Phase 5) — `AppServiceProvider` untouched.
+- `App\Services\MarketingPresence\Exceptions\ChannelBelongsToDifferentCompanyException` — named exception per Founding Principle 9.
+- `App\Services\MarketingPresence\MarketingChannelSuggestion` — a `readonly` value object (`type`, `displayName`, `handleOrUrl`, `reason`, `channelId`) returned by `suggestChannels()`.
+- 45 tests across `tests/Feature/MarketingPresence/` covering CRUD, capability resolution (all four outcomes plus inactive/missing-link edge cases), suggestion logic, validation, tenant isolation, and edge cases (duplicate handles, same-type-twice, invalid type/missing field rejection).
+
+### Notes
+
+- The capability resolver's labels match the live task instruction's lifecycle vocabulary (Declared/Connected/PublishingEnabled/AnalyticsEnabled — spec §5), not the plan document's illustrative UI-label sketch (`connected`/`draft_only`/`not_configured`/`coming_later` — spec §11), which appears to have been mixed into the plan's Phase 2 section from Phase 7 in error.
+- `update()` additionally strips the three capability booleans (beyond `company_id`/`channel_id` as the plan's signature comment states) — a generic business-context edit must never be able to fake a connection.
+- `declare()` applies `suggestedDefaults()` before validating, so a minimal `declare()` call with just `type` and `display_name` succeeds using type-appropriate defaults rather than failing validation on DB-defaulted-but-rule-required fields.
+
+---
+
 ## [Milestone 11 Phase 1 — Marketing Presence Domain Model] — 2026-07-08
 
 Implements Phase 1 only of [Milestone-11-Marketing-Presence.md](docs/plans/Milestone-11-Marketing-Presence.md). Details in [Milestone-11-Phase-1-Review.md](docs/reviews/Milestone-11-Phase-1-Review.md). No service layer, onboarding, Settings UI, Business Brain, Opportunity Engine, or publishing changes — those are Phases 2–8, not started.
