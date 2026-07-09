@@ -8,6 +8,7 @@ use App\Jobs\SyncIntegration;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\Integration;
+use App\Models\MarketingChannel;
 use App\Models\User;
 use App\Services\Observatory\Connectors\ConnectorRegistry;
 use App\Services\Observatory\Connectors\Contracts\Connector;
@@ -54,7 +55,7 @@ class OnboardingControllerTest extends TestCase
             );
     }
 
-    public function test_onboarding_index_redirects_to_status_when_integration_exists(): void
+    public function test_onboarding_index_shows_step_3_when_integration_exists_but_no_marketing_presence(): void
     {
         $user = User::factory()->create();
         $company = Company::withoutGlobalScopes()->create(['name' => 'Acme', 'slug' => 'acme']);
@@ -65,6 +66,34 @@ class OnboardingControllerTest extends TestCase
             'name' => 'Website',
             'config' => ['url' => 'https://acme.com'],
             'status' => 'active',
+        ]);
+
+        $this->actingAs($user)
+            ->get('/onboarding')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Onboarding/Index')
+                ->where('initial_step', 3)
+            );
+    }
+
+    public function test_onboarding_index_redirects_to_status_when_integration_and_marketing_presence_exist(): void
+    {
+        $user = User::factory()->create();
+        $company = Company::withoutGlobalScopes()->create(['name' => 'Acme', 'slug' => 'acme']);
+        CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => 'owner']);
+        Integration::create([
+            'company_id' => $company->id,
+            'type' => 'website_crawl',
+            'name' => 'Website',
+            'config' => ['url' => 'https://acme.com'],
+            'status' => 'active',
+        ]);
+        MarketingChannel::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'website',
+            'display_name' => 'Website',
+            'objective' => ['seo'],
         ]);
 
         $this->actingAs($user)
@@ -100,7 +129,7 @@ class OnboardingControllerTest extends TestCase
 
     // ── Integration step ──────────────────────────────────────────────────────
 
-    public function test_integration_step_creates_integration_and_redirects_to_status(): void
+    public function test_integration_step_creates_integration_and_redirects_to_marketing_presence_step(): void
     {
         $user = User::factory()->create();
         $company = Company::withoutGlobalScopes()->create(['name' => 'My Co', 'slug' => 'my-co']);
@@ -108,11 +137,13 @@ class OnboardingControllerTest extends TestCase
 
         Bus::fake();
 
+        // Redirects back to /onboarding, not straight to the status page —
+        // the marketing-presence step still needs to run first.
         $this->actingAs($user)
             ->post('/onboarding/integration', [
                 'website_url' => 'https://example.com',
             ])
-            ->assertRedirect(route('onboarding.status'));
+            ->assertRedirect(route('onboarding'));
 
         $this->assertDatabaseHas('integrations', [
             'company_id' => $company->id,
@@ -157,7 +188,7 @@ class OnboardingControllerTest extends TestCase
             ->post('/onboarding/integration', [
                 'website_url' => 'https://example.com',
             ])
-            ->assertRedirect(route('onboarding.status'));
+            ->assertRedirect(route('onboarding'));
 
         // No crawl work happened during the request: no observations recorded,
         // no AI calls made. All of that belongs to the queue worker.
@@ -214,7 +245,7 @@ class OnboardingControllerTest extends TestCase
         // to active so the queued sync (and stall detection) treat it fresh.
         $this->actingAs($user)
             ->post('/onboarding/integration', ['website_url' => 'https://working.example.com'])
-            ->assertRedirect(route('onboarding.status'));
+            ->assertRedirect(route('onboarding'));
 
         $integration->refresh();
         $this->assertSame('active', $integration->status);
@@ -251,7 +282,7 @@ class OnboardingControllerTest extends TestCase
             ->post('/onboarding/integration', [
                 'website_url' => 'https://example.com',
             ])
-            ->assertRedirect(route('onboarding.status'));
+            ->assertRedirect(route('onboarding'));
 
         $this->assertDatabaseHas('integrations', [
             'company_id' => $company->id,
@@ -277,6 +308,164 @@ class OnboardingControllerTest extends TestCase
         $this->actingAs($user)
             ->post('/onboarding/integration', ['website_url' => 'https://example.com'])
             ->assertRedirect(route('onboarding'));
+    }
+
+    // ── Marketing presence step ──────────────────────────────────────────────
+
+    public function test_marketing_presence_step_declares_selected_channels(): void
+    {
+        $user = User::factory()->create();
+        $company = Company::withoutGlobalScopes()->create(['name' => 'My Co', 'slug' => 'my-co']);
+        CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => 'owner']);
+
+        $this->actingAs($user)
+            ->post('/onboarding/marketing-presence', [
+                'channels' => ['website', 'instagram', 'events'],
+            ])
+            ->assertRedirect(route('onboarding.status'));
+
+        $this->assertDatabaseHas('marketing_channels', ['company_id' => $company->id, 'type' => 'website', 'display_name' => 'Website']);
+        $this->assertDatabaseHas('marketing_channels', ['company_id' => $company->id, 'type' => 'instagram', 'display_name' => 'Instagram']);
+        $this->assertDatabaseHas('marketing_channels', ['company_id' => $company->id, 'type' => 'events', 'display_name' => 'Events']);
+        $this->assertSame(3, MarketingChannel::withoutGlobalScopes()->where('company_id', $company->id)->count());
+    }
+
+    public function test_marketing_presence_step_creates_no_channel_or_integration_records(): void
+    {
+        $user = User::factory()->create();
+        $company = Company::withoutGlobalScopes()->create(['name' => 'My Co', 'slug' => 'my-co']);
+        CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => 'owner']);
+
+        $this->actingAs($user)->post('/onboarding/marketing-presence', ['channels' => ['website', 'facebook']]);
+
+        $this->assertDatabaseCount('channels', 0);
+        $this->assertDatabaseCount('integrations', 0);
+    }
+
+    public function test_marketing_presence_step_declares_unlinked_unconnected_channels(): void
+    {
+        $user = User::factory()->create();
+        $company = Company::withoutGlobalScopes()->create(['name' => 'My Co', 'slug' => 'my-co']);
+        CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => 'owner']);
+
+        $this->actingAs($user)->post('/onboarding/marketing-presence', ['channels' => ['website']]);
+
+        $channel = MarketingChannel::withoutGlobalScopes()->where('company_id', $company->id)->first();
+        $this->assertNull($channel->channel_id);
+        $this->assertFalse($channel->is_connected);
+        $this->assertSame('active', $channel->status->value);
+    }
+
+    public function test_marketing_presence_step_allows_an_empty_selection(): void
+    {
+        $user = User::factory()->create();
+        $company = Company::withoutGlobalScopes()->create(['name' => 'My Co', 'slug' => 'my-co']);
+        CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => 'owner']);
+
+        $this->actingAs($user)
+            ->post('/onboarding/marketing-presence', ['channels' => []])
+            ->assertRedirect(route('onboarding.status'));
+
+        $this->assertDatabaseCount('marketing_channels', 0);
+    }
+
+    public function test_marketing_presence_step_rejects_an_unknown_channel_type(): void
+    {
+        $user = User::factory()->create();
+        $company = Company::withoutGlobalScopes()->create(['name' => 'My Co', 'slug' => 'my-co']);
+        CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => 'owner']);
+
+        $this->actingAs($user)
+            ->post('/onboarding/marketing-presence', ['channels' => ['carrier-pigeon']])
+            ->assertSessionHasErrors('channels.0');
+
+        $this->assertDatabaseCount('marketing_channels', 0);
+    }
+
+    public function test_marketing_presence_step_requires_the_channels_key(): void
+    {
+        $user = User::factory()->create();
+        $company = Company::withoutGlobalScopes()->create(['name' => 'My Co', 'slug' => 'my-co']);
+        CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => 'owner']);
+
+        $this->actingAs($user)
+            ->post('/onboarding/marketing-presence', [])
+            ->assertSessionHasErrors('channels');
+    }
+
+    public function test_marketing_presence_step_is_idempotent_on_resubmit(): void
+    {
+        $user = User::factory()->create();
+        $company = Company::withoutGlobalScopes()->create(['name' => 'My Co', 'slug' => 'my-co']);
+        CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => 'owner']);
+
+        $this->actingAs($user)->post('/onboarding/marketing-presence', ['channels' => ['website']]);
+        $this->actingAs($user)->post('/onboarding/marketing-presence', ['channels' => ['website']]);
+
+        $this->assertSame(1, MarketingChannel::withoutGlobalScopes()->where('company_id', $company->id)->where('type', 'website')->count());
+    }
+
+    public function test_marketing_presence_step_redirects_to_onboarding_with_no_company(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->post('/onboarding/marketing-presence', ['channels' => ['website']])
+            ->assertRedirect(route('onboarding'));
+    }
+
+    public function test_marketing_presence_step_is_scoped_to_the_acting_users_company(): void
+    {
+        $userA = User::factory()->create();
+        $companyA = Company::withoutGlobalScopes()->create(['name' => 'Company A', 'slug' => 'company-a']);
+        CompanyMembership::create(['company_id' => $companyA->id, 'user_id' => $userA->id, 'role' => 'owner']);
+
+        $userB = User::factory()->create();
+        $companyB = Company::withoutGlobalScopes()->create(['name' => 'Company B', 'slug' => 'company-b']);
+        CompanyMembership::create(['company_id' => $companyB->id, 'user_id' => $userB->id, 'role' => 'owner']);
+
+        $this->actingAs($userA)->post('/onboarding/marketing-presence', ['channels' => ['website']]);
+
+        $this->assertSame(1, MarketingChannel::withoutGlobalScopes()->where('company_id', $companyA->id)->count());
+        $this->assertSame(0, MarketingChannel::withoutGlobalScopes()->where('company_id', $companyB->id)->count());
+    }
+
+    // ── Onboarding progression ───────────────────────────────────────────────
+
+    public function test_full_onboarding_progression_advances_through_all_three_steps(): void
+    {
+        $user = User::factory()->create();
+
+        Bus::fake();
+
+        // Step 1: no membership yet.
+        $this->actingAs($user)
+            ->get('/onboarding')
+            ->assertInertia(fn ($page) => $page->where('initial_step', 1));
+
+        $this->actingAs($user)->post('/onboarding/company', ['name' => 'Progression Co']);
+
+        // Step 2: company exists, no integration yet.
+        $this->actingAs($user)
+            ->get('/onboarding')
+            ->assertInertia(fn ($page) => $page->where('initial_step', 2));
+
+        $this->actingAs($user)->post('/onboarding/integration', ['website_url' => 'https://progression.example.com']);
+
+        // Step 3: integration exists, no marketing presence yet.
+        $this->actingAs($user)
+            ->get('/onboarding')
+            ->assertInertia(fn ($page) => $page->where('initial_step', 3));
+
+        $this->actingAs($user)->post('/onboarding/marketing-presence', ['channels' => ['website', 'instagram']]);
+
+        // Both steps done — onboarding is complete, status page takes over.
+        $this->actingAs($user)
+            ->get('/onboarding')
+            ->assertRedirect(route('onboarding.status'));
+
+        $company = CompanyMembership::where('user_id', $user->id)->first()->company;
+        $this->assertSame(2, MarketingChannel::withoutGlobalScopes()->where('company_id', $company->id)->count());
     }
 
     // ── Status page ───────────────────────────────────────────────────────────

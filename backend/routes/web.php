@@ -40,6 +40,7 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/onboarding/company', [OnboardingController::class, 'createCompany'])->name('onboarding.company');
     // Throttled: each submit can queue a crawl + AI pipeline run (real spend).
     Route::post('/onboarding/integration', [OnboardingController::class, 'createIntegration'])->middleware('throttle:3,1')->name('onboarding.integration');
+    Route::post('/onboarding/marketing-presence', [OnboardingController::class, 'saveMarketingPresence'])->name('onboarding.marketing-presence');
     Route::get('/onboarding/status', [OnboardingController::class, 'status'])->name('onboarding.status');
 });
 

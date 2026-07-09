@@ -30,9 +30,18 @@ For the personas these flows serve, see [Personas.md](Personas.md).
 3. Connect website (URL input)
    → POST /onboarding/integration
    → IntegrationService::create() creates Integration, dispatches SyncIntegration job
+   → Redirect to /onboarding (step 3)
+
+4. Marketing presence ("Where do your customers find you?")
+   → Multi-select checklist: Website (preselected), Email Newsletter, Instagram,
+     Facebook, LinkedIn, X, YouTube, TikTok, Google Business Profile, Events,
+     Print, Other — no handle/URL/API connection prompt anywhere in this step
+   → POST /onboarding/marketing-presence
+   → MarketingPresenceService::declare() creates one unlinked, unconnected
+     MarketingChannel per selection (status: active)
    → Redirect to /onboarding/status
 
-4. Pipeline status page (live progress)
+5. Pipeline status page (live progress)
    → Polls GET /api/onboarding/status every 5 seconds
    → Shows progress through:
        [ Crawling your website... ]         ← SyncIntegration running
@@ -42,7 +51,7 @@ For the personas these flows serve, see [Personas.md](Personas.md).
        [ Preparing your recommendation... ] ← PrepareCampaign + CreateRecommendation running
        [ Your first recommendation is ready! ]
 
-5. When recommendation_count > 0:
+6. When recommendation_count > 0:
    → Stop polling
    → Show "View your recommendation →" button (primary)
    → Button navigates to /app/recommendations/{id}
@@ -50,8 +59,9 @@ For the personas these flows serve, see [Personas.md](Personas.md).
 
 ### UX Decisions
 
-- The wizard is exactly 3 steps: company profile → website URL → confirm. No more.
-- After URL submission, the user is on the status page immediately. They are never on a blank dashboard wondering what's happening.
+- The wizard is 4 steps: company profile → website URL → marketing presence → confirm. Marketing presence was added in Milestone 11 Phase 3 as the final step, so Atlas has a declared marketing presence on record before the pipeline status page's "Atlas is now learning" experience begins — see [marketing-presence.md](../specs/core/marketing-presence.md).
+- The marketing presence step asks only "which channels do you use today" — no handles, no URLs, no API connections. It exists to seed a lightweight declaration, not to configure publishing.
+- After the final step, the user is on the status page immediately. They are never on a blank dashboard wondering what's happening.
 - The status page provides reassurance — each completed step is visually marked done (checkmark) before the next starts.
 - If the pipeline takes longer than expected (>5 min), show: "This is taking a moment. Atlas is doing a thorough analysis. You can leave this page — we'll notify you when the first recommendation is ready."
 - The first recommendation is not shown until it is complete. No partial states in the UI.

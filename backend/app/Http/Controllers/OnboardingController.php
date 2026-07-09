@@ -3,25 +3,52 @@
 namespace App\Http\Controllers;
 
 use App\AI\Exceptions\AiProviderOverloadedException;
+use App\Enums\MarketingChannelType;
 use App\Jobs\SyncIntegration;
 use App\Models\Channel;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\Integration;
+use App\Models\MarketingChannel;
 use App\Models\User;
 use App\Services\Company\CompanyService;
+use App\Services\MarketingPresence\MarketingPresenceService;
 use App\Services\Observatory\IntegrationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use Throwable;
 
 class OnboardingController extends Controller
 {
+    /**
+     * Human-readable display names for the onboarding marketing-presence
+     * step's checklist — one per MarketingChannelType. Kept here rather than
+     * on the enum since these are onboarding-copy concerns, not a domain fact.
+     *
+     * @var array<string, string>
+     */
+    private const CHANNEL_LABELS = [
+        'website' => 'Website',
+        'email' => 'Email Newsletter',
+        'instagram' => 'Instagram',
+        'facebook' => 'Facebook',
+        'linkedin' => 'LinkedIn',
+        'x' => 'X',
+        'youtube' => 'YouTube',
+        'tiktok' => 'TikTok',
+        'google_business_profile' => 'Google Business Profile',
+        'events' => 'Events',
+        'print' => 'Print',
+        'other' => 'Other',
+    ];
+
     public function __construct(
         private readonly CompanyService $companyService,
         private readonly IntegrationService $integrationService,
+        private readonly MarketingPresenceService $marketingPresenceService,
     ) {}
 
     public function index(Request $request): Response|RedirectResponse
@@ -43,7 +70,14 @@ class OnboardingController extends Controller
             return Inertia::render('Onboarding/Index', ['initial_step' => 2]);
         }
 
-        // Integration submitted — wait for analysis to complete
+        // Website connected but marketing presence not declared yet — the
+        // final onboarding step, so it's captured before the status page's
+        // "Atlas is now learning" experience begins.
+        if (! MarketingChannel::where('company_id', $company->id)->exists()) {
+            return Inertia::render('Onboarding/Index', ['initial_step' => 3]);
+        }
+
+        // Both submitted — wait for analysis to complete
         return redirect()->route('onboarding.status');
     }
 
@@ -148,6 +182,53 @@ class OnboardingController extends Controller
         }
 
         $request->session()->forget('onboarding_company_id');
+
+        // Not straight to the status page — the marketing-presence step
+        // still needs to run first. index() re-evaluates and shows step 3.
+        return redirect()->route('onboarding');
+    }
+
+    /**
+     * Final onboarding step: declare which marketing channels the business
+     * already uses today. Creates one unlinked, unconnected MarketingChannel
+     * per selection via MarketingPresenceService::declare() — no Channel
+     * record, no integration, no API connection. Runs before the redirect to
+     * the status page, so Atlas knows the company's declared marketing
+     * presence before the Business Brain pipeline's asynchronous learning
+     * step meaningfully begins.
+     */
+    public function saveMarketingPresence(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+
+        $membership = CompanyMembership::with('company')->where('user_id', $user->id)->first();
+
+        if (! $membership) {
+            return redirect()->route('onboarding');
+        }
+
+        $company = $membership->company;
+        abort_unless($company instanceof Company, 404);
+
+        $validated = $request->validate([
+            'channels' => ['present', 'array'],
+            'channels.*' => [Rule::in(MarketingChannelType::values())],
+        ]);
+
+        foreach ($validated['channels'] as $type) {
+            // Idempotent against back-button resubmits and double-clicks —
+            // declare() itself happily allows duplicates, but a repeat
+            // submission of this same step shouldn't create them.
+            if (MarketingChannel::where('company_id', $company->id)->where('type', $type)->exists()) {
+                continue;
+            }
+
+            $this->marketingPresenceService->declare($company, [
+                'type' => $type,
+                'display_name' => self::CHANNEL_LABELS[$type] ?? ucfirst((string) $type),
+            ]);
+        }
 
         return redirect()->route('onboarding.status');
     }

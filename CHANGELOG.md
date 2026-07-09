@@ -6,6 +6,31 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 11 Phase 3 — Marketing Presence Onboarding] — 2026-07-09
+
+Implements Phase 3 only of [Milestone-11-Marketing-Presence.md](docs/plans/Milestone-11-Marketing-Presence.md). Details in [Milestone-11-Phase-3-Review.md](docs/reviews/Milestone-11-Phase-3-Review.md). No Business Brain, Opportunity Engine, publishing, channel configuration, or OAuth changes.
+
+### Added
+
+- New onboarding step — "Where do your customers find you?" — added as the wizard's final data-entry step (company profile → website URL → marketing presence → confirm). A checkbox-only checklist of all 12 `MarketingChannelType` values (Website preselected); no handle, URL, username, or API-connection prompt anywhere on the step.
+- `App\Http\Controllers\OnboardingController::saveMarketingPresence()` — validates `channels` as an array of valid `MarketingChannelType` values, then declares one unlinked, unconnected `MarketingChannel` per selection via `MarketingPresenceService::declare()` (status `active`, per-type `suggestedDefaults()` for the rest), skipping any type already declared for the company so resubmits are idempotent. No `Channel` record, no `Integration`, no OAuth.
+- `POST /onboarding/marketing-presence` route (`routes/web.php`), inside the existing authenticated onboarding group.
+- `resources/js/Pages/Onboarding/Index.vue` — new step 3 UI (2-column checkbox grid using existing design tokens, no new components); the prior transient "Connected" confirmation screen shifts to step 4 unchanged.
+
+### Changed
+
+- `OnboardingController::index()` — now also gates on whether the company has declared any `MarketingChannel` before redirecting to `/onboarding/status`; if an `Integration` exists but no `MarketingChannel` does, it renders the new step 3 instead.
+- `OnboardingController::createIntegration()` — final redirect changed from `route('onboarding.status')` to `route('onboarding')`, so submitting the website URL returns to the wizard (now showing the marketing-presence step) instead of the pipeline status page. `SyncIntegration`'s dispatch call site and timing are unchanged — see the review's "Deviations" section for why moving the dispatch itself was rejected.
+- `docs/product/UserFlows.md` Flow 1 — updated from "exactly 3 steps" to 4, documenting the new marketing-presence step.
+- `tests/Feature/App/OnboardingControllerTest.php` — 22 new/changed tests: marketing-presence persistence, no-`Channel`/no-`Integration` guarantee, unlinked/unconnected/`active`-status declaration, empty-selection allowance, invalid-type rejection, missing-key rejection, resubmit idempotency, tenant isolation, no-company redirect, a full three-step progression test, and updated redirect-target assertions on the four existing integration-step tests that previously expected `onboarding.status`.
+
+### Notes
+
+- The plan document's Phase 3 sketch describes optional inline `handle_or_url` capture and a free-text label for "Other"; the live task's boundaries ruled both out entirely ("No required metadata yet," "Do NOT ask for handles, usernames, or URLs"). Every declared channel gets a fixed, type-derived `display_name` only.
+- Marketing presence was placed as the literal final step (after website URL), per explicit instruction, rather than the plan's alternative placement between company profile and website URL.
+
+---
+
 ## [Milestone 11 Phase 2 — Marketing Presence Service Layer] — 2026-07-09
 
 Implements Phase 2 only of [Milestone-11-Marketing-Presence.md](docs/plans/Milestone-11-Marketing-Presence.md). Details in [Milestone-11-Phase-2-Review.md](docs/reviews/Milestone-11-Phase-2-Review.md). No onboarding, Business Brain, Opportunity Engine, publishing, or UI changes — those are Phases 3–8, not started.
