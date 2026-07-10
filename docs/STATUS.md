@@ -34,6 +34,18 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
+**Version 1.0 Product Roadmap ✅ Complete**
+*Completed: 2026-07-10*
+
+Strategic (non-implementation) product roadmap for the next ~12 months, written after Milestone 11 (Marketing Presence, Phases 1–7) shipped. Assesses current platform state against the Beta Readiness Audit, Product Polish Audit, and Channel Publishing Reality Audit, then lays out four gated stages — Private Beta (5–10 customers) → Paid Beta (25–50) → Version 1.0 Public Launch → Version 2.0 — each defined by entry/exit criteria and success metrics rather than calendar dates. Also states explicitly what's deferred, what technical debt is fine to carry, and what technical debt must be resolved before public self-serve launch.
+
+See:
+- [Version-1.0-Roadmap.md](plans/Version-1.0-Roadmap.md) — the full strategic roadmap
+
+**Headline assessment:** the 8-phase product loop plus Milestone 10 (customer dashboard) and Milestone 11 (Marketing Presence) are complete and well-tested (840+ tests, PHPStan level 8 clean), but the platform remains **not beta-ready** — the gap is almost entirely operational (no production server, no real email delivery, no monitoring, no backups, no legal documents), not architectural. The Channel Publishing Reality Audit's finding that no channel type publishes externally today (every "Published" badge describes a log line) is the single biggest risk to address before any paying customer is onboarded.
+
+**Previous milestone:**
+
 **Private Beta Readiness Audit ✅ Complete**
 *Completed: 2026-06-27*
 
@@ -576,6 +588,8 @@ All production-blocking items resolved. Remaining pre-production items:
 ---
 
 ## Last Updated
+
+**2026-07-10** — Version 1.0 Product Roadmap written. Strategic, non-implementation roadmap covering current platform assessment (complete/production-ready/beta-ready/risks), four gated stages (Private Beta → Paid Beta → Version 1.0 Public Launch → Version 2.0), work prioritized across Infrastructure/Customer Experience/Integrations/AI Improvements/Growth/Operations, explicit deferred-features and technical-debt-to-carry-vs-must-fix lists, and success metrics per stage. See [Version-1.0-Roadmap.md](plans/Version-1.0-Roadmap.md).
 
 **2026-06-29** — P0 onboarding pipeline fix complete (Phase 4). Critical `body_text`/`bodyText` key mismatch in `WebsiteAnalyst` fixed — all real crawls now produce facts. AI provider binding updated: `AnthropicProvider` used when `ANTHROPIC_API_KEY` is set in local env; `LocalAiProvider` only when no key. `OnboardingStatusController` adds `crawl_succeeded` and `ai_failed` fields. Status page shows dedicated "AI analysis encountered an error" card distinct from crawl failure. All test payloads updated from `bodyText` to `body_text`. `SettingsControllerTest::test_sync_integration_dispatches_job` fixed with `Bus::fake()`. 603 tests (601 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. See [P0-New-Customer-Onboarding-Fix.md](reviews/P0-New-Customer-Onboarding-Fix.md).
 

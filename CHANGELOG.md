@@ -6,6 +6,21 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Version 1.0 Product Roadmap] — 2026-07-10
+
+Strategic product roadmap for the next ~12 months — no code changes, no implementation tasks.
+
+### Added
+
+- `docs/plans/Version-1.0-Roadmap.md` — assesses current platform state (what's complete, production-ready, beta-ready, and remaining risks) against `docs/reviews/Beta-Readiness-Audit.md`, `docs/reviews/Product-Polish-Audit.md`, and `docs/reviews/Channel-Publishing-Reality-Audit.md`; defines four gated stages (Private Beta 5–10 customers → Paid Beta 25–50 → Version 1.0 Public Launch → Version 2.0), each with entry criteria and success metrics rather than calendar dates; prioritizes work across six categories (Infrastructure, Customer Experience, Integrations, AI Improvements, Growth, Operations); explicitly lists deferred features, technical debt worth carrying, and technical debt that must resolve before public launch.
+
+### Notes
+
+- Headline finding: the 8-phase product loop plus Milestones 10–11 are complete and well-tested, but the platform remains not beta-ready for entirely operational reasons (no production server, no real email delivery, no monitoring, no backups, no legal documents) — not architectural ones.
+- Cross-references the Channel Publishing Reality Audit's finding that no channel type publishes externally today, and flags that the landing page's marketing copy already assumes capabilities (real email, real publishing, working analytics comparisons, a published privacy policy) that don't exist yet — this gap is called out as the top pre-launch risk.
+
+---
+
 ## [Milestone 11 Phase 7 — Campaign & Recommendation UI] — 2026-07-10
 
 Implements Phase 7 only of [Milestone-11-Marketing-Presence.md](docs/plans/Milestone-11-Marketing-Presence.md). Details in [Milestone-11-Phase-7-Review.md](docs/reviews/Milestone-11-Phase-7-Review.md). No publishers, no OAuth, no analytics, no onboarding changes, no app redesign.
