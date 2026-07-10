@@ -34,6 +34,16 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
+**Private Beta Execution Checklist ✅ Complete**
+*Completed: 2026-07-10*
+
+Operator's checklist for running Stage A (Private Beta, 5–10 customers) of the Version 1.0 Roadmap — distinct from the roadmap (strategy) and `Private-Beta-Plan.md` (the build-out sprint plan). Covers a production infrastructure checklist (hosting, domain, SSL, database, backups, monitoring, error tracking, email, queue workers, scheduler, log retention), a per-customer onboarding checklist (account creation through publishing expectations, including the new Marketing Presence step), a daily internal support checklist, a single objective Go/No-Go gate for inviting Customer 1, and a first-week operating cadence with daily tasks and metrics. No code changes — a pure operational document, meant to be run and re-run, not read once.
+
+See:
+- [Private-Beta-Execution.md](plans/Private-Beta-Execution.md) — the full checklist
+
+**Previous milestone:**
+
 **Version 1.0 Product Roadmap ✅ Complete**
 *Completed: 2026-07-10*
 
@@ -588,6 +598,8 @@ All production-blocking items resolved. Remaining pre-production items:
 ---
 
 ## Last Updated
+
+**2026-07-10** — Private Beta Execution Checklist written. Operator's checklist (not a roadmap, not a sprint plan) for running Stage A private beta: production infrastructure checklist, per-customer onboarding checklist (including Marketing Presence), daily internal support checklist, a single Go/No-Go gate for inviting Customer 1, and a first-week operating cadence with daily tasks and metrics. See [Private-Beta-Execution.md](plans/Private-Beta-Execution.md).
 
 **2026-07-10** — Version 1.0 Product Roadmap written. Strategic, non-implementation roadmap covering current platform assessment (complete/production-ready/beta-ready/risks), four gated stages (Private Beta → Paid Beta → Version 1.0 Public Launch → Version 2.0), work prioritized across Infrastructure/Customer Experience/Integrations/AI Improvements/Growth/Operations, explicit deferred-features and technical-debt-to-carry-vs-must-fix lists, and success metrics per stage. See [Version-1.0-Roadmap.md](plans/Version-1.0-Roadmap.md).
 

@@ -6,6 +6,21 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Private Beta Execution Checklist] — 2026-07-10
+
+Operator's checklist for running Stage A (Private Beta) — no code changes, no implementation tasks.
+
+### Added
+
+- `docs/plans/Private-Beta-Execution.md` — a checklist, not a roadmap or sprint plan: (1) a production infrastructure checklist covering hosting, domain, SSL, database, backups, monitoring, error tracking, email, queue workers, scheduler, and log retention; (2) a per-customer onboarding checklist from account creation through publishing expectations, including the Marketing Presence step (Milestone 11); (3) a daily internal support checklist (health checks, failed-job review, AI provider monitoring, customer issue triage, backup verification); (4) a single objective Go/No-Go gate for inviting the first 10 customers; (5) a first-week operating cadence with daily tasks and metrics to review once customers start onboarding.
+
+### Notes
+
+- Deliberately distinct from `docs/plans/Private-Beta-Plan.md` (the week-by-week build-out sprint plan) and `docs/plans/Version-1.0-Roadmap.md` (strategy) — this document is meant to be run and re-run during actual beta operation, not read once before building something.
+- Emphasizes verification over assumption throughout: e.g., "a backup has been restored and checked" rather than "backups are configured," since the two are different claims and only the former is acceptable before Customer 1.
+
+---
+
 ## [Version 1.0 Product Roadmap] — 2026-07-10
 
 Strategic product roadmap for the next ~12 months — no code changes, no implementation tasks.
