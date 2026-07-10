@@ -6,6 +6,31 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 11 Phase 6 — Opportunity and Channel Selection Integration] — 2026-07-09
+
+Implements Phase 6 only of [Milestone-11-Marketing-Presence.md](docs/plans/Milestone-11-Marketing-Presence.md). Details in [Milestone-11-Phase-6-Review.md](docs/reviews/Milestone-11-Phase-6-Review.md). No Opportunity detection changes, no publishers, no OAuth, no Settings UI, no external publishing, no analytics ingestion, no onboarding changes.
+
+### Added
+
+- `App\Services\Decision\MarketingChannelSelector` — narrows `DecisionEngine`'s type-affinity-matched `Channel` candidates using the company's declared Marketing Presence: excludes candidates whose linked `MarketingChannel.status` is `inactive` or `planned` (each with a distinct, logged reason), with a safety bypass back to the pre-existing "all active channels" fallback if exclusion would leave nothing to recommend; prefers `importance: primary`-linked candidates when any exist; reports declared, non-inactive, unlinked `MarketingChannel` rows as `draftOnlyChannels`. Queries `MarketingChannel` directly (company-scoped, `withoutGlobalScopes()`) rather than reading `BusinessBrain->marketingPresence`, since that summary (Phase 5) is deliberately display-name-only and not `channel_id`-addressable.
+- `App\Services\Decision\MarketingChannelSelection` — a `readonly` value object distinguishing `executableChannelIds`, `draftOnlyChannels`, and `excludedChannels` (with reasons) — the "channel mix" output, with no `Decision`/`CampaignBlueprint` schema change.
+- Structured logging: one `Log::info('DecisionEngine: marketing-presence channel selection.', [...])` entry per selection, covering channels considered, preferred, excluded (and why), and the executable/draft-only split.
+- `tests/Feature/Decision/MarketingChannelSelectorTest.php` — 12 tests covering every bucketing/exclusion/preference rule and tenant isolation.
+- 5 new end-to-end tests in `tests/Feature/Decision/DecisionEngineTest.php` verifying the same rules through a real committed `Decision`.
+
+### Changed
+
+- `App\Services\Decision\DecisionEngine` — injects `MarketingChannelSelector`; the former `resolveChannelIds()` (returned plucked ids) is now `resolveAffinityChannels()` (returns the `Channel` collection itself, identical type-affinity logic) feeding into the new selector. `Decision.channel_ids` is now populated from the selector's `executableChannelIds`.
+- `App\Services\Decision\DecisionContext` — gained a `null`-defaulting `channelSelection: ?MarketingChannelSelection` property, so the full executable/draft-only/excluded breakdown is available to `DecisionService::commit()` without any persisted schema change.
+
+### Notes
+
+- The plan document's Phase 6 text describes building a `channel_id → MarketingChannel` map "from the `BusinessBrain`... not a fresh query" — not literally possible against the synthesized `BusinessBrain->marketingPresence` Phase 5 actually shipped. A fresh, company-scoped query (the same pattern already used for every other tenant-scoped model in `DecisionEngine`) is used instead.
+- Excluding `planned`-linked channels (not just `inactive`-linked ones) was added per this phase's live task instruction, beyond what the plan document's Phase 6 text originally specified.
+- All 20 pre-existing Decision Engine/pipeline tests pass unmodified — no regression to existing guard-condition or fallback behavior.
+
+---
+
 ## [Milestone 11 Phase 5 — Business Brain Integration] — 2026-07-09
 
 Implements Phase 5 only of [Milestone-11-Marketing-Presence.md](docs/plans/Milestone-11-Marketing-Presence.md). Details in [Milestone-11-Phase-5-Review.md](docs/reviews/Milestone-11-Phase-5-Review.md). No Opportunity Engine, Decision Engine, publishing, or onboarding changes.

@@ -15,5 +15,6 @@ readonly class DecisionContext
         public BusinessBrain $brain,
         public string $campaignType,
         public array $channelIds,
+        public ?MarketingChannelSelection $channelSelection = null,
     ) {}
 }

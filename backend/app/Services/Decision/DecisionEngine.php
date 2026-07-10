@@ -26,6 +26,7 @@ class DecisionEngine
     public function __construct(
         private readonly OpportunityRepository $opportunityRepository,
         private readonly DecisionService $decisionService,
+        private readonly MarketingChannelSelector $marketingChannelSelector,
     ) {}
 
     /**
@@ -91,13 +92,15 @@ class DecisionEngine
             }
 
             // All guards passed — commit this Decision
-            $channelIds = $this->resolveChannelIds($activeChannels, $campaignType);
+            $affinityMatched = $this->resolveAffinityChannels($activeChannels, $campaignType);
+            $selection = $this->marketingChannelSelector->select($company, $affinityMatched, $activeChannels, $campaignType);
 
             $context = new DecisionContext(
                 opportunity: $opportunity,
                 brain: $brain,
                 campaignType: $campaignType,
-                channelIds: $channelIds,
+                channelIds: $selection->executableChannelIds,
+                channelSelection: $selection,
             );
 
             return $this->decisionService->commit($context);
@@ -133,13 +136,16 @@ class DecisionEngine
     }
 
     /**
-     * Select channel IDs with type-affinity preference for the campaign type.
-     * Falls back to all active channels if no affinity match exists.
+     * Type-affinity channel candidates for the campaign type — the original,
+     * Marketing-Presence-unaware selection. Falls back to all active channels
+     * if no affinity match exists. `MarketingChannelSelector::select()` takes
+     * this candidate set and narrows/annotates it using declared Marketing
+     * Presence; this method's own behavior is unchanged from before Phase 6.
      *
      * @param  Collection<int, Channel>  $activeChannels
-     * @return string[]
+     * @return Collection<int, Channel>
      */
-    private function resolveChannelIds(Collection $activeChannels, string $campaignType): array
+    private function resolveAffinityChannels(Collection $activeChannels, string $campaignType): Collection
     {
         $affinity = match ($campaignType) {
             'urgency_promotion' => ['email', 'facebook', 'instagram'],
@@ -149,16 +155,11 @@ class DecisionEngine
         };
 
         if (empty($affinity)) {
-            return $activeChannels->pluck('id')->all();
+            return $activeChannels;
         }
 
-        $preferred = $activeChannels
-            ->filter(fn (Channel $ch): bool => in_array($ch->type, $affinity, true))
-            ->pluck('id')
-            ->all();
+        $preferred = $activeChannels->filter(fn (Channel $ch): bool => in_array($ch->type, $affinity, true));
 
-        return empty($preferred)
-            ? $activeChannels->pluck('id')->all()
-            : $preferred;
+        return $preferred->isEmpty() ? $activeChannels : $preferred;
     }
 }

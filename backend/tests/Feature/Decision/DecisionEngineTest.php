@@ -13,6 +13,7 @@ use App\Models\Channel;
 use App\Models\Company;
 use App\Models\Decision;
 use App\Models\DigitalTwin;
+use App\Models\MarketingChannel;
 use App\Models\Opportunity;
 use App\Models\Recommendation;
 use App\Services\Decision\DecisionEngine;
@@ -196,6 +197,161 @@ class DecisionEngineTest extends TestCase
         ]);
     }
 
+    // ── Marketing Presence channel selection (Milestone 11 Phase 6) ─────────
+
+    public function test_prefers_primary_linked_channel_over_secondary_when_committing(): void
+    {
+        Event::fake([DecisionCommitted::class]);
+        $this->fake->queueFixture('rationale-generation');
+
+        $facebook = $this->makeChannel(['type' => 'facebook', 'name' => 'Facebook']);
+        $instagram = $this->makeChannel(['type' => 'instagram', 'name' => 'Instagram']);
+
+        $this->linkMarketingChannel($facebook, ['importance' => 'secondary']);
+        $this->linkMarketingChannel($instagram, ['importance' => 'primary']);
+
+        $this->makeOpportunity(composite: 80, type: 'featured_item');
+        $brain = $this->makeBrain();
+
+        $decision = $this->engine->evaluate($this->company, $brain);
+
+        $this->assertNotNull($decision);
+        $this->assertSame([$instagram->id], $decision->channel_ids);
+    }
+
+    public function test_excludes_inactive_linked_channel_when_committing(): void
+    {
+        Event::fake([DecisionCommitted::class]);
+        $this->fake->queueFixture('rationale-generation');
+
+        $activeFacebook = $this->makeChannel(['type' => 'facebook', 'name' => 'Facebook']);
+        $inactiveInstagram = $this->makeChannel(['type' => 'instagram', 'name' => 'Instagram']);
+
+        $this->linkMarketingChannel($activeFacebook, ['status' => 'active']);
+        $this->linkMarketingChannel($inactiveInstagram, ['status' => 'inactive']);
+
+        $this->makeOpportunity(composite: 80, type: 'featured_item');
+        $brain = $this->makeBrain();
+
+        $decision = $this->engine->evaluate($this->company, $brain);
+
+        $this->assertNotNull($decision);
+        $this->assertSame([$activeFacebook->id], $decision->channel_ids);
+    }
+
+    public function test_planned_linked_channel_never_becomes_executable(): void
+    {
+        Event::fake([DecisionCommitted::class]);
+        $this->fake->queueFixture('rationale-generation');
+
+        $activeEmail = $this->makeChannel(['type' => 'email']);
+        $plannedInstagram = $this->makeChannel(['type' => 'instagram']);
+
+        $this->linkMarketingChannel($activeEmail, ['status' => 'active']);
+        $this->linkMarketingChannel($plannedInstagram, ['status' => 'planned']);
+
+        $this->makeOpportunity(composite: 80, type: 're_engagement');
+        $brain = $this->makeBrain();
+
+        $decision = $this->engine->evaluate($this->company, $brain);
+
+        $this->assertNotNull($decision);
+        $this->assertNotContains($plannedInstagram->id, $decision->channel_ids);
+    }
+
+    public function test_declared_unlinked_channel_never_enters_channel_ids(): void
+    {
+        Event::fake([DecisionCommitted::class]);
+        $this->fake->queueFixture('rationale-generation');
+
+        $this->makeChannel();
+
+        MarketingChannel::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id,
+            'type' => 'print',
+            'display_name' => 'Local Paper Ad',
+            'status' => 'active',
+            'objective' => ['awareness'],
+        ]);
+
+        $this->makeOpportunity(composite: 80, type: 're_engagement');
+        $brain = $this->makeBrain();
+
+        $decision = $this->engine->evaluate($this->company, $brain);
+
+        $this->assertNotNull($decision);
+        $this->assertContainsOnly('string', $decision->channel_ids);
+        $this->assertCount(1, $decision->channel_ids);
+    }
+
+    public function test_linked_active_channel_is_eligible_for_execution(): void
+    {
+        Event::fake([DecisionCommitted::class]);
+        $this->fake->queueFixture('rationale-generation');
+
+        $channel = $this->makeChannel();
+        $this->linkMarketingChannel($channel, ['status' => 'active', 'importance' => 'primary']);
+
+        $this->makeOpportunity(composite: 80, type: 're_engagement');
+        $brain = $this->makeBrain();
+
+        $decision = $this->engine->evaluate($this->company, $brain);
+
+        $this->assertNotNull($decision);
+        $this->assertSame([$channel->id], $decision->channel_ids);
+    }
+
+    public function test_foreign_company_channel_can_never_be_selected(): void
+    {
+        Event::fake([DecisionCommitted::class]);
+        $this->fake->queueFixture('rationale-generation');
+
+        $this->makeChannel();
+
+        $otherCompany = Company::withoutGlobalScopes()->create(['name' => 'Other', 'slug' => 'other']);
+        $foreignChannel = Channel::withoutGlobalScopes()->create([
+            'company_id' => $otherCompany->id,
+            'type' => 'email',
+            'name' => 'Other Email',
+            'is_active' => true,
+        ]);
+        MarketingChannel::withoutGlobalScopes()->create([
+            'company_id' => $otherCompany->id,
+            'channel_id' => $foreignChannel->id,
+            'type' => 'email',
+            'display_name' => "Other Co's Email",
+            'status' => 'active',
+            'importance' => 'primary',
+            'objective' => ['awareness'],
+        ]);
+
+        $this->makeOpportunity(composite: 80, type: 're_engagement');
+        $brain = $this->makeBrain();
+
+        $decision = $this->engine->evaluate($this->company, $brain);
+
+        $this->assertNotNull($decision);
+        $this->assertNotContains($foreignChannel->id, $decision->channel_ids);
+    }
+
+    public function test_no_marketing_presence_preserves_existing_behavior(): void
+    {
+        Event::fake([DecisionCommitted::class]);
+        $this->fake->queueFixture('rationale-generation');
+
+        // No MarketingChannel rows declared at all — behavior must be
+        // identical to pre-Milestone-11 type-affinity-only selection.
+        $channel = $this->makeChannel();
+
+        $this->makeOpportunity(composite: 80, type: 're_engagement');
+        $brain = $this->makeBrain();
+
+        $decision = $this->engine->evaluate($this->company, $brain);
+
+        $this->assertNotNull($decision);
+        $this->assertSame([$channel->id], $decision->channel_ids);
+    }
+
     private function makeOpportunity(int $composite, string $type = 'featured_item'): Opportunity
     {
         return Opportunity::withoutGlobalScopes()->create([
@@ -213,14 +369,30 @@ class DecisionEngineTest extends TestCase
         ]);
     }
 
-    private function makeChannel(): Channel
+    /** @param array<string, mixed> $overrides */
+    private function makeChannel(array $overrides = []): Channel
     {
-        return Channel::withoutGlobalScopes()->create([
+        return Channel::withoutGlobalScopes()->create(array_merge([
             'company_id' => $this->company->id,
             'type' => 'email',
             'name' => 'Email',
             'is_active' => true,
-        ]);
+        ], $overrides));
+    }
+
+    /** @param array<string, mixed> $overrides */
+    private function linkMarketingChannel(Channel $channel, array $overrides = []): MarketingChannel
+    {
+        return MarketingChannel::withoutGlobalScopes()->create(array_merge([
+            'company_id' => $this->company->id,
+            'channel_id' => $channel->id,
+            'type' => $channel->type,
+            'display_name' => ucfirst($channel->type),
+            'status' => 'active',
+            'importance' => 'secondary',
+            'is_connected' => true,
+            'objective' => ['awareness'],
+        ], $overrides));
     }
 
     private function makeBrain(): BusinessBrain
