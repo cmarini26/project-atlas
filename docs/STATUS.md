@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 855 tests (853 passing, 2 Redis skipped) + 24 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Critical Production Blocker 2 — analytics webhook rate limiting, 10 new tests. |
+| Tests             | ✅ Strong | 860 tests (858 passing, 2 Redis skipped) + 24 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Critical Production Blocker 3 — HTTPS enforcement + security headers, 5 new tests. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,20 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**Critical Production Blocker 3 of 8 — HTTPS Enforcement + Security Headers ✅ Complete**
+*Completed: 2026-07-10*
+
+Third of eight critical blockers from the Production Deployment Readiness Audit resolved, per `docs/plans/Critical-Production-Blockers.md`. `TrustProxies` is now configured (trusting `*`, the immediate calling proxy, since Blocker 7's production proxy layer doesn't exist yet), and a new global `SecurityHeaders` middleware (`app/Http/Middleware/SecurityHeaders.php`, appended in `bootstrap/app.php` outside any specific group so it also covers the Filament admin panel, which builds its own middleware list rather than reusing `'web'`) adds `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, and a baseline `Content-Security-Policy` to every response. `Strict-Transport-Security` is only sent when the request is actually secure (direct TLS or a trusted proxy's forwarded HTTPS scheme) — sending it over plain HTTP would be meaningless, not harmful, so it's simply omitted there.
+
+**Deliberate scope decision:** the shipped CSP is narrow (`frame-ancestors 'none'; object-src 'none'; base-uri 'self'`) rather than a full `script-src`/`style-src`/`connect-src` lockdown. Filament (Livewire + Alpine.js) and Inertia both use inline scripts/styles, and local dev loads assets from the Vite dev server on a different origin — restricting those sources correctly needs a nonce-based rollout wired through Blade, Filament's asset pipeline, and Inertia, which is a separate, larger project. Documented as a deferred follow-up in `Critical-Production-Blockers.md` rather than attempted here, to avoid risking a broken admin panel or broken local dev for a headline-checkbox CSP.
+
+5 new tests (`tests/Feature/Security/SecurityHeadersTest.php`) confirm the headers are present on an Inertia web response, a JSON API response, and the Filament admin login page, and that HSTS is present/absent correctly depending on request scheme. 860 tests (858 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean. Build green.
+
+See:
+- [Critical-Production-Blockers.md](plans/Critical-Production-Blockers.md) — full 8-blocker plan, updated with Blocker 3's completion notes
+
+**Previous milestone:**
 
 **Critical Production Blocker 2 of 8 — Analytics Webhook Rate Limiting ✅ Complete**
 *Completed: 2026-07-10*
@@ -641,6 +655,8 @@ All production-blocking items resolved. Remaining pre-production items:
 ---
 
 ## Last Updated
+
+**2026-07-10** — Critical Production Blocker 3 of 8 resolved: `TrustProxies` configured (trusting `*`, pending Blocker 7's real proxy layer) and a new global `SecurityHeaders` middleware adds `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, a baseline `Content-Security-Policy`, and conditional `Strict-Transport-Security` (only sent over an actually-secure request) to every response, including the Filament admin panel. Full script/style/connect-src CSP lockdown deliberately deferred as a larger, nonce-based follow-up to avoid risking Filament/Inertia/Vite breakage. 5 new tests. See [Critical-Production-Blockers.md](plans/Critical-Production-Blockers.md).
 
 **2026-07-10** — Critical Production Blocker 2 of 8 resolved: `POST /api/analytics/webhooks/{provider}` now has a named rate limiter (`analytics-webhook`, 60/min per IP, with structured logging on rejection) instead of being fully public and unthrottled. Discovered and documented (but did not fix, as out of scope) that every pre-existing bare `throttle:N,M` route shares one rate-limit bucket per IP regardless of route — confirmed exhausting `/login`'s bucket also blocks `/register`. 10 new tests. See [Critical-Production-Blockers.md](plans/Critical-Production-Blockers.md).
 

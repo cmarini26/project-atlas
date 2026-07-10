@@ -6,6 +6,26 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Critical Production Blocker 3 — HTTPS Enforcement and Security Headers] — 2026-07-10
+
+Third of eight critical blockers from `docs/reviews/Production-Deployment-Audit.md`, executed per `docs/plans/Critical-Production-Blockers.md`.
+
+### Added
+
+- `app/Http/Middleware/SecurityHeaders.php` — appended to the global middleware stack (`bootstrap/app.php`, via `$middleware->append()`, not just the `web`/`api` groups) so it covers every response surface, including the Filament admin panel, which builds its own middleware list rather than reusing `'web'`. Sets `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, and `Content-Security-Policy: frame-ancestors 'none'; object-src 'none'; base-uri 'self'` on every response, plus `Strict-Transport-Security: max-age=31536000; includeSubDomains` when the request is actually secure.
+- `tests/Feature/Security/SecurityHeadersTest.php` — 5 tests: headers present on an Inertia web response, a JSON API response, and the Filament admin login page; HSTS present over a secure request; HSTS absent over a plain HTTP request.
+
+### Changed
+
+- `bootstrap/app.php` — `$middleware->trustProxies(at: '*')` configured (trusting the immediate calling proxy, since no production proxy/load-balancer IP exists yet).
+
+### Notes
+
+- HSTS is intentionally gated on `$request->secure()` rather than sent unconditionally — sending it over plain HTTP has no effect, so we simply omit it there instead of sending a meaningless header.
+- The shipped CSP is deliberately narrow — `frame-ancestors 'none'; object-src 'none'; base-uri 'self'` — not a full `script-src`/`style-src`/`connect-src` policy. Filament (Livewire + Alpine.js) and Inertia both rely on inline scripts/styles, and the Vite dev server serves local-dev assets from a different origin; restricting those sources safely requires a nonce-based rollout that is a larger, separate project. Deferred and documented in `docs/plans/Critical-Production-Blockers.md`.
+- `TrustProxies` trusts `*` (the immediate calling proxy) rather than a specific IP range, since Blocker 7 (production environment) hasn't provisioned the real proxy layer yet — revisit once it does.
+- Full suite: 860 tests, 858 passing, 2 Redis-skipped. PHPStan level 8 — 0 errors. Pint clean. `npm run build` green.
+
 ## [Critical Production Blocker 2 — Analytics Webhook Rate Limiting] — 2026-07-10
 
 Second of eight critical blockers from `docs/reviews/Production-Deployment-Audit.md`, executed per `docs/plans/Critical-Production-Blockers.md`.

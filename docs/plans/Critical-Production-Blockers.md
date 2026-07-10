@@ -104,6 +104,8 @@ This is precisely why Blocker 2 uses a named limiter instead of a bare `throttle
 
 ## Blocker 3 — Enforce HTTPS and Add Security Headers
 
+**Status:** ✅ Complete — 2026-07-10. `TrustProxies` is now configured (trusting `*`, the immediate calling proxy, since Blocker 7's deployment topology isn't finalized yet), and a new global `SecurityHeaders` middleware adds `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, a baseline `Content-Security-Policy`, and conditional HSTS to every response. A full script/style/connect-src CSP was deliberately deferred — see "Discovered/decided during implementation" below.
+
 ### Title
 Add `TrustProxies` configuration and a security-headers middleware (HSTS, X-Frame-Options, X-Content-Type-Options, and a baseline CSP).
 
@@ -111,12 +113,12 @@ Add `TrustProxies` configuration and a security-headers middleware (HSTS, X-Fram
 No code anywhere in the application configures trusted proxies or forces the HTTPS scheme, and no middleware sets any of the standard security headers. Behind any real reverse proxy or load balancer, Laravel cannot reliably determine the original request scheme, which directly undermines the session-cookie `secure` flag's auto-detection (itself a High Priority finding). Absent security headers leave the application without baseline protections against clickjacking (X-Frame-Options), MIME-sniffing attacks (X-Content-Type-Options), and downgrade attacks (HSTS) — all standard, low-effort protections expected of any production web application.
 
 ### Acceptance criteria
-- [ ] `TrustProxies` middleware is configured (trusting the expected proxy layer, or `*` if the deployment topology isn't finalized yet — documented either way).
-- [ ] A new middleware adds `Strict-Transport-Security`, `X-Frame-Options`, `X-Content-Type-Options`, and a baseline `Content-Security-Policy` header to every response.
-- [ ] HSTS is only sent over an actual HTTPS connection (or is safe to send unconditionally per standard guidance — decide and document which, since sending HSTS over plain HTTP is not itself harmful but is meaningless).
-- [ ] A feature test asserts the headers are present on a representative response.
-- [ ] No existing test breaks (in particular, Inertia responses and the Filament admin panel must not be broken by an overly strict CSP — verify both surfaces still render in tests).
-- [ ] Full test suite passes, PHPStan clean, Pint clean, build green.
+- [x] `TrustProxies` middleware is configured (trusting the expected proxy layer, or `*` if the deployment topology isn't finalized yet — documented either way).
+- [x] A new middleware adds `Strict-Transport-Security`, `X-Frame-Options`, `X-Content-Type-Options`, and a baseline `Content-Security-Policy` header to every response.
+- [x] HSTS is only sent over an actual HTTPS connection (decided and documented — see below).
+- [x] A feature test asserts the headers are present on a representative response.
+- [x] No existing test breaks (in particular, Inertia responses and the Filament admin panel must not be broken by an overly strict CSP — verify both surfaces still render in tests).
+- [x] Full test suite passes, PHPStan clean, Pint clean, build green.
 
 ### Estimated effort
 Small–Medium (half a day). New middleware class, registration in `bootstrap/app.php`, and enough CSP care to avoid breaking Inertia/Vite asset loading or Filament's own asset pipeline.
@@ -130,6 +132,19 @@ None, but sequenced after Blocker 1 (tenant isolation) and before Blocker 5 (err
 3. Write a feature test hitting any route and asserting the four headers are present with sane values.
 4. Manually verify (via existing Vitest/frontend build, and by re-running the full backend test suite) that Inertia page responses and the Filament panel are unaffected.
 5. Run all four quality gates; update docs; commit and push.
+
+### Decided during implementation: HSTS gating, and a deliberately narrow CSP
+
+**HSTS gating.** `SecurityHeaders` only sends `Strict-Transport-Security` when `$request->secure()` is true — i.e., an actual TLS connection, or (once `TrustProxies` is trusting the calling proxy) a proxy that forwarded `X-Forwarded-Proto: https`. Sending HSTS over plain HTTP isn't harmful, but it has no effect there, so we don't send a header that does nothing.
+
+**`TrustProxies` set to `*`.** No production proxy/load-balancer IP exists yet (Blocker 7 is still infrastructure-pending), so trusting the immediate calling proxy (`*`) is the standard guidance for an unknown or not-yet-provisioned single-hop reverse proxy (e.g. Forge/nginx). Revisit with a specific IP or IP range once Blocker 7 stands up the real proxy layer.
+
+**CSP deliberately narrow, not full script/style/connect lockdown.** The shipped `Content-Security-Policy` is `frame-ancestors 'none'; object-src 'none'; base-uri 'self'` — real protection against clickjacking-via-iframe, legacy plugin/object embeds, and `<base>`-tag injection, all of which are safe to restrict unconditionally because nothing in the app relies on them. A full `default-src`/`script-src`/`style-src`/`connect-src` policy was deliberately **not** attempted in this blocker, because:
+- Filament's admin panel (Livewire + Alpine.js) and Inertia both rely on inline `<script>`/`<style>` in places; restricting those sources correctly requires a nonce or hash-based rollout wired through Blade, Filament's own asset pipeline, and Inertia's SSR (if ever enabled) — a materially larger change than a middleware addition.
+- The Vite dev server used in local development serves assets from a different origin/port (HMR websocket + module scripts), which a strict same-origin `script-src`/`connect-src` would break for every local-dev contributor, not just production.
+- Getting this reintroduced wrong (e.g., silently breaking Filament widget rendering or Inertia navigation) is a worse outcome than shipping the narrower, unconditionally-safe policy now and expanding it deliberately later.
+
+**Recommendation:** track a full CSP rollout (nonce-based script/style-src, tested against Filament + Inertia + Vite-built production assets) as a follow-up item the next time the audit is revisited — it is real hardening, but it is its own scoped project, not a one-middleware fix.
 
 ---
 
