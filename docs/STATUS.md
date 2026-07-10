@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 921 tests (919 passing, 2 Redis skipped) + 24 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Critical Production Blocker 7 — production infrastructure configuration (trusted proxies + topology docs), 12 new tests. |
+| Tests             | ✅ Strong | 933 tests (930 passing, 2 Redis + 1 backup-drill skipped where the local environment can't support it) + 24 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Critical Production Blocker 8 — backup/restore scripts + a real local restore drill, 12 new tests. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,27 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**Critical Production Blocker 8 of 8 — Backup and Disaster Recovery Readiness 🟡 Partially Complete**
+*Completed: 2026-07-10 (repository-representable subset only — see below)*
+
+Eighth and final blocker from the Production Deployment Readiness Audit; like Blocker 7, this blocker's original acceptance criteria are entirely operator-executed (real backups running against a real production database, at least one restore actually performed against it) and remain genuinely undone — no production database exists yet. What was completed is the repository-representable subset: working, tested backup/verify/restore scripts (`infrastructure/backup/`) and a real, automated local restore drill against disposable scratch PostgreSQL databases — not a mock — plus full strategy documentation in `docs/operations/Backup-and-Recovery.md`.
+
+`atlas-db-backup.sh` wraps `pg_dump` (provider-neutral, works against any PostgreSQL instance), fails loudly on any error, never treats an empty dump as success, and supports optional GPG encryption and an optional off-site upload hook. `atlas-db-verify.sh` does a lightweight integrity check, explicitly distinguished from a full restore drill. `atlas-db-restore.sh` is destructive and never proceeds without exact-match confirmation of the target database name — interactively, or via `--yes --confirm-database=<name>` for scripted drills.
+
+Building the automated local drill surfaced a real operational gotcha, now documented: `pg_dump` refuses to dump from a server newer than itself, and a dump taken by a *newer* client than the restore target's server can include settings the older server doesn't recognize — encountered directly (Homebrew's pg_dump 14 vs. a PostgreSQL 16 server, then a PostgreSQL 17 client's dump failing to restore into that same PostgreSQL 16 server). Also confirmed via `grep -rn "Storage::" app/`: no application-managed uploaded files exist today, so no file-backup mechanism was invented for data that doesn't exist — documented explicitly rather than silently omitted.
+
+`docs/operations/Backup-and-Recovery.md` leads with an explicit "code-complete vs. operator-complete" table so this work is never mistaken for "backups are operational" — retention, encryption, off-site storage, and production scheduling guidance are all documented, but none of it has been executed against real infrastructure.
+
+12 new tests (8 safety/argument-parsing tests requiring only a shell, no Postgres; 1 real end-to-end drill requiring — and skipping gracefully without — a compatible local PostgreSQL server). 933 tests (930 passing, 2 Redis + up to 1 backup-drill skipped depending on local environment). PHPStan level 8 — 0 errors. Pint clean. Build green.
+
+See:
+- [Critical-Production-Blockers.md](plans/Critical-Production-Blockers.md) — full 8-blocker plan, now complete (with 2 of 8 blockers' operator-executed remainder still open)
+- [Backup-and-Recovery.md](operations/Backup-and-Recovery.md) — backup strategy, scripts, safety, retention/encryption/off-site guidance, and the restore testing checklist
+
+**All eight Critical Production Blockers have now been addressed to the extent this repository can address them.** Blockers 7 and 8 each have a genuinely open, operator-executed remainder (real infrastructure, real backups) gated on choosing a hosting provider — see both blockers' "Status" notes in `Critical-Production-Blockers.md`. Per that document's own closing section, the Production Deployment Audit should be re-run against the then-current state once Blockers 7–8's operator-executed work is actually complete, rather than assuming this plan's completion is self-verifying.
+
+**Previous milestone:**
 
 **Critical Production Blocker 7 of 8 — Production Infrastructure Configuration 🟡 Partially Complete**
 *Completed: 2026-07-10 (code-representable subset only — see below)*
@@ -716,6 +737,8 @@ All production-blocking items resolved. Remaining pre-production items:
 ---
 
 ## Last Updated
+
+**2026-07-10** — Critical Production Blocker 8 of 8 (final blocker) partially resolved — repository-representable subset only; real backups against a real production database remain operator-executed and undone (gated on Blocker 7). Added `infrastructure/backup/atlas-db-backup.sh`/`atlas-db-verify.sh`/`atlas-db-restore.sh` (provider-neutral `pg_dump` wrapper, fails loudly, destructive restore requires exact-match confirmation) and `docs/operations/Backup-and-Recovery.md` (strategy, safety, retention/encryption/off-site guidance, explicit code-complete-vs-operator-complete distinction). A real automated local restore drill (`tests/Feature/Backup/BackupRestoreDrillTest.php`) round-trips data between two disposable scratch PostgreSQL databases, surfacing a documented pg_dump/server version-compatibility gotcha along the way. Confirmed no application-managed uploaded files exist today, so no speculative file-backup mechanism was added. 12 new tests. All eight Critical Production Blockers are now addressed to the extent this repository can address them — Blockers 7 and 8 each retain a genuine operator-executed remainder. See [Critical-Production-Blockers.md](plans/Critical-Production-Blockers.md).
 
 **2026-07-10** — Critical Production Blocker 7 of 8 partially resolved (code-representable subset only — real infrastructure provisioning is still operator-executed and undone). Replaced Blocker 3's hardcoded `TrustProxies` wildcard with an operator-configured `TRUSTED_PROXIES` env var (fail-closed default: unset trusts no proxies) parsed by a new `App\Services\Http\TrustedProxyResolver`. Added `docs/deployment/Production-Topology.md` documenting the expected reverse-proxy/app-server/database/Redis/queue-worker/scheduler shape. 12 new tests prove HTTPS detection, HSTS, client IP resolution, and IP-keyed rate limiting all work correctly behind a trusted proxy and can't be spoofed by an untrusted one. See [Critical-Production-Blockers.md](plans/Critical-Production-Blockers.md).
 

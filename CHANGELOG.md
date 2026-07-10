@@ -6,6 +6,27 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Critical Production Blocker 8 — Backup and Disaster Recovery Readiness] — 2026-07-10
+
+Eighth and final blocker from `docs/reviews/Production-Deployment-Audit.md`. Like Blocker 7, this blocker's original acceptance criteria are entirely operator-executed (real backups against a real production database) and remain undone — no production database exists yet. This entry covers only the repository-representable subset the live task scoped.
+
+### Added
+
+- `infrastructure/backup/atlas-db-backup.sh` — provider-neutral `pg_dump` wrapper: gzip-compressed dump, fails loudly (`set -euo pipefail`, required-variable checks, never treats an empty dump as success), optional GPG encryption (`BACKUP_GPG_RECIPIENT`), optional off-site upload hook (`BACKUP_OFFSITE_COMMAND`, provider-agnostic shell template), optional local retention pruning (`BACKUP_RETENTION_DAYS`).
+- `infrastructure/backup/atlas-db-verify.sh` — lightweight integrity check (gzip test + schema presence), explicitly distinguished from a full restore drill.
+- `infrastructure/backup/atlas-db-restore.sh` — destructive restore; never proceeds without exact-match confirmation of the target database name, interactively or via `--yes --confirm-database=<name>`; refuses gpg-encrypted files outright (decrypt first).
+- `docs/operations/Backup-and-Recovery.md` — backup strategy (database via `pg_dump`; no application-managed uploaded files exist today, confirmed via `grep -rn "Storage::" app/`; secrets/`.env` recovery referenced but never stored in-repo), retention/encryption/off-site guidance, production scheduling guidance, a restore testing checklist, and a leading "code-complete vs. operator-complete" table.
+- `tests/Feature/Backup/BackupScriptSafetyTest.php` (11 tests) — argument-parsing and safety checks (missing config, unreachable host, missing/empty files, every restore-confirmation path) requiring only a shell, no Postgres.
+- `tests/Feature/Backup/BackupRestoreDrillTest.php` (1 test) — a real end-to-end drill: creates two scratch PostgreSQL databases, seeds one, backs it up, verifies the dump, restores into the other, and asserts the data matches. Skips gracefully (mirroring `RedisConnectionTest`) when a compatible local PostgreSQL client/server isn't available.
+
+### Notes
+
+- **Logical (`pg_dump`) backups, not WAL archiving** — chosen for provider-neutrality, since no managed PostgreSQL provider has been chosen yet (Blocker 7 remains unprovisioned). Once one is, its own automated backup feature should likely become primary, with these scripts as the portable fallback/local-drill tool.
+- **A real drill surfaced a real gotcha:** `pg_dump` refuses to dump from a server newer than itself, and a dump taken by a newer client than the restore target's server can include settings the older server doesn't recognize (encountered directly: Homebrew's pg_dump 14 vs. a PostgreSQL 16 server; then a PostgreSQL 17 client's dump failing to restore into that same PostgreSQL 16 server over an unrecognized `transaction_timeout` setting). Documented in `Backup-and-Recovery.md`.
+- **No uploaded-file backup strategy was invented** — a repository-wide check confirmed none exist. Documented explicitly, with guidance for what to do if this changes.
+- **This does not mean backups are operational.** No cloud storage was provisioned, no infrastructure was deployed, and no claim is made anywhere that backups exist in production — see `Backup-and-Recovery.md`'s leading "code-complete vs. operator-complete" table.
+- Full suite: 933 tests, 930 passing, 2 Redis + up to 1 backup-drill skipped depending on local environment. PHPStan level 8 — 0 errors. Pint clean. `npm run build` green.
+
 ## [Critical Production Blocker 7 — Production Infrastructure Configuration] — 2026-07-10
 
 Seventh of eight critical blockers from `docs/reviews/Production-Deployment-Audit.md`. This blocker's original acceptance criteria are entirely operator-executed infrastructure provisioning (a real server, domain, SSL, a live deploy) and remain undone — nothing was provisioned this session, per explicit instruction. This entry covers only the code-representable subset the live task scoped as "Production Infrastructure Configuration."

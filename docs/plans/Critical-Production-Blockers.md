@@ -341,6 +341,8 @@ The default changed from fail-open (`'*'`, trust the immediate caller unconditio
 
 ## Blocker 8 — Configure and Verify Database Backups
 
+**Status:** 🟡 Partially complete — 2026-07-10. Like Blocker 7, this blocker's original acceptance criteria are entirely operator-executed (real backups running against a real production database) and remain genuinely undone — no production database exists yet. What **was** completed is the repository-representable portion: working, tested backup/verify/restore scripts, a real local restore drill (against scratch PostgreSQL databases, not a mock), and full documentation in [Backup-and-Recovery.md](../operations/Backup-and-Recovery.md). See "Decided during implementation" below.
+
 ### Title
 Configure automated database backups and perform (and document) at least one successful restore.
 
@@ -355,14 +357,33 @@ Like Blocker 7, this is fundamentally a provisioning and verification task again
 - [ ] At least one backup has been restored to a separate/scratch database, and the restored data was spot-checked for correctness.
 - [ ] A restore procedure is documented well enough that a second person could follow it without asking whoever performed the first restore.
 
+**Repository-representable subset completed this session (not part of the original acceptance criteria above, added per the live task's explicit scope):**
+- [x] A provider-neutral `pg_dump` backup script (`infrastructure/backup/atlas-db-backup.sh`) — fails loudly, never treats an empty dump as success, supports optional GPG encryption and an optional off-site upload hook.
+- [x] A lightweight backup verification script (`atlas-db-verify.sh`) distinguishing "the file isn't corrupt" from "this backup is confirmed restorable" (only the full drill proves the latter).
+- [x] A restore script (`atlas-db-restore.sh`) that never proceeds without explicit, exact-match confirmation of the target database name — interactively or via `--yes --confirm-database=<name>`.
+- [x] A real, automated local restore drill (`tests/Feature/Backup/BackupRestoreDrillTest.php`) against two disposable scratch PostgreSQL databases, proving the scripts round-trip real data — not merely that they parse arguments. Skips gracefully (mirroring `RedisConnectionTest`) when a compatible local PostgreSQL client/server isn't available, rather than failing the build.
+- [x] `docs/operations/Backup-and-Recovery.md` — strategy for the database (the only stateful store today), uploaded files (none exist — verified via `grep -rn "Storage::" app/`), and secrets recovery references (never stored in the repo); retention, encryption, off-site, and scheduling guidance; and an explicit code-complete-vs-operator-complete distinction so this work is never mistaken for "backups are operational."
+
 ### Estimated effort
-Small–Medium (a day, mostly waiting on the first backup cycle and performing the restore drill) — but entirely gated on Blocker 7 existing first.
+Small–Medium (a day, mostly waiting on the first backup cycle and performing the restore drill) — but entirely gated on Blocker 7 existing first. The repository-representable subset above was small (a few hours); the operator-executed remainder is unchanged and still gated on Blocker 7.
 
 ### Dependencies
 Blocker 7 (production environment) — there is no database to back up until then.
 
 ### Verification steps
 See the "Backups" subsection of [Private-Beta-Execution.md](Private-Beta-Execution.md)'s Production Infrastructure Checklist, and the Go/No-Go gate's explicit backup-restore requirement — both already specify exactly what "done" looks like for this blocker.
+
+### Decided during implementation: logical (`pg_dump`) backups, not WAL archiving
+
+WAL-based physical backups/point-in-time recovery are typically a managed-provider dashboard toggle, not something this repository can meaningfully configure in advance of choosing a provider (Blocker 7 remains unprovisioned). `pg_dump`-based logical backups were chosen instead because they're **provider-neutral** — the same script works against any PostgreSQL instance, local or managed, which is exactly what made a real, automated local restore drill possible without any real infrastructure existing yet. Once a managed provider is chosen, its own automated backup feature should likely become the *primary* mechanism, with these scripts as the portable fallback/local-drill tool — this is documented explicitly in `Backup-and-Recovery.md` rather than left to be rediscovered later.
+
+### Decided during implementation: a real local drill, not just documentation
+
+The live task asked for a "local or disposable-database restore drill procedure." Rather than writing that up as prose alone, `tests/Feature/Backup/BackupRestoreDrillTest.php` actually performs it — creating two scratch databases, seeding one, backing it up, verifying the dump, restoring into the other, and asserting the data matches — every time the test suite runs (skipping gracefully if the local environment can't support it). Building this surfaced a real, worth-documenting operational gotcha: `pg_dump` refuses to dump from a database server newer than itself, and a dump taken by a *newer* `pg_dump` than the restore target's server can include settings the older server doesn't recognize (encountered directly while building this: Homebrew's `pg_dump` 14 refused a PostgreSQL 16 server; a mismatched PostgreSQL 17 client's dump then failed to restore into that PostgreSQL 16 server over an unrecognized `transaction_timeout` setting). This is now documented in `Backup-and-Recovery.md`'s drill section as a real, specific pitfall to check for, not a hypothetical one.
+
+### Decided during implementation: no uploaded-file backup strategy, because there's nothing to back up
+
+The live task asked this blocker to define a backup strategy for "application-managed uploaded files, if any." A repository-wide check (`grep -rn "Storage::" app/`) confirms there are none — no code path anywhere uploads, generates, or stores a file on disk or object storage today (consistent with the audit's existing High Priority finding on file storage). Rather than inventing a speculative mechanism for data that doesn't exist, `Backup-and-Recovery.md` documents this explicitly and states what to do if this changes in the future, so the gap is a deliberate, checked observation — not a silent omission.
 
 ---
 
