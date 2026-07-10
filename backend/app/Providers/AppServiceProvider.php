@@ -29,9 +29,13 @@ use App\Models\Company;
 use App\Services\Analytics\AnalyticsProviderRegistry;
 use App\Services\Analytics\FakeAnalyticsProvider;
 use App\Services\Brain\BusinessBrainService;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -99,5 +103,24 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(CampaignAssetsReady::class, TriggerRecommendationCreation::class);
         Event::listen(RecommendationApproved::class, TriggerCampaignPublishing::class);
         Event::listen(ExecutionCompleted::class, ScheduleMetricRetrieval::class);
+
+        // Named limiter (not a bare `throttle:N,M` string) so this endpoint
+        // gets its own isolated bucket and a place to log rejections — bare
+        // `throttle:N,M` middleware shares one key (domain+IP only, no route
+        // distinction) across every route that uses it, so a webhook sharing
+        // that key with, say, the login/register routes would let one starve
+        // the other's attempts. See Critical-Production-Blockers.md Blocker 2.
+        RateLimiter::for('analytics-webhook', function (Request $request): Limit {
+            return Limit::perMinute(60)
+                ->by($request->ip())
+                ->response(function (Request $request) {
+                    Log::warning('AnalyticsWebhookController: rate limit exceeded.', [
+                        'ip' => $request->ip(),
+                        'provider' => $request->route('provider'),
+                    ]);
+
+                    return response()->json(['error' => 'Too many requests.'], 429);
+                });
+        });
     }
 }

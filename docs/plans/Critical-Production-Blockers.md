@@ -29,6 +29,8 @@ Blockers 5 and 3 both touch `bootstrap/app.php` — sequencing them non-adjacent
 
 ## Blocker 1 — Enforce Tenant Isolation at the Container Level
 
+**Status:** ✅ Complete (commit `63cc1dc`) — see `docs/reviews/` STATUS.md/CHANGELOG.md entries dated 2026-07-10. Fixing this surfaced a real regression (three cross-company membership lookups were incorrectly narrowed by the newly-active scope), fixed in the same commit with explicit `withoutGlobalScopes()` at each site.
+
 ### Title
 Bind `current_company_id` in `EnsureCompanyMembership` so `CompanyScope` is a real safety net, not dead code.
 
@@ -62,6 +64,8 @@ None. This is the first blocker precisely because it depends on nothing else in 
 
 ## Blocker 2 — Rate-Limit and Authenticate the Analytics Webhook Endpoint
 
+**Status:** ✅ Complete — 2026-07-10. Implemented as a named rate limiter (`analytics-webhook`, registered in `AppServiceProvider::boot()`) rather than the plan's originally-suggested bare `throttle:60,1` string, after discovering that bare `throttle:N,M` middleware shares one rate-limit bucket (keyed only by route domain + IP, with no route distinction) across *every* route using it with no explicit prefix — confirmed by testing that exhausting `/login`'s existing `throttle:5,1` bucket also blocked `/register`. A named limiter gives this endpoint its own isolated bucket and a place to log rejections. See "Discovered during implementation" below.
+
 ### Title
 Add rate limiting to `POST /api/analytics/webhooks/{provider}`, and confirm its signature verification is the correct sole gate (no additional auth needed for a public webhook receiver).
 
@@ -69,14 +73,15 @@ Add rate limiting to `POST /api/analytics/webhooks/{provider}`, and confirm its 
 `routes/api.php` registers this endpoint with no `throttle:` middleware and no authentication middleware at all — it is a fully public, unthrottled POST endpoint reachable by anyone on the internet today. Even though `AnalyticsWebhookHandler` implementations verify a provider-specific signature (e.g., HMAC) before processing a payload, the verification step itself still costs CPU and log volume per request, and an unthrottled endpoint is an easy target for basic denial-of-service or log-flooding, independent of whether any payload is ever accepted.
 
 ### Acceptance criteria
-- [ ] The route has a rate limit applied (e.g., `throttle:60,1` — generous enough for legitimate webhook bursts from a real provider, tight enough to blunt abuse).
-- [ ] Signature verification remains the correctness gate for whether a payload is processed (this does not change — webhooks are legitimately unauthenticated in the traditional sense; the provider's signature is the authentication mechanism). This blocker adds a volume limit, not a login requirement.
-- [ ] A test confirms the route is throttled (requests beyond the limit receive a 429).
-- [ ] Existing webhook-handling tests (signature verification, event processing) continue to pass unmodified.
-- [ ] Full test suite passes, PHPStan clean, Pint clean, build green.
+- [x] The route has a rate limit applied — a named limiter (`analytics-webhook`, 60/minute per IP), not a bare `throttle:60,1` string; generous enough for legitimate webhook bursts, tight enough to blunt abuse.
+- [x] Signature verification remains the correctness gate for whether a payload is processed (unchanged — webhooks are legitimately unauthenticated in the traditional sense; the provider's signature is the authentication mechanism). This blocker adds a volume limit, not a login requirement.
+- [x] A test confirms the route is throttled (requests beyond the limit receive a 429).
+- [x] Existing webhook-handling tests (signature verification, event processing) continue to pass unmodified.
+- [x] Full test suite passes, PHPStan clean, Pint clean, build green.
+- [x] (Added beyond the original acceptance criteria, per the live task's explicit requirements) Structured logging on rejection, a limit-reset test, an explicit legitimate-retry test, and cross-route bucket-isolation tests.
 
 ### Estimated effort
-Small (under an hour). A one-line route middleware addition plus one new test.
+Small (under an hour) as originally estimated — actual effort was closer to medium, once the bare-`throttle:N,M` bucket-sharing discovery (below) required a named limiter instead of the one-line fix originally planned.
 
 ### Dependencies
 None.
@@ -86,6 +91,14 @@ None.
 2. Add a feature test that sends requests past the configured limit and asserts a 429 response.
 3. Run the existing analytics webhook test suite and confirm no regression.
 4. Run all four quality gates; update `STATUS.md`/`CHANGELOG.md`; commit and push.
+
+### Discovered during implementation: bare `throttle:N,M` shares one bucket per IP across every route using it
+
+Laravel's default (non-named) `throttle:maxAttempts,decayMinutes` middleware computes its rate-limit key as `sha1($route->getDomain().'|'.$request->ip())` — **it does not factor in the route path at all**, and no prefix is applied unless a third middleware argument is explicitly given. Confirmed empirically: in a throwaway test, exhausting `/login`'s existing `throttle:5,1` bucket caused the very next `/register` request (also `throttle:5,1`, a different route) to receive a 429 too — the two routes share one counter per IP today.
+
+This means `/login`, `/register`, `/forgot-password`, `/reset-password`, and `/onboarding/integration` (all pre-existing, all using bare `throttle:N,M`) already silently share rate-limit buckets by IP wherever their decay windows overlap. This is out of scope for Blocker 2 (those are unrelated, already-throttled routes, and the live task's instruction was explicit: "do not modify unrelated endpoints") — but it is a genuine, previously-undocumented finding worth its own follow-up. **Recommendation: add this as a new High Priority item** the next time `docs/reviews/Production-Deployment-Audit.md` is revisited, and fix by giving each existing bare-throttled route its own prefix or named limiter, the same pattern this blocker used for the webhook.
+
+This is precisely why Blocker 2 uses a named limiter instead of a bare `throttle:60,1` string: a bare string would have put the webhook's traffic into the *same* shared bucket as login/register/password-reset/onboarding, meaning a burst of legitimate webhook deliveries could have silently locked out real users trying to log in, and vice versa.
 
 ---
 

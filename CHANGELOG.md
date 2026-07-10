@@ -6,6 +6,25 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Critical Production Blocker 2 — Analytics Webhook Rate Limiting] — 2026-07-10
+
+Second of eight critical blockers from `docs/reviews/Production-Deployment-Audit.md`, executed per `docs/plans/Critical-Production-Blockers.md`.
+
+### Added
+
+- Named rate limiter `analytics-webhook` (`app/Providers/AppServiceProvider.php`), 60 requests/minute keyed by IP, logging a structured `Log::warning('AnalyticsWebhookController: rate limit exceeded.', [...])` before returning a 429 JSON response.
+- `tests/Feature/Analytics/AnalyticsWebhookRateLimitTest.php` — 10 tests covering: requests within the limit succeed, the request beyond the limit returns 429, events stop dispatching once over the limit, the rejection is logged, the limit resets after the decay window, a legitimate multi-request retry sequence succeeds, the webhook's bucket is isolated from `/login`'s bucket in both directions, and regression coverage for the existing 422 (unknown provider) and 401 (invalid signature) responses.
+
+### Changed
+
+- `routes/api.php` — `POST /api/analytics/webhooks/{provider}` now has `->middleware('throttle:analytics-webhook')`. Previously fully public and unthrottled.
+
+### Notes
+
+- Chose a **named** limiter over a bare `throttle:60,1` string. While researching this, discovered (and verified via a throwaway test hitting `/login` then `/register`) that Laravel's bare `throttle:N,M` middleware keys its bucket by `domain + IP` only, with no route distinction — every pre-existing bare-throttled route (`/login`, `/register`, password reset, `/onboarding/integration`) currently shares one bucket per IP. A bare string on the webhook route would have joined that shared bucket, letting the webhook and login/register starve each other. The named limiter gives the webhook its own isolated bucket instead.
+- This shared-bucket issue is out of scope here per "do not modify unrelated endpoints" — it is documented in `docs/plans/Critical-Production-Blockers.md` as a discovered issue, recommended as a future High Priority audit item, and left unfixed for the pre-existing routes.
+- Full suite: 855 tests, 853 passing, 2 Redis-skipped. PHPStan level 8 — 0 errors. Pint clean. `npm run build` green.
+
 ## [Critical Production Blocker 1 — Tenant Isolation Container Binding] — 2026-07-10
 
 First of eight critical blockers from `docs/reviews/Production-Deployment-Audit.md`, executed per `docs/plans/Critical-Production-Blockers.md`.

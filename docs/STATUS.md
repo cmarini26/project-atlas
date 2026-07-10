@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 845 tests (843 passing, 2 Redis skipped) + 24 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Critical Production Blocker 1 — tenant isolation container binding, 5 new tests. |
+| Tests             | ✅ Strong | 855 tests (853 passing, 2 Redis skipped) + 24 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Critical Production Blocker 2 — analytics webhook rate limiting, 10 new tests. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,20 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**Critical Production Blocker 2 of 8 — Analytics Webhook Rate Limiting ✅ Complete**
+*Completed: 2026-07-10*
+
+Second of eight critical blockers from the Production Deployment Readiness Audit resolved, per `docs/plans/Critical-Production-Blockers.md`. `POST /api/analytics/webhooks/{provider}` — previously a fully public, unthrottled endpoint — now has a named rate limiter (`analytics-webhook`, 60/minute per IP, registered in `AppServiceProvider::boot()`) with structured logging on rejection. Signature verification remains the actual correctness gate; this only adds a volume limit.
+
+**Significant discovery while implementing:** Laravel's bare `throttle:N,M` middleware (used by every pre-existing throttled route — login, register, password reset, onboarding integration) keys its rate limit by route *domain + IP only*, with no route distinction unless a prefix is explicitly given. Confirmed empirically that exhausting `/login`'s bucket also blocks `/register`. This is out of scope for this blocker (those are unrelated, already-throttled routes) but is now documented in `Critical-Production-Blockers.md` as a recommended future High Priority item, and is exactly why this blocker uses a named limiter instead of a bare `throttle:60,1` string — a shared bucket would have let webhook traffic and real user logins silently starve each other.
+
+10 new tests (`tests/Feature/Analytics/AnalyticsWebhookRateLimitTest.php`) cover: limit reached, structured logging on rejection, limit reset after the decay window, legitimate retry sequences, cross-route bucket isolation (webhook vs. login, both directions), and regression (existing signature/unknown-provider behavior unchanged). 855 tests (853 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean. Build green.
+
+See:
+- [Critical-Production-Blockers.md](plans/Critical-Production-Blockers.md) — full 8-blocker plan, updated with Blocker 2's completion notes
+
+**Previous milestone:**
 
 **Critical Production Blocker 1 of 8 — Tenant Isolation Container Binding ✅ Complete**
 *Completed: 2026-07-10*
@@ -627,6 +641,8 @@ All production-blocking items resolved. Remaining pre-production items:
 ---
 
 ## Last Updated
+
+**2026-07-10** — Critical Production Blocker 2 of 8 resolved: `POST /api/analytics/webhooks/{provider}` now has a named rate limiter (`analytics-webhook`, 60/min per IP, with structured logging on rejection) instead of being fully public and unthrottled. Discovered and documented (but did not fix, as out of scope) that every pre-existing bare `throttle:N,M` route shares one rate-limit bucket per IP regardless of route — confirmed exhausting `/login`'s bucket also blocks `/register`. 10 new tests. See [Critical-Production-Blockers.md](plans/Critical-Production-Blockers.md).
 
 **2026-07-10** — Critical Production Blocker 1 of 8 resolved: `EnsureCompanyMembership` now binds `current_company_id` into the container on every real `/app/*` request, making `CompanyScope`'s global scope genuine defense-in-depth instead of dead code. Fixing this surfaced a real regression — three places that look up a user's memberships *across* companies (the sidebar switcher's `companies` prop, the middleware's own membership resolution, and `CompanySelectorController`) were incorrectly narrowed by the newly-active scope, since they're inherently cross-tenant, user-keyed queries — all three fixed with explicit `withoutGlobalScopes()`. 5 new tests prove the binding and the scope's live filtering, not just that manual filtering still works. See [Critical-Production-Blockers.md](plans/Critical-Production-Blockers.md) for the full 8-blocker plan.
 
