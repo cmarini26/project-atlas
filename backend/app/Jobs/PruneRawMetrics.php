@@ -9,10 +9,15 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class PruneRawMetrics implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public int $tries = 3;
+
+    public int $backoff = 300;
 
     public function __construct()
     {
@@ -27,5 +32,12 @@ class PruneRawMetrics implements ShouldQueue
             ->update(['raw' => null]);
 
         Log::info("PruneRawMetrics: nulled raw on {$count} record(s).");
+    }
+
+    public function failed(Throwable $exception): void
+    {
+        Log::error('PruneRawMetrics: job failed after exhausting retries.', [
+            'error' => $exception->getMessage(),
+        ]);
     }
 }

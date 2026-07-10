@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 860 tests (858 passing, 2 Redis skipped) + 24 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Critical Production Blocker 3 — HTTPS enforcement + security headers, 5 new tests. |
+| Tests             | ✅ Strong | 874 tests (872 passing, 2 Redis skipped) + 24 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Critical Production Blocker 4 — scheduler + queue production readiness, 14 new tests. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,22 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**Critical Production Blocker 4 of 8 — Scheduler and Queue Production Readiness ✅ Complete**
+*Completed: 2026-07-10*
+
+Fourth of eight critical blockers from the Production Deployment Readiness Audit resolved, per `docs/plans/Critical-Production-Blockers.md`. All six `routes/console.php` scheduled entries (`atlas:sync-due-integrations`, `ExpireOpportunities`, `PublishScheduledContent`, `CheckChannelHealth`, `PruneRawMetrics`, `ApplyLearnings`) now have `->withoutOverlapping()`, and `->onOneServer()` on the five not already deduped via `ShouldBeUnique` (`ApplyLearnings` is unique per company per day, so `onOneServer()` would be redundant there). A new `infrastructure/cron/atlas-scheduler` artifact — mirroring `infrastructure/supervisor/atlas-worker.conf`'s documented style — gives an operator a ready-to-install crontab entry for `php artisan schedule:run`, since nothing in the repo previously triggered it in production at all.
+
+Also addressed the audit's related "Queue recovery" finding: `CheckChannelHealth`, `ProcessAnalyticsWebhookEvent`, `PruneRawMetrics`, and `PublishScheduledContent` had no `$tries`/`$backoff`, silently falling back to the `maintenance`/`observations` queue workers' blunt CLI defaults. All four now have explicit `$tries = 3` plus a job-appropriate `$backoff` (60s for network/DB-adjacent work, 30s for the lighter webhook-metric update, 300s for the low-urgency monthly prune), and a `failed()` method logging a structured error once retries are exhausted — matching the `SyncIntegration`/`PublishContent` convention already used elsewhere.
+
+**Deliberately not done:** a `failed_jobs` recovery command or Filament resource. The audit flags that failed jobs land in `failed_jobs` with no visibility, but that's scoped to Blocker 5 (real error tracking), not this one — this blocker's own acceptance criteria never asked for it, and the live task's instructions were explicit that it should only be added if this blocker's plan already called for it.
+
+14 new tests (`tests/Feature/Scheduling/ScheduledJobsProductionReadinessTest.php`) cover: all six entries registered, every entry has overlap protection, `onOneServer()` on the five non-unique jobs, queue assignment for the three maintenance-queue jobs, and `$tries`/`$backoff` values for all four newly-configured jobs. 874 tests (872 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean. Build green.
+
+See:
+- [Critical-Production-Blockers.md](plans/Critical-Production-Blockers.md) — full 8-blocker plan, updated with Blocker 4's completion notes
+
+**Previous milestone:**
 
 **Critical Production Blocker 3 of 8 — HTTPS Enforcement + Security Headers ✅ Complete**
 *Completed: 2026-07-10*
@@ -655,6 +671,8 @@ All production-blocking items resolved. Remaining pre-production items:
 ---
 
 ## Last Updated
+
+**2026-07-10** — Critical Production Blocker 4 of 8 resolved: every scheduled entry in `routes/console.php` now has `->withoutOverlapping()`/`->onOneServer()` (except `ApplyLearnings`, already `ShouldBeUnique`), plus a committed `infrastructure/cron/atlas-scheduler` artifact so `php artisan schedule:run` actually gets triggered in production. `CheckChannelHealth`, `ProcessAnalyticsWebhookEvent`, `PruneRawMetrics`, and `PublishScheduledContent` — the four jobs the audit flagged as missing retry/backoff — now have `$tries`/`$backoff`/`failed()` structured logging. `failed_jobs` recovery visibility deliberately deferred to Blocker 5. 14 new tests. See [Critical-Production-Blockers.md](plans/Critical-Production-Blockers.md).
 
 **2026-07-10** — Critical Production Blocker 3 of 8 resolved: `TrustProxies` configured (trusting `*`, pending Blocker 7's real proxy layer) and a new global `SecurityHeaders` middleware adds `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, a baseline `Content-Security-Policy`, and conditional `Strict-Transport-Security` (only sent over an actually-secure request) to every response, including the Filament admin panel. Full script/style/connect-src CSP lockdown deliberately deferred as a larger, nonce-based follow-up to avoid risking Filament/Inertia/Vite breakage. 5 new tests. See [Critical-Production-Blockers.md](plans/Critical-Production-Blockers.md).
 

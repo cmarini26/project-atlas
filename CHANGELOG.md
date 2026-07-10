@@ -6,6 +6,27 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Critical Production Blocker 4 — Scheduler and Queue Production Readiness] — 2026-07-10
+
+Fourth of eight critical blockers from `docs/reviews/Production-Deployment-Audit.md`, executed per `docs/plans/Critical-Production-Blockers.md`.
+
+### Added
+
+- `infrastructure/cron/atlas-scheduler` — a documented, deployable crontab entry invoking `php artisan schedule:run` every minute, mirroring `infrastructure/supervisor/atlas-worker.conf`'s style. Previously nothing in the repository triggered the scheduler in production at all.
+- `$tries`/`$backoff`/`failed()` on the four jobs the audit's "Queue recovery" section flagged as missing retry/backoff configuration: `app/Jobs/CheckChannelHealth.php` (3 tries, 60s backoff), `app/Jobs/ProcessAnalyticsWebhookEvent.php` (3 tries, 30s backoff), `app/Jobs/PruneRawMetrics.php` (3 tries, 300s backoff), `app/Jobs/PublishScheduledContent.php` (3 tries, 60s backoff). Each `failed()` method logs a structured `Log::error(...)` once retries are exhausted.
+- `tests/Feature/Scheduling/ScheduledJobsProductionReadinessTest.php` — 14 tests: all six scheduled entries registered, every entry has `withoutOverlapping()`, `onOneServer()` on the five non-`ShouldBeUnique` jobs, queue assignment for the three `maintenance`-queue jobs, and `$tries`/`$backoff` values for the four newly-configured jobs.
+
+### Changed
+
+- `routes/console.php` — every `Schedule::` entry now chains `->withoutOverlapping()`, plus `->onOneServer()` on the five entries not already deduped via `ShouldBeUnique` (`ApplyLearnings` is unique per company per day, so `onOneServer()` would be redundant there).
+
+### Notes
+
+- Backoff values are job-appropriate, not uniform: 60s for network/DB-adjacent work (`CheckChannelHealth`, `PublishScheduledContent`, matching the existing `SyncIntegration`/`CommitDecision` convention), 30s for the lighter single-metric `ProcessAnalyticsWebhookEvent` update, and 300s for the low-urgency monthly `PruneRawMetrics` prune.
+- `failed_jobs` recovery visibility (a Filament resource or recovery command) was deliberately **not** added — the audit raises it under "Queue recovery," but it isn't in this blocker's acceptance criteria, and belongs with Blocker 5 (real error tracking), whose whole point is making a human aware something failed. Documented as a follow-up recommendation in `docs/plans/Critical-Production-Blockers.md`.
+- No monitoring, Sentry, real email, hosting, or backup work was touched — out of scope for this blocker.
+- Full suite: 874 tests, 872 passing, 2 Redis-skipped. PHPStan level 8 — 0 errors. Pint clean. `npm run build` green.
+
 ## [Critical Production Blocker 3 — HTTPS Enforcement and Security Headers] — 2026-07-10
 
 Third of eight critical blockers from `docs/reviews/Production-Deployment-Audit.md`, executed per `docs/plans/Critical-Production-Blockers.md`.

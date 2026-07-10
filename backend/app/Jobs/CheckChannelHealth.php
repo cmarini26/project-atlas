@@ -10,10 +10,15 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class CheckChannelHealth implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public int $tries = 3;
+
+    public int $backoff = 60;
 
     public function __construct()
     {
@@ -35,7 +40,7 @@ class CheckChannelHealth implements ShouldQueue
                         'status' => $status,
                         'last_used_at' => now(),
                     ]);
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     $credentials->update(['status' => 'error']);
 
                     Log::error('CheckChannelHealth: ping failed.', [
@@ -45,5 +50,12 @@ class CheckChannelHealth implements ShouldQueue
                     ]);
                 }
             });
+    }
+
+    public function failed(Throwable $exception): void
+    {
+        Log::error('CheckChannelHealth: job failed after exhausting retries.', [
+            'error' => $exception->getMessage(),
+        ]);
     }
 }

@@ -1,0 +1,18 @@
+# Atlas scheduler — cron entry
+#
+# Laravel's scheduler (routes/console.php) defines six recurring jobs, but
+# nothing invokes `php artisan schedule:run` in production on its own — this
+# single crontab line is what makes that happen, checked every minute so
+# each job fires at its own configured cadence.
+#
+# Install: copy this line into the crontab of the user that owns the
+# deployment (matching infrastructure/supervisor/atlas-worker.conf's
+# `user=www-data`), e.g. via `crontab -e` as that user, or drop this file
+# into /etc/cron.d/ (as root-owned, 644, with the user column below
+# uncommented) — pick whichever your provisioning tooling already manages.
+#
+# /etc/cron.d/ form (six columns, user-column included):
+# * * * * * www-data cd /var/www/atlas/backend && php artisan schedule:run >> /dev/null 2>&1
+#
+# Per-user crontab form (five columns, no user column):
+* * * * * cd /var/www/atlas/backend && php artisan schedule:run >> /dev/null 2>&1

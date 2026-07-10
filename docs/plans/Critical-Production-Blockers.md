@@ -150,6 +150,8 @@ None, but sequenced after Blocker 1 (tenant isolation) and before Blocker 5 (err
 
 ## Blocker 4 — Make the Scheduler Production-Ready
 
+**Status:** ✅ Complete — 2026-07-10. All six `routes/console.php` entries now have `->withoutOverlapping()`, and `->onOneServer()` on the five not already deduped via `ShouldBeUnique` (`ApplyLearnings` is the exception). Added `infrastructure/cron/atlas-scheduler`, mirroring `infrastructure/supervisor/atlas-worker.conf`'s style. Also addressed the related audit finding (from the "Queue recovery" operational-risk section, not originally listed in this blocker's acceptance criteria, but explicitly in scope for the live task): `CheckChannelHealth`, `ProcessAnalyticsWebhookEvent`, `PruneRawMetrics`, and `PublishScheduledContent` — the four jobs the audit flagged as having no `$tries`/`$backoff` — now have both, plus a `failed()` method for structured failure logging.
+
 ### Title
 Add overlap/single-server protection to every scheduled job, and commit a deployable cron/systemd artifact for `schedule:run` (mirroring the existing `infrastructure/supervisor/` pattern for queue workers).
 
@@ -157,11 +159,12 @@ Add overlap/single-server protection to every scheduled job, and commit a deploy
 `routes/console.php` defines six scheduled jobs — including the recurring integration sync that is the entire mechanism behind Atlas's "knows more tomorrow than today" promise, and opportunity expiration, which prevents stale opportunities from silently suppressing fresh detection. None of the six use `withoutOverlapping()` or `onOneServer()`, and — more fundamentally — nothing in the repository triggers `schedule:run` in production at all; only the local-dev `composer dev` script runs a foreground scheduler loop. Without a production trigger, all six scheduled behaviors simply never happen after deployment, silently.
 
 ### Acceptance criteria
-- [ ] Every scheduled job in `routes/console.php` has `->withoutOverlapping()` added (and `->onOneServer()` where the job is not already idempotent/unique via `ShouldBeUnique`), so a slow run doesn't stack with the next scheduled tick.
-- [ ] A committed, deployable artifact exists (e.g., `infrastructure/cron/atlas-scheduler` or a systemd timer unit) that an operator can install to invoke `php artisan schedule:run` every minute — mirroring how `infrastructure/supervisor/atlas-worker.conf` already documents the queue-worker deployment shape.
-- [ ] The artifact is documented (a short comment block, matching the existing Supervisor config's style) explaining exactly what it does and how to install it.
-- [ ] Existing scheduled-job tests continue to pass; a new test (where practical) confirms `withoutOverlapping()` is applied to at least the highest-value jobs (integration sync, opportunity expiration).
-- [ ] Full test suite passes, PHPStan clean, Pint clean, build green.
+- [x] Every scheduled job in `routes/console.php` has `->withoutOverlapping()` added (and `->onOneServer()` where the job is not already idempotent/unique via `ShouldBeUnique`), so a slow run doesn't stack with the next scheduled tick.
+- [x] A committed, deployable artifact exists (`infrastructure/cron/atlas-scheduler`) that an operator can install to invoke `php artisan schedule:run` every minute — mirroring how `infrastructure/supervisor/atlas-worker.conf` already documents the queue-worker deployment shape.
+- [x] The artifact is documented (a short comment block, matching the existing Supervisor config's style) explaining exactly what it does and how to install it.
+- [x] Existing scheduled-job tests continue to pass; a new test suite confirms `withoutOverlapping()`/`onOneServer()` on every scheduled entry, not just the highest-value ones.
+- [x] Full test suite passes, PHPStan clean, Pint clean, build green.
+- [x] (Added beyond the original acceptance criteria, per the live task's explicit requirements) `$tries`/`$backoff`/`failed()` added to the four jobs the audit's "Queue recovery" section flagged as missing retry/backoff configuration: `CheckChannelHealth`, `ProcessAnalyticsWebhookEvent`, `PruneRawMetrics`, `PublishScheduledContent`.
 
 ### Estimated effort
 Small (a few hours). The code change is mechanical; the deployable artifact is a short, well-precedented file (the Supervisor config is the template to follow).
@@ -174,6 +177,12 @@ None. The actual installation of the cron/systemd artifact on a real server is B
 2. Add `infrastructure/cron/` (or `infrastructure/systemd/`) with a committed template file and a short explanatory comment.
 3. Confirm existing tests for `SyncDueIntegrations`, `ExpireOpportunities`, and the other scheduled jobs still pass.
 4. Run all four quality gates; update docs; commit and push.
+
+### Decided during implementation: retry/backoff values, and why `failed_jobs` visibility was deferred
+
+**Retry/backoff values chosen.** All four newly-configured jobs use `$tries = 3` (consistent with every other job in the codebase — `SyncIntegration`, `CommitDecision`, `GenerateContent`). Backoff varies by how quickly a retry is likely to help: `CheckChannelHealth`/`PublishScheduledContent` use `$backoff = 60` (transient network/DB blips, matching `SyncIntegration`/`CommitDecision`'s existing convention), `ProcessAnalyticsWebhookEvent` uses `$backoff = 30` (a lighter-weight, single-metric update), and `PruneRawMetrics` uses `$backoff = 300` (a monthly bulk update with no urgency — a longer backoff avoids hammering the database again immediately if the first attempt failed for a capacity reason). Each of the four also gained a `failed()` method logging a structured `Log::error(...)` once retries are exhausted, matching the `SyncIntegration`/`PublishContent` convention already in the codebase.
+
+**`failed_jobs` visibility/recovery command deferred, not implemented.** The audit's "Queue recovery" section separately notes that failed jobs land in `failed_jobs` but nothing in the app references them — no Filament resource, no recovery command, no alerting. This blocker's own acceptance criteria never asked for that (it asked for `$tries`/`$backoff`/overlap protection/a cron artifact), and the live task's instructions were explicit that a failed-job recovery command should only be added here if this blocker's plan already called for it. It doesn't, so it wasn't added — it belongs with Blocker 5 (real error tracking/monitoring), where "how does a human find out a job failed" is already the blocker's whole point. Recommendation: fold a minimal `failed_jobs` Filament resource or `artisan queue:failed`-adjacent recovery step into Blocker 5's scope when it's executed.
 
 ---
 

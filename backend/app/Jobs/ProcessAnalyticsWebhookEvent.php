@@ -9,10 +9,16 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ProcessAnalyticsWebhookEvent implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public int $tries = 3;
+
+    public int $backoff = 30;
 
     public function __construct(public readonly WebhookEvent $event)
     {
@@ -38,5 +44,15 @@ class ProcessAnalyticsWebhookEvent implements ShouldQueue
 
         $metric->metrics = $currentMetrics;
         $metric->save();
+    }
+
+    public function failed(Throwable $exception): void
+    {
+        Log::error('ProcessAnalyticsWebhookEvent: job failed after exhausting retries.', [
+            'provider_type' => $this->event->providerType,
+            'platform_message_id' => $this->event->platformMessageId,
+            'event_type' => $this->event->eventType,
+            'error' => $exception->getMessage(),
+        ]);
     }
 }

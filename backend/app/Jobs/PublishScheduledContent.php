@@ -9,10 +9,15 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class PublishScheduledContent implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public int $tries = 3;
+
+    public int $backoff = 60;
 
     public function __construct()
     {
@@ -39,5 +44,12 @@ class PublishScheduledContent implements ShouldQueue
                 'count' => $count,
             ]);
         }
+    }
+
+    public function failed(Throwable $exception): void
+    {
+        Log::error('PublishScheduledContent: job failed after exhausting retries.', [
+            'error' => $exception->getMessage(),
+        ]);
     }
 }
