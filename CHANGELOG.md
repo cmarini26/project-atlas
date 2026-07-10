@@ -6,6 +6,29 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Critical Production Blocker 1 — Tenant Isolation Container Binding] — 2026-07-10
+
+First of eight critical blockers from `docs/reviews/Production-Deployment-Audit.md`, executed per `docs/plans/Critical-Production-Blockers.md`.
+
+### Added
+
+- `tests/Feature/Tenancy/CompanyScopeActivationTest.php` — 5 tests proving `current_company_id` is bound during a real request (single-membership and session-selected-multi-membership paths), that redirect paths never bind it, and that `CompanyScope` actively filters an unfiltered tenant-model query during a real request — not merely that manual `company_id` filtering still produces the correct result.
+
+### Changed
+
+- `app/Http/Middleware/EnsureCompanyMembership.php` — binds `current_company_id` into the container (`app()->instance(...)`) alongside the existing `$request->attributes->set('company', ...)`, on both the single-membership and resolved-multi-membership paths. `CompanyScope`'s global scope, previously inert in production, now genuinely constrains every tenant-scoped query for the duration of a real `/app/*` request.
+- `app/Domain/Shared/Scopes/CompanyScope.php` — doc comment updated to state that the scope is now active defense-in-depth during real web requests, not merely a no-op everywhere outside tests.
+- `app/Http/Middleware/HandleInertiaRequests.php` — the `companies` shared prop (drives the sidebar company switcher) now queries `CompanyMembership::withoutGlobalScopes()`. This closure runs after `EnsureCompanyMembership`, by which point `current_company_id` is bound to the *current* tenant — without this fix, a multi-company user's switcher would incorrectly show only the currently-active company instead of all of them.
+- `app/Http/Middleware/EnsureCompanyMembership.php` — its own membership-resolution query is now `withoutGlobalScopes()` too: determining which companies a user belongs to is inherently a cross-tenant, `user_id`-keyed lookup and must never be narrowed by an already-bound tenant.
+- `app/Http/Controllers/App/CompanySelectorController.php` — both membership queries (`index()`, `select()`) made `withoutGlobalScopes()` for the same reason, defensively.
+
+### Notes
+
+- This fix was validated by the existing test suite catching a real regression: two pre-existing tests (`CompanySelectorControllerTest::test_switching_company_changes_which_companys_data_the_dashboard_serves`, `MiddlewareTest::test_shared_companies_prop_lists_all_memberships_for_switcher`) failed immediately after the scope went live, because three places that look up a user's memberships *across* companies had never needed to think about tenant scoping before (since the scope was always inert). All three are fixed; no other behavior changed.
+- 845 tests (843 passing, 2 Redis skipped — unchanged from before this fix aside from the 5 new tests). PHPStan level 8 — 0 errors. Pint clean. `npm run build` green.
+
+---
+
 ## [Production Deployment Readiness Audit] — 2026-07-10
 
 Read-only audit of the current repository for production deployment readiness — no code changes.

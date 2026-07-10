@@ -46,8 +46,15 @@ class HandleInertiaRequests extends Middleware
             },
             // All companies the user belongs to — drives the sidebar company
             // switcher (rendered only when there is more than one).
+            // withoutGlobalScopes(): this listing is deliberately
+            // cross-company (a user's own memberships, keyed by user_id, not
+            // by the currently-bound tenant) — by the time this closure runs
+            // (after EnsureCompanyMembership), current_company_id is already
+            // bound to the active company, and without this the query would
+            // incorrectly show only that one company instead of all of them.
             'companies' => fn (): array => $request->user()
-                ? CompanyMembership::with('company')
+                ? CompanyMembership::withoutGlobalScopes()
+                    ->with('company')
                     ->where('user_id', $request->user()->id)
                     ->get()
                     ->map(fn (CompanyMembership $m): array => [

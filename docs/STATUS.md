@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 840 tests (838 passing, 2 Redis skipped) + 24 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Milestone 11 Phase 7 — Recommendation channel mix + capability-badge refinement, 15 new PHP tests + 10 new Vitest tests. |
+| Tests             | ✅ Strong | 845 tests (843 passing, 2 Redis skipped) + 24 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Critical Production Blocker 1 — tenant isolation container binding, 5 new tests. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,21 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**Critical Production Blocker 1 of 8 — Tenant Isolation Container Binding ✅ Complete**
+*Completed: 2026-07-10*
+
+First of eight critical blockers from the Production Deployment Readiness Audit resolved, per the execution plan in `docs/plans/Critical-Production-Blockers.md`. `EnsureCompanyMembership` now binds `current_company_id` into the container for every real `/app/*` web request, so `CompanyScope`'s global scope is genuine defense-in-depth — not dead code — on top of the explicit `company_id` filtering every controller already performs.
+
+**Regression caught and fixed by the test suite itself:** activating the scope broke the cross-company "company switcher" listing (`HandleInertiaRequests`'s `companies` prop, `EnsureCompanyMembership`'s own membership lookup, and `CompanySelectorController`) — all three query a user's memberships *across* companies by `user_id`, which the newly-active scope incorrectly narrowed to just the current tenant. Fixed by making those three specific lookups explicit `withoutGlobalScopes()` calls, since "which companies does this user belong to" is inherently a cross-tenant, user-keyed question the scope was never meant to answer.
+
+5 new tests (`tests/Feature/Tenancy/CompanyScopeActivationTest.php`) prove the binding happens on a real request and that the scope actively filters an unfiltered query — not merely that manual filtering still works. 845 tests (843 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean. Build green.
+
+See:
+- [Critical-Production-Blockers.md](plans/Critical-Production-Blockers.md) — the full 8-blocker execution plan, ordered by dependency and merge-conflict risk
+- [Production-Deployment-Audit.md](reviews/Production-Deployment-Audit.md) — source audit
+
+**Previous milestone:**
 
 **Production Deployment Readiness Audit ✅ Complete**
 *Completed: 2026-07-10*
@@ -612,6 +627,8 @@ All production-blocking items resolved. Remaining pre-production items:
 ---
 
 ## Last Updated
+
+**2026-07-10** — Critical Production Blocker 1 of 8 resolved: `EnsureCompanyMembership` now binds `current_company_id` into the container on every real `/app/*` request, making `CompanyScope`'s global scope genuine defense-in-depth instead of dead code. Fixing this surfaced a real regression — three places that look up a user's memberships *across* companies (the sidebar switcher's `companies` prop, the middleware's own membership resolution, and `CompanySelectorController`) were incorrectly narrowed by the newly-active scope, since they're inherently cross-tenant, user-keyed queries — all three fixed with explicit `withoutGlobalScopes()`. 5 new tests prove the binding and the scope's live filtering, not just that manual filtering still works. See [Critical-Production-Blockers.md](plans/Critical-Production-Blockers.md) for the full 8-blocker plan.
 
 **2026-07-10** — Production Deployment Readiness Audit complete. Read-only, evidence-based audit of the repository (not infrastructure that doesn't exist yet) covering infrastructure config, Laravel production config, security, and operational risk, each with exact file/line evidence and a READY/PARTIALLY READY/NOT READY verdict. Headline finding: `CompanyScope`'s global scope never activates in production (`current_company_id` is only ever bound in test files) — tenant isolation today relies entirely on manual per-query `company_id` filtering, applied consistently but with no structural safety net. 8 critical blockers, 8 high-priority items, 6 nice-to-have improvements identified. See [Production-Deployment-Audit.md](reviews/Production-Deployment-Audit.md).
 

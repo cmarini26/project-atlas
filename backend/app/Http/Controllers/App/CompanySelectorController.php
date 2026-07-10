@@ -17,7 +17,11 @@ class CompanySelectorController extends Controller
         $user = $request->user();
         abort_unless($user instanceof User, 401);
 
-        $memberships = CompanyMembership::with('company')
+        // withoutGlobalScopes(): listing every company this user belongs to
+        // is a user_id-keyed lookup, deliberately cross-company — must not
+        // be narrowed by any current_company_id bound elsewhere.
+        $memberships = CompanyMembership::withoutGlobalScopes()
+            ->with('company')
             ->where('user_id', $user->id)
             ->get();
 
@@ -40,7 +44,8 @@ class CompanySelectorController extends Controller
             'company_id' => ['required', 'string'],
         ]);
 
-        $membership = CompanyMembership::where('user_id', $user->id)
+        $membership = CompanyMembership::withoutGlobalScopes()
+            ->where('user_id', $user->id)
             ->where('company_id', $validated['company_id'])
             ->firstOrFail();
 

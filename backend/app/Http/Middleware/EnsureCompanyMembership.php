@@ -17,7 +17,13 @@ class EnsureCompanyMembership
             return redirect()->route('login');
         }
 
-        $memberships = CompanyMembership::with('company')
+        // withoutGlobalScopes(): this middleware's whole job is figuring out
+        // which company/companies this user belongs to — a lookup keyed by
+        // user_id, not by whatever tenant (if any) happened to be bound on
+        // a prior request in this process. It must see every membership
+        // regardless of any already-bound current_company_id.
+        $memberships = CompanyMembership::withoutGlobalScopes()
+            ->with('company')
             ->where('user_id', $user->id)
             ->get();
 
@@ -26,8 +32,11 @@ class EnsureCompanyMembership
         }
 
         if ($memberships->count() === 1) {
-            $request->attributes->set('company', $memberships->first()->company);
-            $request->attributes->set('membership', $memberships->first());
+            $membership = $memberships->first();
+
+            $request->attributes->set('company', $membership->company);
+            $request->attributes->set('membership', $membership);
+            app()->instance('current_company_id', $membership->company_id);
 
             return $next($request);
         }
@@ -42,6 +51,7 @@ class EnsureCompanyMembership
 
         $request->attributes->set('company', $membership->company);
         $request->attributes->set('membership', $membership);
+        app()->instance('current_company_id', $membership->company_id);
 
         return $next($request);
     }
