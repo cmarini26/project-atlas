@@ -6,6 +6,29 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Critical Production Blocker 7 — Production Infrastructure Configuration] — 2026-07-10
+
+Seventh of eight critical blockers from `docs/reviews/Production-Deployment-Audit.md`. This blocker's original acceptance criteria are entirely operator-executed infrastructure provisioning (a real server, domain, SSL, a live deploy) and remain undone — nothing was provisioned this session, per explicit instruction. This entry covers only the code-representable subset the live task scoped as "Production Infrastructure Configuration."
+
+### Added
+
+- `app/Services/Http/TrustedProxyResolver.php` — `resolve(?string $raw): array|string|null`, parsing `TRUSTED_PROXIES` into whatever `Middleware::trustProxies(at: ...)` expects (`null` for unset/empty, `'*'` for the literal wildcard, or a trimmed array for a comma-separated IP/CIDR list).
+- `TRUSTED_PROXIES` documented in `.env.example` (unset by default — trusts no proxies).
+- `docs/deployment/Production-Topology.md` — the expected production shape (reverse proxy → application server → {database, Redis, queue workers, scheduler}), and what remains for an operator to actually provision.
+- `tests/Feature/Http/TrustedProxyResolverTest.php` (7 tests) — the parser's full input matrix.
+- `tests/Feature/Http/TrustedProxyBehaviorTest.php` (5 tests) — HTTPS detection, HSTS, client IP resolution, and the `analytics-webhook` rate limiter (from Blocker 2) all behave correctly given a trusted proxy, and are correctly unaffected by an untrusted proxy forging the same forwarded headers.
+
+### Changed
+
+- `bootstrap/app.php` — the hardcoded `trustProxies(at: '*')` set in Blocker 3 is replaced with `trustProxies(at: (new TrustedProxyResolver())->resolve(env('TRUSTED_PROXIES')))`. Default behavior changed from fail-open (trust the immediate caller unconditionally) to fail-closed (trust nothing unless explicitly configured).
+
+### Notes
+
+- **Why not hardcode a real proxy IP instead of the wildcard?** No hosting provider has been chosen yet — there is no real IP to hardcode, and guessing one would be worse than the wildcard it replaces. The fix moves the trust *decision* into an operator-set env var; the *mechanism* is production-ready now, the *value* is provisioning-time configuration, same as every other credential in `.env.example`.
+- **Fail-closed, not fail-open, by design** — mirrors `ProductionMailerGuard`'s fail-clearly philosophy from Blocker 6. A production deploy that forgets to set `TRUSTED_PROXIES` will visibly misbehave (no HSTS, wrong client IPs) rather than silently trusting whatever connects.
+- **No infrastructure was provisioned, no DNS configured, no backups created, and Blocker 8 was not started** — all explicitly out of scope per instruction.
+- Full suite: 921 tests, 919 passing, 2 Redis-skipped. PHPStan level 8 — 0 errors. Pint clean. `npm run build` green.
+
 ## [Critical Production Blocker 6 — Real Transactional Email] — 2026-07-10
 
 Sixth of eight critical blockers from `docs/reviews/Production-Deployment-Audit.md`, executed per `docs/plans/Critical-Production-Blockers.md`.

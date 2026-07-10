@@ -293,6 +293,8 @@ The live task's requirements made this conditional — "if this is part of the b
 
 ## Blocker 7 — Provision the Production Environment
 
+**Status:** 🟡 Partially complete — 2026-07-10. This blocker's original acceptance criteria are entirely operator-executed infrastructure provisioning (a real server, domain, SSL, a live deploy) and remain genuinely undone — no server, domain, or DNS record exists as a result of this session, and none was provisioned, per explicit instruction. What **was** completed is the code-representable subset the live task titled "Production Infrastructure Configuration": removing the hardcoded `TrustProxies` wildcard from Blocker 3 in favor of an operator-configurable `TRUSTED_PROXIES` setting, and documenting the expected production topology. See "Decided during implementation" below.
+
 ### Title
 Stand up a real production server, domain, and deploy pipeline.
 
@@ -310,14 +312,30 @@ This cannot be completed by writing code in this repository. It requires an oper
 - [ ] Queue workers (per `infrastructure/supervisor/atlas-worker.conf`) and the scheduler (per Blocker 4's deployable artifact) are both running under process supervision.
 - [ ] A second, successful deploy has been performed, proving the process is repeatable.
 
+**Code-representable subset completed this session (not part of the original acceptance criteria above, added per the live task's explicit scope):**
+- [x] The hardcoded `TrustProxies` wildcard (`at: '*'`, set in Blocker 3 as a deliberate placeholder) is replaced with an operator-configured `TRUSTED_PROXIES` env var, parsed by a new `App\Services\Http\TrustedProxyResolver`.
+- [x] Default (unset `TRUSTED_PROXIES`) now trusts **no** proxies — a fail-closed change from Blocker 3's fail-open `'*'` default — correct for local/testing (no proxy exists) and safer for an unconfigured production (silently trusting everyone is worse than a misconfigured deploy that visibly fails HTTPS detection until fixed).
+- [x] `docs/deployment/Production-Topology.md` documents the expected reverse proxy → application server → {database, Redis, queue workers, scheduler} shape.
+- [x] Tests prove HTTPS detection, HSTS, client IP resolution, and IP-keyed rate limiting all behave correctly given a trusted proxy, and are correctly *not* fooled by an untrusted one forging the same headers.
+
 ### Estimated effort
-Large (days, per the existing `Private-Beta-Plan.md` Week 1 sprint estimate — roughly matches this blocker one-to-one).
+Large (days, per the existing `Private-Beta-Plan.md` Week 1 sprint estimate — roughly matches this blocker one-to-one). The code-representable subset above was small (a few hours); the operator-executed remainder is unchanged and still large.
 
 ### Dependencies
 Should follow Blockers 1–6, so the code being deployed already has tenant isolation, webhook protection, security headers, a hardened scheduler, error tracking, and real email ready to be credentialed — deploying before those land just means redeploying again immediately after.
 
 ### Verification steps
 See the "Production Infrastructure Checklist" section of [Private-Beta-Execution.md](Private-Beta-Execution.md) — that document is the detailed, step-by-step verification procedure for this blocker and should be run in full once infrastructure work begins.
+
+### Decided during implementation: why a hardcoded wildcard became an operator-configured variable, not a hardcoded IP
+
+Blocker 3 hardcoded `trustProxies(at: '*')` with an explicit comment to revisit "once Blocker 7 fixes the actual proxy layer in place." That proxy layer still doesn't exist — no hosting provider has been chosen, so there is no real IP to hardcode. Hardcoding a *guess* would be worse than the wildcard it replaces. Instead, the trust decision moved from application code into `TRUSTED_PROXIES`, an environment variable an operator sets once the real topology is chosen (a specific IP/CIDR, or `*` again if the real proxy's own IP genuinely isn't fixed — e.g. most managed load balancers). This satisfies "replace wildcard proxy trust with a production-ready configuration strategy" without requiring infrastructure that doesn't exist yet: the *mechanism* is now production-ready; the *value* is an operator decision, exactly like every other credential in `.env.example`.
+
+The default changed from fail-open (`'*'`, trust the immediate caller unconditionally) to fail-closed (unset → trust nothing). A production deploy that forgets to set `TRUSTED_PROXIES` will visibly misbehave (no HSTS, wrong client IPs) rather than silently trusting whatever happens to connect — consistent with the fail-clearly philosophy already established for mail in Blocker 6's `ProductionMailerGuard`.
+
+### Decided during implementation: testing trusted-proxy behavior without a real proxy
+
+`bootstrap/app.php` resolves `TRUSTED_PROXIES` once at application boot, before any test method's body runs — too early to vary per test. Two things made this testable anyway: the parsing logic itself was pulled into `App\Services\Http\TrustedProxyResolver` (a pure function, unit-tested directly), and the actual runtime trust decision uses `Illuminate\Http\Middleware\TrustProxies::at()`/`::flushState()` — static methods that take effect immediately, letting tests simulate "a request from a trusted proxy" vs. "a request from an untrusted one claiming the same forwarded headers" within the same running application, including a full round-trip through the real `analytics-webhook` rate limiter to prove IP-keyed limiting survives being placed behind a proxy.
 
 ---
 

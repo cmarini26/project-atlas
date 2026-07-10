@@ -4,6 +4,7 @@ use App\ErrorTracking\Contracts\ErrorTracker;
 use App\Http\Middleware\EnsureCompanyMembership;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SecurityHeaders;
+use App\Services\Http\TrustedProxyResolver;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -24,13 +25,22 @@ return Application::configure(basePath: dirname(__DIR__))
             'company' => EnsureCompanyMembership::class,
         ]);
 
-        // Deployment topology (hosting provider, load balancer) isn't
-        // finalized yet (Blocker 7 is still infrastructure-pending), so we
-        // trust the immediate calling proxy ('*') rather than a hardcoded IP
-        // list — standard guidance for a single-hop reverse proxy (e.g.
-        // Forge/nginx) whose own IP isn't known in advance. Revisit once
-        // Blocker 7 fixes the actual proxy layer in place.
-        $middleware->trustProxies(at: '*');
+        // Operator-configured, not hardcoded — TRUSTED_PROXIES is unset by
+        // default, which trusts no proxies (correct for local/testing,
+        // where none exists). Production must set it explicitly once a real
+        // reverse proxy/load balancer is provisioned: a comma-separated
+        // IP/CIDR list, or the literal "*" to trust whichever machine is
+        // directly connecting (the standard choice when the proxy's own IP
+        // isn't fixed, e.g. Forge/most managed load balancers). Left unset
+        // in production, HTTPS detection, HSTS, client IP resolution, and
+        // IP-keyed rate limiting all read from the proxy instead of the real
+        // client. See docs/deployment/Production-Topology.md and
+        // docs/plans/Critical-Production-Blockers.md, Blocker 7.
+        $trustedProxiesEnv = env('TRUSTED_PROXIES');
+
+        $middleware->trustProxies(
+            at: (new TrustedProxyResolver())->resolve(is_string($trustedProxiesEnv) ? $trustedProxiesEnv : null),
+        );
 
         // Global (not just 'web'/'api'), so every response — Inertia pages,
         // JSON API responses, and the Filament admin panel (which builds its

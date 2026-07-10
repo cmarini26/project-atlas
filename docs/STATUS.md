@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 909 tests (907 passing, 2 Redis skipped) + 24 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Critical Production Blocker 6 — real transactional email (Postmark) + delivery safety, 17 new tests. |
+| Tests             | ✅ Strong | 921 tests (919 passing, 2 Redis skipped) + 24 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Critical Production Blocker 7 — production infrastructure configuration (trusted proxies + topology docs), 12 new tests. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,21 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**Critical Production Blocker 7 of 8 — Production Infrastructure Configuration 🟡 Partially Complete**
+*Completed: 2026-07-10 (code-representable subset only — see below)*
+
+Seventh of eight critical blockers from the Production Deployment Readiness Audit; this blocker's original acceptance criteria are entirely operator-executed infrastructure provisioning (a real server, domain, SSL, a live deploy) and remain genuinely undone — no infrastructure was provisioned this session, per explicit instruction. What was completed is the code-representable subset: removing Blocker 3's hardcoded `TrustProxies` wildcard (`at: '*'`) in favor of an operator-configured `TRUSTED_PROXIES` env var, parsed by a new `App\Services\Http\TrustedProxyResolver`, and documenting the expected production topology in `docs/deployment/Production-Topology.md`.
+
+The default changed from fail-open (trust the immediate caller unconditionally) to fail-closed (unset `TRUSTED_PROXIES` → trust no proxies) — correct for local/testing, where no reverse proxy exists, and safer for an unconfigured production deploy, which will now visibly misbehave (no HSTS, wrong client IPs) rather than silently trusting whatever connects. This mirrors the fail-clearly philosophy `ProductionMailerGuard` established in Blocker 6.
+
+12 new tests prove HTTPS detection, HSTS, client IP resolution, and IP-keyed rate limiting (the `analytics-webhook` limiter from Blocker 2) all behave correctly given a trusted proxy — and are correctly *not* fooled by an untrusted proxy forging the same forwarded headers. 921 tests (919 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean. Build green.
+
+See:
+- [Critical-Production-Blockers.md](plans/Critical-Production-Blockers.md) — full 8-blocker plan, updated with Blocker 7's completion notes
+- [Production-Topology.md](deployment/Production-Topology.md) — the expected production shape (reverse proxy, app server, queue workers, scheduler, Redis, database)
+
+**Previous milestone:**
 
 **Critical Production Blocker 6 of 8 — Real Transactional Email ✅ Complete**
 *Completed: 2026-07-10*
@@ -701,6 +716,8 @@ All production-blocking items resolved. Remaining pre-production items:
 ---
 
 ## Last Updated
+
+**2026-07-10** — Critical Production Blocker 7 of 8 partially resolved (code-representable subset only — real infrastructure provisioning is still operator-executed and undone). Replaced Blocker 3's hardcoded `TrustProxies` wildcard with an operator-configured `TRUSTED_PROXIES` env var (fail-closed default: unset trusts no proxies) parsed by a new `App\Services\Http\TrustedProxyResolver`. Added `docs/deployment/Production-Topology.md` documenting the expected reverse-proxy/app-server/database/Redis/queue-worker/scheduler shape. 12 new tests prove HTTPS detection, HSTS, client IP resolution, and IP-keyed rate limiting all work correctly behind a trusted proxy and can't be spoofed by an untrusted one. See [Critical-Production-Blockers.md](plans/Critical-Production-Blockers.md).
 
 **2026-07-10** — Critical Production Blocker 6 of 8 resolved: Postmark is now a fully wired production mailer (config completed, and a previously-undocumented gap fixed — `symfony/postmark-mailer`/`symfony/http-client` were never installed, so `MAIL_MAILER=postmark` would have thrown even with a valid key). A new `ProductionMailerGuard` refuses delivery and logs critically if production is left on `log`/`array`; real transport failures are caught and logged without leaking secrets; the same generic anti-enumeration response is preserved in every case. 17 new tests. See [Critical-Production-Blockers.md](plans/Critical-Production-Blockers.md).
 
