@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 892 tests (890 passing, 2 Redis skipped) + 24 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Critical Production Blocker 5 — failed-job visibility + error-tracking abstraction, 18 new tests. |
+| Tests             | ✅ Strong | 909 tests (907 passing, 2 Redis skipped) + 24 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Critical Production Blocker 6 — real transactional email (Postmark) + delivery safety, 17 new tests. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,20 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**Critical Production Blocker 6 of 8 — Real Transactional Email ✅ Complete**
+*Completed: 2026-07-10*
+
+Sixth of eight critical blockers from the Production Deployment Readiness Audit resolved, per `docs/plans/Critical-Production-Blockers.md`. Postmark is now a fully wired, credential-driven production mailer option: `config/mail.php`'s `message_stream_id` is uncommented and filled in, and — a previously-undocumented gap found while auditing this — `symfony/postmark-mailer`/`symfony/http-client` were never actually installed, so `MAIL_MAILER=postmark` would have thrown a class-not-found error even with a valid API key. Both packages are now in `composer.json`. `POSTMARK_API_KEY`/`POSTMARK_MESSAGE_STREAM_ID` are documented in `.env.example`; the safe `MAIL_MAILER=log` local default is untouched.
+
+**Delivery safety, beyond the original plan's config-only scope:** the live task explicitly asked for production-misconfiguration rejection, failure logging, and anti-enumeration re-verification — none expressible as pure config, since `MAIL_MAILER=log`/`array` never throws (it "succeeds" by writing to a log file instead of delivering). A new `App\Services\Mail\ProductionMailerGuard` checks for exactly that before every password-reset send attempt; if production is misconfigured, delivery is skipped and a `Log::critical(...)` fires instead. Real transport failures (e.g., an invalid Postmark token) are now caught and logged (`Log::error`, mailer + recipient email + exception message — never the reset token or password). In every branch — misconfigured, real failure, or success — the exact same generic "If an account exists..." response is returned, so the anti-enumeration guarantee is unchanged.
+
+17 new tests cover: the guard's environment/mailer matrix, Postmark transport resolution (no live API call), production+log rejection and its critical log, production+Postmark normal delivery, local/test safety, delivery-failure handling without secret leakage, and no user-enumeration regression across all of the above. 909 tests (907 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean. Build green.
+
+See:
+- [Critical-Production-Blockers.md](plans/Critical-Production-Blockers.md) — full 8-blocker plan, updated with Blocker 6's completion notes
+
+**Previous milestone:**
 
 **Critical Production Blocker 5 of 8 — Failed Job Visibility and Error Tracking ✅ Complete**
 *Completed: 2026-07-10*
@@ -687,6 +701,8 @@ All production-blocking items resolved. Remaining pre-production items:
 ---
 
 ## Last Updated
+
+**2026-07-10** — Critical Production Blocker 6 of 8 resolved: Postmark is now a fully wired production mailer (config completed, and a previously-undocumented gap fixed — `symfony/postmark-mailer`/`symfony/http-client` were never installed, so `MAIL_MAILER=postmark` would have thrown even with a valid key). A new `ProductionMailerGuard` refuses delivery and logs critically if production is left on `log`/`array`; real transport failures are caught and logged without leaking secrets; the same generic anti-enumeration response is preserved in every case. 17 new tests. See [Critical-Production-Blockers.md](plans/Critical-Production-Blockers.md).
 
 **2026-07-10** — Critical Production Blocker 5 of 8 resolved: a new `FailedJobResource` Filament panel (`/admin/failed-jobs`) gives operators visibility into and a Retry/Discard recovery workflow for `failed_jobs` (queue, job class, failure timestamp, exception summary), gated by existing superadmin-only panel access. An `ErrorTracker` abstraction (`App\ErrorTracking\Contracts\ErrorTracker` + `NullErrorTracker`) is wired into `withExceptions()->reportable()`, additive to Laravel's own logging — no real vendor (Sentry) installed yet, deliberately deferred and documented with exact production-activation steps. 18 new tests. See [Critical-Production-Blockers.md](plans/Critical-Production-Blockers.md).
 

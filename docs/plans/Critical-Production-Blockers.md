@@ -243,6 +243,8 @@ What exists now: `App\ErrorTracking\Contracts\ErrorTracker` (an interface with o
 
 ## Blocker 6 — Wire Real Transactional Email
 
+**Status:** ✅ Complete — 2026-07-10. Scope grew beyond this section's original "no controller changes" constraint, per the live task's explicit delivery-safety requirements (production-misconfiguration rejection, failure logging, anti-enumeration verification) — see "Decided during implementation" below. The Postmark mailer transport itself was also missing its underlying package (`symfony/postmark-mailer` was never installed, so selecting `MAIL_MAILER=postmark` would have thrown a class-not-found error even with valid credentials); that gap is now fixed too.
+
 ### Title
 Configure a real transactional email mailer (Postmark, already stubbed in `config/mail.php`) as an available, credential-driven production option, and confirm the password-reset flow actually sends through it once configured.
 
@@ -250,14 +252,15 @@ Configure a real transactional email mailer (Postmark, already stubbed in `confi
 `MAIL_MAILER=log` is the shipped default and no application code calls `Mail::` directly — but Laravel's built-in password-reset flow already sends through the framework's notification system (`Password::sendResetLink()` → `ResetPassword` notification → mail channel), which means the *code path* already exists and needs no new application code, only a real mailer being selected and credentialed. As shipped, in production, this flow would silently do nothing — password reset (the one flow that most needs email to work) would appear to succeed to the user while never actually sending anything.
 
 ### Acceptance criteria
-- [ ] The Postmark mailer in `config/mail.php` is fully wired (any missing configuration keys — e.g., message stream ID — filled in, currently noted as commented out).
-- [ ] `.env.example` documents every variable needed to activate Postmark in production (API token, message stream), with placeholders, without changing the safe `MAIL_MAILER=log` default for local/test environments.
-- [ ] A test confirms that, given Postmark selected as the mailer (via config override in the test), the password-reset notification resolves to the correct mailer/transport without needing a real API call (Laravel's notification testing fakes cover this).
-- [ ] No change to the actual password-reset business logic — this blocker is purely making the transport real and configurable, not touching `PasswordResetController`.
-- [ ] Full test suite passes, PHPStan clean, Pint clean, build green.
+- [x] The Postmark mailer in `config/mail.php` is fully wired (`message_stream_id` uncommented and filled in; `symfony/postmark-mailer` + `symfony/http-client` added to `composer.json` — without them, the transport class doesn't exist at all, so `MAIL_MAILER=postmark` would fail even with valid credentials).
+- [x] `.env.example` documents every variable needed to activate Postmark in production (`POSTMARK_API_KEY`, `POSTMARK_MESSAGE_STREAM_ID`), with placeholders, without changing the safe `MAIL_MAILER=log` default for local/test environments.
+- [x] A test confirms that, given Postmark selected as the mailer (via config override in the test), the password-reset notification resolves to the correct mailer/transport without needing a real API call.
+- [x] ~~No change to the actual password-reset business logic~~ — **superseded by the live task's explicit requirements**; `PasswordResetController::email()` was extended (not its outward behavior or anti-enumeration guarantee) to add a production-misconfiguration guard and delivery-failure logging. See notes below.
+- [x] Full test suite passes, PHPStan clean, Pint clean, build green.
+- [x] (Added, per the live task's explicit requirements beyond this plan's original scope) A `ProductionMailerGuard` service refuses to attempt delivery — and logs critically — when `APP_ENV=production` and `MAIL_MAILER` is `log`/`array`; delivery failures from a real transport are caught and logged without leaking secrets; the generic anti-enumeration response is preserved in every case.
 
 ### Estimated effort
-Small (a few hours) — this is primarily configuration completion, not new application code, since the sending code path already exists via Laravel's framework.
+Small (a few hours) — this is primarily configuration completion, not new application code, since the sending code path already exists via Laravel's framework. Actual effort was medium once the missing Postmark package and the live task's delivery-safety requirements were addressed.
 
 ### Dependencies
 None.
@@ -267,6 +270,24 @@ None.
 2. Add a test that swaps the mail mailer to `postmark` in config and confirms the password-reset notification would route through it (using Laravel's `Notification::fake()`/`Mail::fake()` assertions, not a live send).
 3. Confirm the safe `log` default remains untouched for `local`/`testing`.
 4. Run all four quality gates; update docs; commit and push.
+
+### Decided during implementation: the Postmark package was never actually installed
+
+Auditing `config/mail.php`'s Postmark block revealed it couldn't have worked even fully configured: `symfony/postmark-mailer` (the bridge package Laravel's `MailManager::createPostmarkTransport()` requires) was never in `composer.json`. Selecting `MAIL_MAILER=postmark` in production, even with a valid API key, would have thrown `Class "Symfony\Component\Mailer\Bridge\Postmark\Transport\PostmarkTransportFactory" not found` on the very first send attempt — a second, previously-undocumented way this blocker's "silently do nothing" failure mode could occur. Fixed by `composer require symfony/postmark-mailer symfony/http-client`.
+
+### Decided during implementation: why `PasswordResetController` was touched despite the original "no controller changes" note
+
+This plan's original acceptance criteria said "no change to the actual password-reset business logic," written when the blocker's scope was purely configuration completion. The live task's instructions explicitly asked for delivery safety beyond configuration: rejecting a production+`log` misconfiguration "clearly," logging delivery failures without secrets, and re-verifying no user-enumeration regression. None of that is expressible as pure config — `MAIL_MAILER=log`/`array` never throws (it "succeeds" by writing to a log file instead of delivering), so there is no exception for a try/catch to catch; it has to be checked explicitly, at the one call site that ever sends mail. `PasswordResetController::email()` is that site.
+
+The change is deliberately narrow: a new `App\Services\Mail\ProductionMailerGuard::isMisconfigured(string $environment, string $mailer): bool` (pure, easily unit-tested) is checked before calling `Password::sendResetLink()`. If misconfigured, delivery is skipped and a `Log::critical(...)` fires instead — loud, in the log/error-tracker an operator actually watches (see Blocker 5). If not misconfigured, the existing call is wrapped in a `try/catch (Throwable)` that logs `Log::error(...)` (mailer + exception message + the recipient email — not a secret — but never the reset token or password) on any real transport failure. **In every branch, the exact same generic "If an account exists..." response is returned** — the anti-enumeration guarantee and the actual reset business logic are both completely unchanged; only the code path leading up to the existing `Password::sendResetLink()` call gained a guard and a catch.
+
+### Decided during implementation: operator-facing signal vs. user-facing signal
+
+"Fail clearly" (an operational requirement) and "avoid leaking whether an account exists" (a security requirement) point in different directions for different audiences. The resolution: operators get a loud, unmissable signal (`Log::critical`, distinct message, immediately actionable), while the end user always sees the same reassuring, non-committal message regardless of whether the account exists, whether the mailer is misconfigured, or whether a real send actually failed. A misconfigured production mailer is an incident an operator needs to see immediately — it is never something a website visitor should be able to infer from response differences.
+
+### Not done, per explicit instruction: a mail health/readiness check
+
+The live task's requirements made this conditional — "if this is part of the blocker plan" — and it isn't; this plan's acceptance criteria never called for one. `HealthController` was not touched, and no health check sends real email (nothing about mail was added to `/api/health`/`/api/ready`/`/api/live` at all).
 
 ---
 

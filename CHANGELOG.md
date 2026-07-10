@@ -6,6 +6,30 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Critical Production Blocker 6 — Real Transactional Email] — 2026-07-10
+
+Sixth of eight critical blockers from `docs/reviews/Production-Deployment-Audit.md`, executed per `docs/plans/Critical-Production-Blockers.md`.
+
+### Added
+
+- `symfony/postmark-mailer` and `symfony/http-client` to `composer.json` — the actual transport package Laravel's Postmark mailer driver requires. Previously missing entirely, so `MAIL_MAILER=postmark` would have thrown a class-not-found error even with a valid API key.
+- `POSTMARK_API_KEY`/`POSTMARK_MESSAGE_STREAM_ID` documented in `.env.example` with placeholders; the safe `MAIL_MAILER=log` local default is untouched.
+- `app/Services/Mail/ProductionMailerGuard.php` — `isMisconfigured(string $environment, string $mailer): bool`, true only when `production` is paired with a non-delivery mailer (`log`/`array`). `MAIL_MAILER=log`/`array` never throws, so this has to be checked explicitly rather than caught as an exception.
+- `tests/Feature/Mail/ProductionMailerGuardTest.php` (7 tests), `tests/Feature/Mail/PostmarkTransportConfigurationTest.php` (3 tests), `tests/Feature/Auth/PasswordResetDeliveryTest.php` (7 tests) — 17 tests covering the guard's environment/mailer matrix, Postmark transport resolution without a live API call, production+log rejection and its critical log, production+Postmark normal delivery, local/test safety, delivery-failure handling without secret leakage, and no user-enumeration regression.
+
+### Changed
+
+- `config/mail.php` — Postmark's `message_stream_id` uncommented and wired to `POSTMARK_MESSAGE_STREAM_ID`.
+- `app/Http/Controllers/Auth/PasswordResetController.php` — `email()` now checks `ProductionMailerGuard` before calling `Password::sendResetLink()` (logging `Log::critical` and skipping the send if misconfigured), and wraps the send in a `try/catch (Throwable)` that logs `Log::error` (mailer, recipient email, exception message — never the reset token or password) on a real transport failure. In every branch, the exact same generic "If an account exists..." response is returned — the anti-enumeration guarantee is unchanged.
+
+### Notes
+
+- **Scope grew beyond this blocker's original "no controller changes" note**, per the live task's explicit delivery-safety requirements (production-misconfiguration rejection, failure logging without secrets, anti-enumeration re-verification) — none of which are expressible as pure configuration. Documented in `docs/plans/Critical-Production-Blockers.md`.
+- **Operator signal vs. user signal, deliberately different:** a misconfigured production mailer logs critically (loud, for whoever watches logs/the error tracker from Blocker 5) while the end user always sees the identical generic response regardless of account existence, misconfiguration, or real delivery failure.
+- **No mail health/readiness check added** — conditional on being part of this blocker's plan, and it isn't; `HealthController` is untouched, and no health check sends real email.
+- No marketing campaign email publishing, newsletter automation, production hosting, or backups were touched — out of scope for this blocker.
+- Full suite: 909 tests, 907 passing, 2 Redis-skipped. PHPStan level 8 — 0 errors. Pint clean. `npm run build` green.
+
 ## [Critical Production Blocker 5 — Failed Job Visibility and Error Tracking] — 2026-07-10
 
 Fifth of eight critical blockers from `docs/reviews/Production-Deployment-Audit.md`, executed per `docs/plans/Critical-Production-Blockers.md`. Scope was widened at execution time to fold in the `failed_jobs` visibility gap Blocker 4 identified and deliberately deferred, alongside this blocker's original error-tracking scope.
