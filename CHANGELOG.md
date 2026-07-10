@@ -6,6 +6,23 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Production Deployment Readiness Audit] — 2026-07-10
+
+Read-only audit of the current repository for production deployment readiness — no code changes.
+
+### Added
+
+- `docs/reviews/Production-Deployment-Audit.md` — evidence-based audit (exact file/line citations throughout) covering: infrastructure (environment variables, queue workers, scheduler, storage, logging, cache, sessions, Redis, SSL, backups, email, monitoring, error tracking); Laravel production configuration (`APP_ENV`/`APP_DEBUG`, cache/config/route optimization, queue configuration, Horizon, scheduler); security (secrets, cookie settings, HTTPS, CSRF, rate limits, password reset, tenant isolation, authorization review); and operational risks (single points of failure, AI provider resilience, queue recovery, database recovery, deployment rollback). Concludes with critical blockers, high-priority items, and nice-to-have improvements.
+
+### Notes
+
+- Headline finding: `App\Domain\Shared\Scopes\CompanyScope` only applies its `company_id` filter when `current_company_id` is bound in the container; the only bindings of that key anywhere in the codebase are in three test files. `EnsureCompanyMembership` (the middleware that resolves the acting company) only sets a request attribute, never a container binding. Tenant isolation in production therefore relies entirely on every controller and job manually filtering by `company_id` — a pattern applied consistently today, but with no automated or structural safety net against a future omission.
+- New findings not previously documented in the June Beta Readiness Audit: the analytics webhook endpoint (`POST /api/analytics/webhooks/{provider}`) has no authentication and no rate limiting; `SettingsController::update()`/`syncIntegration()` and all three `MarketingPresenceController` mutations have no role check beyond company membership (only the Recommendation approval workflow enforces owner/admin); password reset does not invalidate other active sessions.
+- Confirms several June-audit blockers remain unaddressed in the repository (no production environment, no backups, no real email delivery, no error tracking, no deploy pipeline, no scheduler cron trigger) while noting these are largely provisioning work outside the repo's scope to fix via code alone.
+- Confirms several things are solid and shouldn't be re-litigated: CSRF protection, secrets management (nothing real tracked in git), genuinely functional health/readiness endpoints, `BusinessBrainService`'s documented decision to avoid the cache facade, and the Anthropic provider's retry/backoff engineering.
+
+---
+
 ## [Private Beta Execution Checklist] — 2026-07-10
 
 Operator's checklist for running Stage A (Private Beta) — no code changes, no implementation tasks.

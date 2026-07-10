@@ -34,6 +34,20 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
+**Production Deployment Readiness Audit ✅ Complete**
+*Completed: 2026-07-10*
+
+Read-only, evidence-based audit of the actual repository (config files, middleware, routes, jobs, CI) for production deployment readiness — distinct from the Beta Readiness Audit's broader operational scoring. Every finding is backed by exact file/line evidence, not inference.
+
+**Headline finding:** `CompanyScope`, the global scope every tenant model relies on, never activates during a real HTTP request — `current_company_id` is bound in the container only inside test files, never in `app/`. Tenant isolation today works only because every controller and job manually filters by `company_id`; there is no structural safety net if a future code path forgets to. This is rated above every infrastructure gap because it's a false sense of security, not merely an absence.
+
+Also confirmed still open since June: no production environment, no backups, no real email delivery, no error tracking/monitoring beyond genuinely solid health-check endpoints, no HTTPS/security-header enforcement, no deploy pipeline (CI is test-only), and no cron trigger for the six scheduled jobs that carry Atlas's recurring-intelligence promise. New findings not previously documented: the analytics webhook endpoint is public and unthrottled; several mutating endpoints (company settings, integration sync, all Marketing Presence CRUD) have no role check beyond company membership; password reset doesn't invalidate other sessions.
+
+See:
+- [Production-Deployment-Audit.md](reviews/Production-Deployment-Audit.md) — the full audit, with critical/high-priority/nice-to-have findings
+
+**Previous milestone:**
+
 **Private Beta Execution Checklist ✅ Complete**
 *Completed: 2026-07-10*
 
@@ -598,6 +612,8 @@ All production-blocking items resolved. Remaining pre-production items:
 ---
 
 ## Last Updated
+
+**2026-07-10** — Production Deployment Readiness Audit complete. Read-only, evidence-based audit of the repository (not infrastructure that doesn't exist yet) covering infrastructure config, Laravel production config, security, and operational risk, each with exact file/line evidence and a READY/PARTIALLY READY/NOT READY verdict. Headline finding: `CompanyScope`'s global scope never activates in production (`current_company_id` is only ever bound in test files) — tenant isolation today relies entirely on manual per-query `company_id` filtering, applied consistently but with no structural safety net. 8 critical blockers, 8 high-priority items, 6 nice-to-have improvements identified. See [Production-Deployment-Audit.md](reviews/Production-Deployment-Audit.md).
 
 **2026-07-10** — Private Beta Execution Checklist written. Operator's checklist (not a roadmap, not a sprint plan) for running Stage A private beta: production infrastructure checklist, per-customer onboarding checklist (including Marketing Presence), daily internal support checklist, a single Go/No-Go gate for inviting Customer 1, and a first-week operating cadence with daily tasks and metrics. See [Private-Beta-Execution.md](plans/Private-Beta-Execution.md).
 
