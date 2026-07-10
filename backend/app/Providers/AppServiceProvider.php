@@ -6,6 +6,8 @@ use App\AI\Contracts\AiProvider;
 use App\AI\Providers\AnthropicProvider;
 use App\AI\Providers\LocalAiProvider;
 use App\AI\Testing\FakeAiProvider;
+use App\ErrorTracking\Contracts\ErrorTracker;
+use App\ErrorTracking\NullErrorTracker;
 use App\Events\CampaignAssetsReady;
 use App\Events\DecisionCommitted;
 use App\Events\ExecutionCompleted;
@@ -58,6 +60,23 @@ class AppServiceProvider extends ServiceProvider
         } else {
             $this->app->singleton(AiProvider::class, AnthropicProvider::class);
         }
+
+        // Only 'null' has a real implementation today (no vendor package is
+        // installed yet — see Critical-Production-Blockers.md Blocker 5).
+        // Forced to null in testing regardless of config so test runs never
+        // attempt to phone home; a future real driver (e.g. Sentry) only
+        // needs a new case added below, not a change to withExceptions()'s
+        // wiring in bootstrap/app.php.
+        $this->app->singleton(ErrorTracker::class, function (): ErrorTracker {
+            if ($this->app->environment('testing')) {
+                return new NullErrorTracker();
+            }
+
+            return match (config('services.error_tracking.driver')) {
+                // 'sentry' => new SentryErrorTracker(...),
+                default => new NullErrorTracker(),
+            };
+        });
 
         if ($this->app->environment('testing')) {
             // FakeAnalyticsProvider is registered as the catch-all in testing.

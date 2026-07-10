@@ -41,4 +41,13 @@ return [
         'base_url' => env('ANTHROPIC_BASE_URL', 'https://api.anthropic.com'),
     ],
 
+    // Abstraction only for now — no real vendor (Sentry or equivalent) is
+    // installed yet. 'null' (the default) binds NullErrorTracker, a no-op.
+    // See docs/plans/Critical-Production-Blockers.md, Blocker 5, for exactly
+    // what's left to activate a real driver in production.
+    'error_tracking' => [
+        'driver' => env('ERROR_TRACKING_DRIVER', 'null'),
+        'dsn' => env('ERROR_TRACKING_DSN'),
+    ],
+
 ];

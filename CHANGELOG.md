@@ -6,6 +6,33 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Critical Production Blocker 5 — Failed Job Visibility and Error Tracking] — 2026-07-10
+
+Fifth of eight critical blockers from `docs/reviews/Production-Deployment-Audit.md`, executed per `docs/plans/Critical-Production-Blockers.md`. Scope was widened at execution time to fold in the `failed_jobs` visibility gap Blocker 4 identified and deliberately deferred, alongside this blocker's original error-tracking scope.
+
+### Added
+
+- `app/Models/FailedJob.php` — maps the framework's own `failed_jobs` table (no migration needed, no company scope). `jobClass()`/`exceptionSummary()` parse the job's display name and the first line of its exception trace out of the raw `payload`/`exception` columns.
+- `app/Services/Queue/FailedJobRecoveryService.php` — `retry()` (mirrors `artisan queue:retry`: resets the payload's `attempts` to 0, re-pushes to the original connection/queue, deletes the failed_jobs row) and `forget()` (mirrors `artisan queue:forget`: deletes the row). Both log a structured `Log::info(...)`.
+- `app/Filament/Resources/FailedJobResource.php` (+ `Pages/ListFailedJobs.php`, `Pages/ViewFailedJob.php`) — a new Filament panel at `/admin/failed-jobs` listing queue, job class, exception summary, and failure timestamp, with per-row Retry/Discard actions (no bulk actions, deliberately — see notes). Gated by the existing superadmin-only `canAccessPanel()` check; no new authorization code was needed.
+- `app/ErrorTracking/Contracts/ErrorTracker.php` — a one-method interface (`report(Throwable $exception, array $context = [])`), mirroring the existing `App\AI\Contracts\AiProvider` abstraction pattern.
+- `app/ErrorTracking/NullErrorTracker.php` — a no-op implementation, bound by default and unconditionally in `testing`.
+- `app/ErrorTracking/Testing/FakeErrorTracker.php` — a test double recording reported exceptions for assertions.
+- `config/services.php` — `error_tracking.driver`/`error_tracking.dsn`, sourced from new `ERROR_TRACKING_DRIVER`/`ERROR_TRACKING_DSN` env vars (documented with placeholders in `.env.example`).
+- `tests/Feature/Queue/FailedJobRecoveryServiceTest.php` (8 tests), `tests/Feature/ErrorTracking/ErrorTrackerTest.php` (4 tests), `tests/Feature/Filament/FailedJobResourceTest.php` (6 tests) — 18 tests total covering recovery workflow behavior/logging, diagnostics parsing, the `ErrorTracker` binding and `withExceptions()` wiring, resource visibility, and authorization.
+
+### Changed
+
+- `bootstrap/app.php` — `withExceptions()` now also registers a `reportable()` callback that resolves `ErrorTracker` from the container and calls it for every reported exception, additive to Laravel's own exception logging.
+- `app/Providers/AppServiceProvider.php` — binds `ErrorTracker` to `NullErrorTracker` (forced in `testing` regardless of config); the binding is structured as a `match` on `config('services.error_tracking.driver')` so a future real driver is a one-line addition.
+
+### Notes
+
+- **Sentry (or an equivalent vendor) was deliberately not installed.** The live task explicitly allowed deferring full integration in favor of preparing the abstraction and documenting production-activation steps — installing a real SaaS error-tracking vendor is an operational/billing decision, not a code change, and shouldn't block shipping the wiring. Exact activation steps (composer-require the SDK, implement one `ErrorTracker` class, add one `match` arm, set the real DSN) are documented in `docs/plans/Critical-Production-Blockers.md`.
+- **No bulk actions on the Failed Jobs resource.** Retry/Discard are per-row only — bulk-retrying many failed jobs at once risks re-triggering whatever caused the original failure all at once.
+- No production hosting, backups, or real email were touched — out of scope for this blocker. No unrelated queues were modified.
+- Full suite: 892 tests, 890 passing, 2 Redis-skipped. PHPStan level 8 — 0 errors. Pint clean. `npm run build` green.
+
 ## [Critical Production Blocker 4 — Scheduler and Queue Production Readiness] — 2026-07-10
 
 Fourth of eight critical blockers from `docs/reviews/Production-Deployment-Audit.md`, executed per `docs/plans/Critical-Production-Blockers.md`.

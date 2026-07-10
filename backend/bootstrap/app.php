@@ -1,5 +1,6 @@
 <?php
 
+use App\ErrorTracking\Contracts\ErrorTracker;
 use App\Http\Middleware\EnsureCompanyMembership;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SecurityHeaders;
@@ -41,4 +42,13 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*'),
         );
+
+        // Additive to Laravel's own exception logging, not a replacement —
+        // reportable() callbacks run alongside the default log-based
+        // reporting, never instead of it. Resolves to NullErrorTracker (a
+        // no-op) until a real driver is configured; see
+        // docs/plans/Critical-Production-Blockers.md Blocker 5.
+        $exceptions->reportable(function (Throwable $e): void {
+            app(ErrorTracker::class)->report($e);
+        });
     })->create();

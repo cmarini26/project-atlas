@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 874 tests (872 passing, 2 Redis skipped) + 24 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Critical Production Blocker 4 — scheduler + queue production readiness, 14 new tests. |
+| Tests             | ✅ Strong | 892 tests (890 passing, 2 Redis skipped) + 24 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Critical Production Blocker 5 — failed-job visibility + error-tracking abstraction, 18 new tests. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,22 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**Critical Production Blocker 5 of 8 — Failed Job Visibility and Error Tracking ✅ Complete**
+*Completed: 2026-07-10*
+
+Fifth of eight critical blockers from the Production Deployment Readiness Audit resolved, per `docs/plans/Critical-Production-Blockers.md`. Scope was widened at execution time to fold in the `failed_jobs` visibility gap Blocker 4 identified and deliberately deferred, alongside this blocker's original error-tracking scope.
+
+**Failed job visibility + recovery:** a new `App\Models\FailedJob` maps the framework's own `failed_jobs` table (queue, job class, failure timestamp, exception summary — all now parsed and surfaced, none of it visible before). `App\Services\Queue\FailedJobRecoveryService` provides Retry (mirrors `artisan queue:retry`'s exact mechanism — resets the payload's attempt counter, re-pushes to the original connection/queue) and Discard (mirrors `artisan queue:forget`), both structured-logging every action. A new `FailedJobResource` Filament panel (`/admin/failed-jobs`) exposes this to operators, gated by the same superadmin-only panel access every existing Filament resource already relies on — no new authorization mechanism was needed.
+
+**Error tracking — abstraction prepared, not fully integrated:** no real vendor package (Sentry or equivalent) was installed, per the live task's explicit allowance to defer full integration. Instead, `App\ErrorTracking\Contracts\ErrorTracker` (a one-method interface) and `App\ErrorTracking\NullErrorTracker` (a no-op, bound by default and unconditionally in `testing`) are wired into `bootstrap/app.php`'s `withExceptions()->reportable()` callback — additive to Laravel's own exception logging, never a replacement. `ERROR_TRACKING_DRIVER`/`ERROR_TRACKING_DSN` are documented in `.env.example`. Exactly what remains for production activation (composer-require a vendor SDK, implement one new `ErrorTracker` class, add one `match` arm, set the real DSN) is documented in `Critical-Production-Blockers.md`.
+
+18 new tests cover: retry/forget recovery behavior and logging, `job_class`/`exception_summary` diagnostics parsing, the `ErrorTracker` binding and `withExceptions()` wiring, Filament resource visibility, and authorization (superadmin can view; regular/unauthenticated users cannot). 892 tests (890 passing, 2 Redis skipped). PHPStan level 8 — 0 errors. Pint clean. Build green.
+
+See:
+- [Critical-Production-Blockers.md](plans/Critical-Production-Blockers.md) — full 8-blocker plan, updated with Blocker 5's completion notes
+
+**Previous milestone:**
 
 **Critical Production Blocker 4 of 8 — Scheduler and Queue Production Readiness ✅ Complete**
 *Completed: 2026-07-10*
@@ -671,6 +687,8 @@ All production-blocking items resolved. Remaining pre-production items:
 ---
 
 ## Last Updated
+
+**2026-07-10** — Critical Production Blocker 5 of 8 resolved: a new `FailedJobResource` Filament panel (`/admin/failed-jobs`) gives operators visibility into and a Retry/Discard recovery workflow for `failed_jobs` (queue, job class, failure timestamp, exception summary), gated by existing superadmin-only panel access. An `ErrorTracker` abstraction (`App\ErrorTracking\Contracts\ErrorTracker` + `NullErrorTracker`) is wired into `withExceptions()->reportable()`, additive to Laravel's own logging — no real vendor (Sentry) installed yet, deliberately deferred and documented with exact production-activation steps. 18 new tests. See [Critical-Production-Blockers.md](plans/Critical-Production-Blockers.md).
 
 **2026-07-10** — Critical Production Blocker 4 of 8 resolved: every scheduled entry in `routes/console.php` now has `->withoutOverlapping()`/`->onOneServer()` (except `ApplyLearnings`, already `ShouldBeUnique`), plus a committed `infrastructure/cron/atlas-scheduler` artifact so `php artisan schedule:run` actually gets triggered in production. `CheckChannelHealth`, `ProcessAnalyticsWebhookEvent`, `PruneRawMetrics`, and `PublishScheduledContent` — the four jobs the audit flagged as missing retry/backoff — now have `$tries`/`$backoff`/`failed()` structured logging. `failed_jobs` recovery visibility deliberately deferred to Blocker 5. 14 new tests. See [Critical-Production-Blockers.md](plans/Critical-Production-Blockers.md).
 

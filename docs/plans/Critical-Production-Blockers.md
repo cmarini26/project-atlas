@@ -186,34 +186,58 @@ None. The actual installation of the cron/systemd artifact on a real server is B
 
 ---
 
-## Blocker 5 — Wire Real Error Tracking
+## Blocker 5 — Failed Job Visibility and Error Tracking
+
+**Status:** ✅ Complete — 2026-07-10. Scope was widened at execution time (per the live task's explicit instructions) to fold in the `failed_jobs` visibility/recovery gap Blocker 4 identified and deliberately deferred here, alongside this blocker's original error-tracking scope. Error tracking was **not** fully integrated — no real vendor package (Sentry or equivalent) was installed. Instead, an `ErrorTracker` abstraction was built and wired into `withExceptions()`, bound to a `NullErrorTracker` no-op until a real driver is configured — see "Decided during implementation" below for exactly what remains for production activation.
 
 ### Title
-Install and configure a real error-tracking integration (Sentry or an equivalent Laravel-native option) so production exceptions are reported somewhere a human is alerted, not only written to a log file.
+Install and configure a real error-tracking integration (Sentry or an equivalent Laravel-native option) so production exceptions are reported somewhere a human is alerted, not only written to a log file. **Widened during execution** to also give operators visibility into and a recovery workflow for `failed_jobs`, which had none.
 
 ### Why it is critical
-`bootstrap/app.php`'s entire exception-handling customization today is a single `shouldRenderJsonWhen` rule. No error-tracking package exists in `composer.json`. Combined with no monitoring/APM (a High Priority finding, not critical on its own, but compounding this one), a production outage today would be discovered by a customer noticing something wrong, not by the team noticing an alert — directly contradicting the operational maturity the Private Beta Execution Checklist's Go/No-Go gate requires.
+`bootstrap/app.php`'s entire exception-handling customization today is a single `shouldRenderJsonWhen` rule. No error-tracking package exists in `composer.json`. Combined with no monitoring/APM (a High Priority finding, not critical on its own, but compounding this one), a production outage today would be discovered by a customer noticing something wrong, not by the team noticing an alert — directly contradicting the operational maturity the Private Beta Execution Checklist's Go/No-Go gate requires. Separately (per Blocker 4's own deferred finding): failed jobs land in `failed_jobs` with zero operational visibility — no Filament resource, no recovery command, no alerting — so a job that exhausts its retries today is invisible and unrecoverable without a manual database query.
 
 ### Acceptance criteria
-- [ ] A real error-tracking package is added to `composer.json` and its service provider/config is published.
-- [ ] `bootstrap/app.php`'s `withExceptions()` reports exceptions to the tracker in addition to (not instead of) existing logging.
-- [ ] The integration is entirely config/env-driven (a DSN or API key via `.env`) — no hardcoded project identifiers, and the integration is inert (or explicitly disabled) in `testing`/`local` environments so test runs never attempt to phone home.
-- [ ] `.env.example` documents the new variable(s) with a placeholder, consistent with every other credential in that file.
-- [ ] A test confirms the binding/config resolves correctly given a test-environment configuration (full end-to-end delivery to a real account is not testable in CI and is not required for this blocker's acceptance — that is verified operationally once a real account exists, per the Private Beta Execution Checklist).
-- [ ] Full test suite passes, PHPStan clean, Pint clean, build green.
+- [x] ~~A real error-tracking package is added to `composer.json`~~ — **not done**; deliberately deferred (see notes below). Instead, an `ErrorTracker` interface + `NullErrorTracker` no-op implementation were added, ready for a real driver to be substituted in with a single `AppServiceProvider` binding change.
+- [x] `bootstrap/app.php`'s `withExceptions()` reports exceptions to the tracker in addition to (not instead of) existing logging.
+- [x] The integration is entirely config/env-driven (`ERROR_TRACKING_DRIVER`/`ERROR_TRACKING_DSN` via `.env`) — no hardcoded project identifiers, and the integration is inert (forced to `NullErrorTracker`) in `testing` regardless of config, so test runs never attempt to phone home.
+- [x] `.env.example` documents the new variables with placeholders, consistent with every other credential in that file.
+- [x] A test confirms the binding resolves correctly in the test environment, and that the `withExceptions()` wiring actually invokes whatever `ErrorTracker` is bound.
+- [x] Full test suite passes, PHPStan clean, Pint clean, build green.
+- [x] (Added — folded in from Blocker 4's deferred finding) A `FailedJobResource` Filament panel gives operators visibility into `failed_jobs` (queue, job class, failure timestamp, exception summary) and a Retry/Discard recovery workflow, gated by the same superadmin-only panel access every other Filament resource already relies on.
 
 ### Estimated effort
-Medium (half a day to a day) — package install, configuration, and care to ensure test/CI runs are unaffected (no accidental outbound calls during `php artisan test`).
+Medium (half a day to a day) — package install, configuration, and care to ensure test/CI runs are unaffected (no accidental outbound calls during `php artisan test`). Actual effort was closer to a full day once the `failed_jobs` visibility work (folded in from Blocker 4) was added.
 
 ### Dependencies
 None functionally, but sequenced after Blocker 3 (security headers) since both touch `bootstrap/app.php`'s exception/middleware configuration — doing them in this order means the file's state is simple and single-purpose at each step.
 
 ### Verification steps
-1. `composer require` the chosen package; publish its config.
-2. Wire reporting into `withExceptions()` without removing existing log-based reporting.
-3. Confirm via a test (or explicit environment check) that no outbound call is attempted when `APP_ENV=testing`.
-4. Add the new env var(s) to `.env.example` with a placeholder value.
+1. Build an `ErrorTracker` interface + `NullErrorTracker` implementation; wire `withExceptions()->reportable()` to call whatever is bound, without removing existing log-based reporting.
+2. Confirm via a test that the binding resolves to the no-op implementation in `testing`, and that a directly-invoked exception report reaches a substituted fake tracker.
+3. Add the new env var(s) to `.env.example` with a placeholder value.
+4. Add a `FailedJob` model (mapping the framework's own `failed_jobs` table), a `FailedJobRecoveryService` (retry/forget, mirroring `artisan queue:retry`/`queue:forget`), and a `FailedJobResource` Filament panel with Retry/Discard actions.
 5. Run all four quality gates; update docs; commit and push.
+
+### Decided during implementation: why Sentry wasn't actually installed, and what production activation requires
+
+The live task's instructions explicitly allowed deferring full Sentry integration in favor of "prepare the abstraction/configuration needed and clearly document what remains for production activation" — taken deliberately, for the same reason the codebase already abstracts its AI provider (`App\AI\Contracts\AiProvider`) rather than hardcoding a vendor: installing a real error-tracking vendor package is an operational/billing decision (which service, whose account, what plan) that shouldn't block shipping the code-side wiring, and a `composer require` of a real SaaS SDK is exactly the kind of external, budget-affecting dependency this session's scope discipline (one blocker at a time, no unrelated changes) argues against introducing speculatively.
+
+What exists now: `App\ErrorTracking\Contracts\ErrorTracker` (an interface with one method, `report(Throwable $exception, array $context = [])`), `App\ErrorTracking\NullErrorTracker` (a no-op, bound by default and unconditionally in `testing`), and `bootstrap/app.php`'s `withExceptions()->reportable()` callback that resolves `ErrorTracker` from the container and calls it for every reported exception — additive to Laravel's own exception logging, never a replacement.
+
+**What remains for production activation:**
+1. `composer require sentry/sentry-laravel` (or another vendor SDK).
+2. Implement `App\ErrorTracking\SentryErrorTracker implements ErrorTracker`, wrapping the vendor SDK's own exception-capture call.
+3. Add a `'sentry' => new SentryErrorTracker(...)` arm to the `match` in `AppServiceProvider::register()`'s `ErrorTracker` binding (the commented-out example line is already there).
+4. Set `ERROR_TRACKING_DRIVER=sentry` and the vendor's DSN env var in the real production `.env` (never in `.env.example`, which only ships placeholders).
+5. Re-run the existing `ErrorTrackerTest` suite — it should pass unmodified, since it tests the abstraction boundary, not a specific vendor.
+
+### Decided during implementation: the `failed_jobs` recovery workflow
+
+**Filament, not a CLI command or new dashboard.** `failed_jobs` is a system-wide table (no `company_id`, not tenant data), and the app already has a superadmin-gated Filament panel with an established resource pattern (`ExecutionResource`, `RecommendationResource`) that this reuses directly — a `FailedJobResource` needed no new authorization mechanism, no new panel, and no new access-control code, since panel-level `canAccessPanel()` (superadmin-only) already gates it exactly like every other resource.
+
+**Retry mirrors `artisan queue:retry` exactly**, including resetting the payload's `attempts` counter to 0 before re-pushing it onto the job's original connection/queue — this is the same mechanism Laravel's own CLI command uses (`Illuminate\Queue\Console\RetryCommand::resetAttempts()`), so the recovery workflow behaves identically to the documented CLI path, just reachable from the admin panel. A successful retry removes the `failed_jobs` row; if the retry fails again, a *new* row appears with a new UUID — there is no separate "retry status" column to maintain, since presence/absence in the table already communicates it.
+
+**No bulk actions.** Retry/Discard are per-row only. Bulk-retrying many failed jobs at once risks re-triggering whatever caused the original failure (e.g., a downstream outage) all at once; an operator reviewing failures one at a time is the safer default until there's a real operational need for bulk recovery.
 
 ---
 
