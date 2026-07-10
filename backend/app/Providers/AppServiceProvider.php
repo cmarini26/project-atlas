@@ -11,6 +11,7 @@ use App\Events\DecisionCommitted;
 use App\Events\ExecutionCompleted;
 use App\Events\FactExtracted;
 use App\Events\KnowledgeSynthesized;
+use App\Events\MarketingPresenceUpdated;
 use App\Events\ObservationProcessed;
 use App\Events\ObservationRecorded;
 use App\Events\OpportunityDetected;
@@ -82,6 +83,10 @@ class AppServiceProvider extends ServiceProvider
 
         Event::listen(KnowledgeSynthesized::class, function (KnowledgeSynthesized $event): void {
             BusinessBrainService::invalidate($event->knowledge->company_id);
+        });
+
+        Event::listen(MarketingPresenceUpdated::class, function (MarketingPresenceUpdated $event): void {
+            BusinessBrainService::invalidate($event->marketingChannel->company_id);
         });
 
         Event::listen(ObservationRecorded::class, DispatchObservationProcessing::class);

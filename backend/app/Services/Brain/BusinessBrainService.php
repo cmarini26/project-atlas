@@ -33,6 +33,7 @@ class BusinessBrainService
     public function __construct(
         private readonly FactRepository $facts,
         private readonly KnowledgeRepository $knowledge,
+        private readonly MarketingPresenceSynthesizer $marketingPresence,
     ) {}
 
     public function for(Company $company): BusinessBrain
@@ -117,6 +118,7 @@ class BusinessBrainService
             catalog: $catalog,
             featuredItems: $featuredItems,
             recentCampaigns: $recentCampaigns,
+            marketingPresence: $this->marketingPresence->synthesize($company->id),
         );
     }
 }

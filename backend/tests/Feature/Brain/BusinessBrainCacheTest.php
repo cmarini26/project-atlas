@@ -4,11 +4,13 @@ namespace Tests\Feature\Brain;
 
 use App\Events\FactExtracted;
 use App\Events\KnowledgeSynthesized;
+use App\Events\MarketingPresenceUpdated;
 use App\Models\Catalog;
 use App\Models\Company;
 use App\Models\DigitalTwin;
 use App\Models\Fact;
 use App\Models\Knowledge;
+use App\Models\MarketingChannel;
 use App\Services\Brain\BusinessBrainService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -185,6 +187,66 @@ class BusinessBrainCacheTest extends TestCase
         KnowledgeSynthesized::dispatch($knowledge);
 
         $this->assertFalse(BusinessBrainService::isMemoized($this->company->id));
+    }
+
+    // --- Invalidation via MarketingPresenceUpdated (Milestone 11 Phase 5) ---
+
+    public function test_marketing_presence_updated_event_invalidates_memo(): void
+    {
+        $this->service->for($this->company);
+        $this->assertTrue(BusinessBrainService::isMemoized($this->company->id));
+
+        $channel = MarketingChannel::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id,
+            'type' => 'instagram',
+            'display_name' => 'Acme Instagram',
+            'objective' => ['awareness'],
+        ]);
+
+        MarketingPresenceUpdated::dispatch($channel);
+
+        $this->assertFalse(BusinessBrainService::isMemoized($this->company->id));
+    }
+
+    public function test_marketing_presence_updated_from_other_company_does_not_invalidate_memo(): void
+    {
+        $this->service->for($this->company);
+
+        $otherCompany = Company::withoutGlobalScopes()->create([
+            'name' => 'Other Co',
+            'slug' => 'other-co',
+        ]);
+
+        $channel = MarketingChannel::withoutGlobalScopes()->create([
+            'company_id' => $otherCompany->id,
+            'type' => 'instagram',
+            'display_name' => "Other Co's Instagram",
+            'objective' => ['awareness'],
+        ]);
+
+        MarketingPresenceUpdated::dispatch($channel);
+
+        // This company's memo must still be populated
+        $this->assertTrue(BusinessBrainService::isMemoized($this->company->id));
+    }
+
+    public function test_after_marketing_presence_invalidation_fresh_marketing_presence_is_assembled(): void
+    {
+        $brain1 = $this->service->for($this->company);
+        $this->assertSame([], $brain1->marketingPresence->primaryChannels);
+
+        $channel = MarketingChannel::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id,
+            'type' => 'instagram',
+            'display_name' => 'Acme Instagram',
+            'importance' => 'primary',
+            'objective' => ['awareness'],
+        ]);
+
+        MarketingPresenceUpdated::dispatch($channel);
+
+        $brain2 = $this->service->for($this->company);
+        $this->assertSame(['Acme Instagram'], $brain2->marketingPresence->primaryChannels);
     }
 
     // --- Event from a different company does not invalidate this company's memo ---

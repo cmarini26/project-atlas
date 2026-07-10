@@ -6,6 +6,32 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 11 Phase 5 — Business Brain Integration] — 2026-07-09
+
+Implements Phase 5 only of [Milestone-11-Marketing-Presence.md](docs/plans/Milestone-11-Marketing-Presence.md). Details in [Milestone-11-Phase-5-Review.md](docs/reviews/Milestone-11-Phase-5-Review.md). No Opportunity Engine, Decision Engine, publishing, or onboarding changes.
+
+### Added
+
+- `App\Domain\BusinessBrain\MarketingPresenceSummary` — a synthesized, natural-language-ready value object (`primaryChannels`, `secondaryChannels`, `inactiveChannels`, `primaryObjectives` — all `list<string>` — plus a composed `summary` sentence). Never raw `MarketingChannel` rows.
+- `App\Services\Brain\MarketingPresenceSynthesizer` — the only place that reads `MarketingChannel` rows to describe a company's marketing strategy. Buckets by status first (inactive overrides importance), then importance (primary vs. secondary/experimental); derives `primaryObjectives` from primary channels, falling back to all active channels; composes one sentence per non-empty bucket. Deterministic string composition — no AI call.
+- `tests/Feature/Brain/MarketingPresenceSynthesizerTest.php` — 12 tests covering bucketing rules, objective derivation/fallback/dedup, summary composition, and tenant isolation.
+
+### Changed
+
+- `App\Domain\BusinessBrain\BusinessBrain` — gained a 9th constructor parameter, `public ?MarketingPresenceSummary $marketingPresence = null` (nullable with a default so every pre-existing test that constructs `BusinessBrain` directly continues to work unmodified).
+- `App\Services\Brain\BusinessBrainService` — `assemble()` now synthesizes and attaches `marketingPresence` via the injected `MarketingPresenceSynthesizer`.
+- `App\Providers\AppServiceProvider::boot()` — registered a listener for the previously-inert `MarketingPresenceUpdated` event (shipped in Phase 2), calling `BusinessBrainService::invalidate($event->marketingChannel->company_id)`, in the exact style of the existing `FactExtracted`/`KnowledgeSynthesized` listeners. Invalidation only clears an in-process memo entry — no synchronous rebuild, no new queue or job.
+- `tests/Feature/Brain/BusinessBrainServiceTest.php` — 3 new tests: `marketingPresence` is populated and non-null; the empty-company sentence; the summary only ever contains strings, never `MarketingChannel` instances.
+- `tests/Feature/Brain/BusinessBrainCacheTest.php` — 3 new tests: `MarketingPresenceUpdated` invalidates the memo; a cross-company event does not; a fresh summary is assembled after invalidation.
+- `specs/core/marketing-presence.md` §8 — updated to describe the synthesized `MarketingPresenceSummary` design actually implemented (a "superseded design note" documents the change from the section's original unfiltered-`Collection<MarketingChannel>` sketch and the reasoning behind it).
+
+### Notes
+
+- The live task instruction for this phase ("Do NOT expose raw MarketingChannel rows directly to prompts") explicitly overrode both the plan document's and the spec's original design (an unfiltered `Collection<MarketingChannel>` property) — treated as authoritative, consistent with how earlier phases treated a more specific live instruction as superseding a rough plan sketch.
+- No prompt template (`CampaignPreparationPrompt`, `RationaleGenerationPrompt`, etc.) was modified — the data is available on `BusinessBrain` for any `Analyst` that chooses to read it, but folding it into generated prompt text wasn't required for this phase and would have meant editing files immediately adjacent to Opportunity/Decision Engine territory this phase must not touch.
+
+---
+
 ## [Milestone 11 Phase 4 — Marketing Presence Settings UI] — 2026-07-09
 
 Implements Phase 4 only of [Milestone-11-Marketing-Presence.md](docs/plans/Milestone-11-Marketing-Presence.md). Details in [Milestone-11-Phase-4-Review.md](docs/reviews/Milestone-11-Phase-4-Review.md). No Business Brain, Opportunity Engine, publishing, channel health dashboard, or external integration changes.

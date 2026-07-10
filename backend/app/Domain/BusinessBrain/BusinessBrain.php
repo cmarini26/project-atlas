@@ -33,5 +33,6 @@ readonly class BusinessBrain
         public ?Catalog $catalog,
         public Collection $featuredItems,
         public Collection $recentCampaigns,
+        public ?MarketingPresenceSummary $marketingPresence = null,
     ) {}
 }

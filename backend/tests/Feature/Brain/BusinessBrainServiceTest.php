@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\DigitalTwin;
 use App\Models\Fact;
 use App\Models\Knowledge;
+use App\Models\MarketingChannel;
 use App\Services\Brain\BusinessBrainService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -117,5 +118,74 @@ class BusinessBrainServiceTest extends TestCase
 
         $this->assertCount(0, $brain->featuredItems);
         $this->assertCount(0, $brain->recentCampaigns);
+    }
+
+    // ── Marketing Presence (Milestone 11 Phase 5) ───────────────────────────
+
+    public function test_includes_a_marketing_presence_summary_when_no_channels_are_declared(): void
+    {
+        $brain = $this->service->for($this->company);
+
+        $this->assertNotNull($brain->marketingPresence);
+        $this->assertSame([], $brain->marketingPresence->primaryChannels);
+        $this->assertSame('No marketing channels have been declared yet.', $brain->marketingPresence->summary);
+    }
+
+    public function test_marketing_presence_never_exposes_raw_marketing_channel_rows(): void
+    {
+        MarketingChannel::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id,
+            'type' => 'instagram',
+            'display_name' => 'Acme Instagram',
+            'importance' => 'primary',
+            'objective' => ['awareness'],
+        ]);
+
+        $brain = $this->service->for($this->company);
+
+        // The brain only ever holds the synthesized summary — a list of
+        // display-name strings and a composed sentence — never MarketingChannel
+        // model instances.
+        $this->assertContainsOnly('string', $brain->marketingPresence->primaryChannels);
+        $this->assertContains('Acme Instagram', $brain->marketingPresence->primaryChannels);
+    }
+
+    public function test_marketing_presence_buckets_channels_by_importance_and_status(): void
+    {
+        MarketingChannel::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id,
+            'type' => 'instagram',
+            'display_name' => 'Main Instagram',
+            'importance' => 'primary',
+            'status' => 'active',
+            'objective' => ['awareness'],
+        ]);
+
+        MarketingChannel::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id,
+            'type' => 'facebook',
+            'display_name' => 'Facebook Page',
+            'importance' => 'secondary',
+            'status' => 'active',
+            'objective' => ['community'],
+        ]);
+
+        MarketingChannel::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id,
+            'type' => 'x',
+            'display_name' => 'Old X Account',
+            'importance' => 'primary',
+            'status' => 'inactive',
+            'objective' => ['awareness'],
+        ]);
+
+        $summary = $this->service->for($this->company)->marketingPresence;
+
+        $this->assertSame(['Main Instagram'], $summary->primaryChannels);
+        $this->assertSame(['Facebook Page'], $summary->secondaryChannels);
+        $this->assertSame(['Old X Account'], $summary->inactiveChannels);
+        $this->assertSame(['awareness'], $summary->primaryObjectives);
+        $this->assertStringContainsString('Main Instagram', $summary->summary);
+        $this->assertStringContainsString('Old X Account', $summary->summary);
     }
 }
