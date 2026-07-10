@@ -62,3 +62,48 @@ export function channelLabel(channelType: string): string {
 export function channelCapability(channelType: string): ChannelCapability {
   return CHANNEL_CAPABILITY[channelType] ?? 'coming_later'
 }
+
+/**
+ * A MarketingChannel linked to the real Channel being displayed, if one
+ * exists — see specs/core/marketing-presence.md §11. Only the two facts
+ * this table needs.
+ */
+export interface LinkedMarketingChannel {
+  supportsPublishing: boolean
+}
+
+/**
+ * Resolves capability for a real, technical Channel — spec §11's first two
+ * table rows. A linked MarketingChannel's `supports_publishing` flag always
+ * wins over the global type-only guess, since it is company-specific truth;
+ * absent a link, the existing global lookup remains the correct fallback
+ * (Milestone 11 Phase 7 — this is a refinement, not a replacement).
+ */
+export function resolveChannelCapability(
+  channelType: string,
+  linkedMarketingChannel?: LinkedMarketingChannel | null,
+): ChannelCapability {
+  if (linkedMarketingChannel) {
+    return linkedMarketingChannel.supportsPublishing ? 'connected' : 'draft_only'
+  }
+
+  return channelCapability(channelType)
+}
+
+/**
+ * MarketingChannelType values with a corresponding Channel type today —
+ * mirrors App\Enums\MarketingChannelType::hasChannelEquivalent() (email,
+ * instagram, facebook, linkedin, x). Kept in sync manually, the same way
+ * lib/marketingChannelTypes.ts already mirrors that enum's full value set.
+ */
+const MARKETING_TYPES_WITH_CHANNEL_EQUIVALENT = ['email', 'instagram', 'facebook', 'linkedin', 'x']
+
+/**
+ * Resolves capability for a declared MarketingChannel with no linked Channel
+ * at all — spec §11's last two table rows ("Not configured" vs. "Coming
+ * later"), which turn on whether the declared type could ever map to a real
+ * Channel, not on any company-specific data.
+ */
+export function resolveDeclaredChannelCapability(marketingChannelType: string): ChannelCapability {
+  return MARKETING_TYPES_WITH_CHANNEL_EQUIVALENT.includes(marketingChannelType) ? 'not_configured' : 'coming_later'
+}

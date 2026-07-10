@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\ContentAsset;
 use App\Models\Decision;
+use App\Models\MarketingChannel;
 use App\Models\Opportunity;
 use App\Models\Recommendation;
 use App\Models\User;
@@ -108,6 +109,76 @@ class RecommendationControllerTest extends TestCase
             );
     }
 
+    public function test_show_includes_channel_mix_with_a_supporting_channel(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+
+        $channel = Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'email',
+            'name' => 'Email',
+            'is_active' => true,
+        ]);
+
+        MarketingChannel::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'channel_id' => $channel->id,
+            'type' => 'email',
+            'display_name' => 'Acme Newsletter',
+            'status' => 'active',
+            'importance' => 'secondary',
+            'objective' => ['awareness'],
+        ]);
+
+        $rec = $this->pendingRecommendation($company, [$channel->id]);
+
+        $this->actingAs($user)
+            ->get("/app/recommendations/{$rec->id}")
+            ->assertInertia(fn ($page) => $page
+                ->where('channel_mix.supporting.0.name', 'Acme Newsletter')
+                ->where('channel_mix.primary', [])
+            );
+    }
+
+    public function test_show_includes_declared_draft_only_channel_in_mix(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+
+        MarketingChannel::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'print',
+            'display_name' => 'Local Paper Ad',
+            'status' => 'active',
+            'objective' => ['awareness'],
+        ]);
+
+        $rec = $this->pendingRecommendation($company);
+
+        $this->actingAs($user)
+            ->get("/app/recommendations/{$rec->id}")
+            ->assertInertia(fn ($page) => $page->where('channel_mix.draft_only.0.name', 'Local Paper Ad'));
+    }
+
+    public function test_show_channel_mix_never_leaks_another_companys_marketing_channels(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $other = Company::withoutGlobalScopes()->create(['name' => 'Other', 'slug' => 'other-mc']);
+
+        MarketingChannel::withoutGlobalScopes()->create([
+            'company_id' => $other->id,
+            'type' => 'print',
+            'display_name' => "Other Co's Print Ad",
+            'status' => 'active',
+            'objective' => ['awareness'],
+        ]);
+
+        $rec = $this->pendingRecommendation($company);
+
+        $this->actingAs($user)
+            ->get("/app/recommendations/{$rec->id}")
+            ->assertInertia(fn ($page) => $page->where('channel_mix.draft_only', []));
+    }
+
     public function test_show_returns_404_for_other_company_recommendation(): void
     {
         [$user] = $this->userWithCompany();
@@ -205,7 +276,8 @@ class RecommendationControllerTest extends TestCase
         return [$user, $company];
     }
 
-    private function pendingRecommendation(Company $company): Recommendation
+    /** @param list<string> $channelIds */
+    private function pendingRecommendation(Company $company, array $channelIds = []): Recommendation
     {
         $opportunity = Opportunity::withoutGlobalScopes()->create([
             'company_id' => $company->id,
@@ -225,7 +297,7 @@ class RecommendationControllerTest extends TestCase
             'company_id' => $company->id,
             'opportunity_id' => $opportunity->id,
             'campaign_type' => 'featured_item',
-            'channel_ids' => [],
+            'channel_ids' => $channelIds,
             'rationale' => ['why_now' => 'Good timing'],
             'expected_impact' => ['reach' => '1000'],
             'status' => 'recommended',

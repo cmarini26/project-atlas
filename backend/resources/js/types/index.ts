@@ -85,7 +85,34 @@ export interface ContentAsset {
     title: string | null
     status: string
     metadata: Record<string, unknown>
-    channel?: { type: string } | null
+    channel?: { type: string; marketing_channel?: { supports_publishing: boolean } | null } | null
+}
+
+// One entry in a Recommendation's channel mix (RecommendationController::show())
+export interface ExecutableChannelMixEntry {
+    type: string
+    name: string
+    marketing_channel: { supports_publishing: boolean } | null
+}
+
+export interface DraftOnlyChannelMixEntry {
+    type: string
+    name: string
+}
+
+export interface UnavailableChannelMixEntry {
+    type: string
+    name: string
+    reason: 'inactive' | 'planned'
+}
+
+// Channel mix as returned by RecommendationController::show() — see
+// Milestone 11 Phase 7 (docs/reviews/Milestone-11-Phase-7-Review.md)
+export interface ChannelMix {
+    primary: ExecutableChannelMixEntry[]
+    supporting: ExecutableChannelMixEntry[]
+    draft_only: DraftOnlyChannelMixEntry[]
+    unavailable: UnavailableChannelMixEntry[]
 }
 
 export interface Campaign {

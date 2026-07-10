@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { useForm } from '@inertiajs/vue3'
 import ConfirmDialog from '@/Components/UI/ConfirmDialog.vue'
-import { CAPABILITY_LABELS, channelCapability, channelLabel } from '@/lib/channelCapability'
+import { CAPABILITY_LABELS, channelLabel, resolveChannelCapability } from '@/lib/channelCapability'
 import type { ContentAsset } from '@/types'
 
 const props = defineProps<{
@@ -47,7 +47,10 @@ const approvalEffects = computed(() =>
     }
 
     const label = channelLabel(channelType)
-    const capabilityNote = CAPABILITY_LABELS[channelCapability(channelType)]
+    const linkedMarketingChannel = asset.channel?.marketing_channel
+      ? { supportsPublishing: asset.channel.marketing_channel.supports_publishing }
+      : null
+    const capabilityNote = CAPABILITY_LABELS[resolveChannelCapability(channelType, linkedMarketingChannel)]
 
     return `Queue the ${type}${title} for ${label} — ${capabilityNote}: logged internally, not yet sent live.`
   }),

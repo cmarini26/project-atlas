@@ -4,11 +4,12 @@ import { Head, useForm, Link } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import RationaleCard from '@/Components/Recommendations/RationaleCard.vue'
 import ImpactCard from '@/Components/Recommendations/ImpactCard.vue'
+import ChannelMixCard from '@/Components/Recommendations/ChannelMixCard.vue'
 import ContentPreview from '@/Components/Recommendations/ContentPreview.vue'
 import ContentEditor from '@/Components/Recommendations/ContentEditor.vue'
 import ApproveActions from '@/Components/Recommendations/ApproveActions.vue'
 import Badge from '@/Components/UI/Badge.vue'
-import type { Recommendation, DecisionDetail, ContentAsset } from '@/types'
+import type { Recommendation, DecisionDetail, ContentAsset, ChannelMix } from '@/types'
 
 // Persistent layout: the sidebar/toast shell survives Inertia visits.
 defineOptions({ layout: AppLayout })
@@ -16,6 +17,7 @@ defineOptions({ layout: AppLayout })
 const props = defineProps<{
   recommendation: Recommendation
   decision: DecisionDetail | null
+  channel_mix: ChannelMix
   content_assets: ContentAsset[]
 }>()
 
@@ -98,6 +100,11 @@ function saveEdit(payload: { title: string; body: string }): void {
     <section v-if="Object.keys(recommendation.rationale_display ?? {}).length > 0" class="mb-6">
       <h2 class="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide mb-3">Why Atlas recommends this</h2>
       <RationaleCard :rationale-display="recommendation.rationale_display" />
+    </section>
+
+    <!-- Channel mix: the campaign as a coordinated marketing plan -->
+    <section class="mb-6">
+      <ChannelMixCard :channel-mix="channel_mix" />
     </section>
 
     <!-- Expected impact -->

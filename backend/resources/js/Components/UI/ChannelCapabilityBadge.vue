@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import Badge from '@/Components/UI/Badge.vue'
-import { CAPABILITY_DESCRIPTIONS, CAPABILITY_LABELS, channelCapability } from '@/lib/channelCapability'
+import { CAPABILITY_DESCRIPTIONS, CAPABILITY_LABELS, resolveChannelCapability } from '@/lib/channelCapability'
+import type { LinkedMarketingChannel } from '@/lib/channelCapability'
 
 const props = defineProps<{
   channelType: string
+  linkedMarketingChannel?: LinkedMarketingChannel | null
 }>()
 
-const capability = computed(() => channelCapability(props.channelType))
+const capability = computed(() => resolveChannelCapability(props.channelType, props.linkedMarketingChannel))
 
 const variant = computed(() => {
   switch (capability.value) {

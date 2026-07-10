@@ -6,6 +6,33 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 11 Phase 7 — Campaign & Recommendation UI] — 2026-07-10
+
+Implements Phase 7 only of [Milestone-11-Marketing-Presence.md](docs/plans/Milestone-11-Marketing-Presence.md). Details in [Milestone-11-Phase-7-Review.md](docs/reviews/Milestone-11-Phase-7-Review.md). No publishers, no OAuth, no analytics, no onboarding changes, no app redesign.
+
+### Added
+
+- `App\Services\Recommendation\ChannelMixPresenter` — assembles a Recommendation's "channel mix" (primary/supporting/draft-only/unavailable channels) fresh at display time from `Decision.channel_ids` and a company-scoped `MarketingChannel` query. Never treats a `MarketingChannel` as executable; never invents a `Channel` row.
+- `resources/js/Components/Recommendations/ChannelMixCard.vue` — renders the four buckets as one compact card on the Recommendation detail page, using the existing capability badge and card styling.
+- `resolveChannelCapability()` and `resolveDeclaredChannelCapability()` in `resources/js/lib/channelCapability.ts` — additive extensions implementing `specs/core/marketing-presence.md` §11's mapping table (linked `MarketingChannel.supports_publishing` overrides the global type-only guess for real Channels; a declared-but-unlinked type resolves to "Not configured" or "Coming later" depending on whether it has a `Channel` type equivalent).
+- `tests/Feature/Recommendation/ChannelMixPresenterTest.php` (11 tests), 3 new `RecommendationControllerTest` tests, and `ChannelMixCard.spec.ts` (6 Vitest tests).
+
+### Changed
+
+- `App\Http\Controllers\App\RecommendationController::show()` — now passes a `channel_mix` prop and enriches each content asset's `channel` with its linked `MarketingChannel`'s `supports_publishing` flag (when one exists).
+- `resources/js/Components/UI/ChannelCapabilityBadge.vue` — gained an optional `linkedMarketingChannel` prop; existing usages without it are unaffected.
+- `resources/js/Components/Recommendations/ApproveActions.vue` — its per-content-asset confirmation line now uses `resolveChannelCapability()` instead of the bare global lookup, per the plan's explicit mention of this file.
+- `resources/js/types/index.ts` — added `ChannelMix`/`ExecutableChannelMixEntry`/`DraftOnlyChannelMixEntry`/`UnavailableChannelMixEntry`; `ContentAsset.channel` gained an optional `marketing_channel` field.
+
+### Notes
+
+- Only `Recommendations/Show.vue` and `ApproveActions.vue` were touched, not `Campaigns/Show.vue`/`Publishing.vue`/`Dashboard.vue` as the plan document's Phase 7 section lists — the live task's ask was scoped to the Recommendation detail page, and the capability-badge extension is purely additive so untouched pages keep working unchanged.
+- The channel mix is recomputed at display time rather than persisting Phase 6's `MarketingChannelSelection` — no `Decision`/`Recommendation`/`Campaign` schema change, and the picture shown always reflects current Settings state rather than a stale snapshot from Decision-commit time.
+- No new AI prompt work — "why these channels were chosen" is already covered by the existing `why_channel` rationale field; "why excluded"/"why draft-only is still valuable" are deterministic, hand-written copy.
+- All pre-existing tests (826 PHP, 18 Vitest) pass unmodified, including every approval-workflow test — no regression.
+
+---
+
 ## [Milestone 11 Phase 6 — Opportunity and Channel Selection Integration] — 2026-07-09
 
 Implements Phase 6 only of [Milestone-11-Marketing-Presence.md](docs/plans/Milestone-11-Marketing-Presence.md). Details in [Milestone-11-Phase-6-Review.md](docs/reviews/Milestone-11-Phase-6-Review.md). No Opportunity detection changes, no publishers, no OAuth, no Settings UI, no external publishing, no analytics ingestion, no onboarding changes.

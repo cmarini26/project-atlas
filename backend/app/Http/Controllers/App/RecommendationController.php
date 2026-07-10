@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\ContentAsset;
+use App\Models\MarketingChannel;
 use App\Models\Recommendation;
 use App\Models\User;
 use App\Services\Recommendation\ApprovalService;
+use App\Services\Recommendation\ChannelMixPresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -16,7 +18,10 @@ use Inertia\Response;
 
 class RecommendationController extends Controller
 {
-    public function __construct(private readonly ApprovalService $approvalService) {}
+    public function __construct(
+        private readonly ApprovalService $approvalService,
+        private readonly ChannelMixPresenter $channelMixPresenter,
+    ) {}
 
     public function index(Request $request): Response
     {
@@ -55,6 +60,12 @@ class RecommendationController extends Controller
 
         $contentAssets = $recommendation->campaign !== null ? $recommendation->campaign->contentAssets : collect();
 
+        $linkedMarketingChannelsByChannelId = MarketingChannel::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->whereNotNull('channel_id')
+            ->get()
+            ->keyBy('channel_id');
+
         return Inertia::render('App/Recommendations/Show', [
             'recommendation' => $this->formatRecommendation($recommendation),
             'decision' => $recommendation->decision ? [
@@ -70,15 +81,25 @@ class RecommendationController extends Controller
                 'campaign_type' => $recommendation->campaign->campaign_type,
                 'status' => $recommendation->campaign->status,
             ] : null,
-            'content_assets' => $contentAssets->map(fn (ContentAsset $a) => [
-                'id' => $a->id,
-                'type' => $a->type,
-                'body' => $a->body,
-                'title' => $a->title,
-                'status' => $a->status,
-                'metadata' => $a->metadata ?? [],
-                'channel' => $a->channel ? ['type' => $a->channel->type] : null,
-            ])->values()->all(),
+            'channel_mix' => $this->channelMixPresenter->present($company, $recommendation->decision),
+            'content_assets' => $contentAssets->map(function (ContentAsset $a) use ($linkedMarketingChannelsByChannelId) {
+                $linked = $a->channel !== null ? $linkedMarketingChannelsByChannelId->get($a->channel->id) : null;
+
+                return [
+                    'id' => $a->id,
+                    'type' => $a->type,
+                    'body' => $a->body,
+                    'title' => $a->title,
+                    'status' => $a->status,
+                    'metadata' => $a->metadata ?? [],
+                    'channel' => $a->channel ? [
+                        'type' => $a->channel->type,
+                        'marketing_channel' => $linked !== null
+                            ? ['supports_publishing' => (bool) $linked->supports_publishing]
+                            : null,
+                    ] : null,
+                ];
+            })->values()->all(),
         ]);
     }
 
