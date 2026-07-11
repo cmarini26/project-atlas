@@ -124,6 +124,31 @@ class OpportunityDetectionAnalystTest extends TestCase
         $this->assertSame(0, $candidates->first()->timingScore);
     }
 
+    public function test_invalid_ai_subject_references_are_sanitized_to_null(): void
+    {
+        $this->fake->queueResponse(json_encode([
+            'opportunities' => [[
+                'type' => 'featured_item',
+                'subject_type' => 'product',
+                'subject_id' => 'Uncanny X-Men #60 CGC 9.6 1st App Sauron',
+                'title' => 'Spotlight a high-interest key issue',
+                'description' => 'This key issue looks like a strong candidate for promotion.',
+                'relevance_score' => 74,
+                'timing_score' => 71,
+                'confidence_score' => 70,
+                'urgency_score' => 40,
+            ]],
+        ]));
+
+        $brain = $this->makeBrain();
+        $candidate = $this->analyst->analyze($this->company, $brain)->first();
+
+        $this->assertNotNull($candidate);
+        $this->assertSame('featured_item', $candidate->type);
+        $this->assertNull($candidate->subjectType);
+        $this->assertNull($candidate->subjectId);
+    }
+
     private function makeBrain(): BusinessBrain
     {
         return new BusinessBrain(

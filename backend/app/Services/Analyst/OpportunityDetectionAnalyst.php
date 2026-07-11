@@ -10,6 +10,7 @@ use App\Models\Company;
 use App\Services\Analyst\Contracts\Analyst;
 use App\Services\Opportunity\OpportunityCandidate;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 class OpportunityDetectionAnalyst implements Analyst
 {
@@ -42,19 +43,23 @@ class OpportunityDetectionAnalyst implements Analyst
 
         return collect($raw)
             ->filter(fn (array $item): bool => $this->isValid($item))
-            ->map(fn (array $item): OpportunityCandidate => new OpportunityCandidate(
-                type: (string) $item['type'],
-                subjectType: isset($item['subject_type']) ? (string) $item['subject_type'] : null,
-                subjectId: isset($item['subject_id']) ? (string) $item['subject_id'] : null,
-                title: (string) $item['title'],
-                description: (string) $item['description'],
-                expiresAt: isset($item['expires_at']) ? (string) $item['expires_at'] : null,
-                relevanceScore: min(100, max(0, (int) ($item['relevance_score'] ?? 0))),
-                timingScore: min(100, max(0, (int) ($item['timing_score'] ?? 0))),
-                confidenceScore: min(100, max(0, (int) ($item['confidence_score'] ?? 0))),
-                urgencyScore: min(100, max(0, (int) ($item['urgency_score'] ?? 0))),
-                aiDetected: true,
-            ))
+            ->map(function (array $item): OpportunityCandidate {
+                ['subjectType' => $subjectType, 'subjectId' => $subjectId] = $this->normalizeSubjectReference($item);
+
+                return new OpportunityCandidate(
+                    type: (string) $item['type'],
+                    subjectType: $subjectType,
+                    subjectId: $subjectId,
+                    title: (string) $item['title'],
+                    description: (string) $item['description'],
+                    expiresAt: isset($item['expires_at']) ? (string) $item['expires_at'] : null,
+                    relevanceScore: min(100, max(0, (int) ($item['relevance_score'] ?? 0))),
+                    timingScore: min(100, max(0, (int) ($item['timing_score'] ?? 0))),
+                    confidenceScore: min(100, max(0, (int) ($item['confidence_score'] ?? 0))),
+                    urgencyScore: min(100, max(0, (int) ($item['urgency_score'] ?? 0))),
+                    aiDetected: true,
+                );
+            })
             ->values();
     }
 
@@ -68,5 +73,33 @@ class OpportunityDetectionAnalyst implements Analyst
             && $item['type'] !== ''
             && $item['title'] !== ''
             && $item['description'] !== '';
+    }
+
+    /**
+     * Atlas downstream systems only understand internal ULID-backed subject references.
+     * AI responses often contain external labels like "product" or raw titles instead.
+     * Treat unsupported/non-ULID subject references as descriptive context, not foreign keys.
+     *
+     * @param  array<string, mixed>  $item
+     * @return array{subjectType: ?string, subjectId: ?string}
+     */
+    private function normalizeSubjectReference(array $item): array
+    {
+        $subjectType = isset($item['subject_type']) ? trim((string) $item['subject_type']) : null;
+        $subjectId = isset($item['subject_id']) ? trim((string) $item['subject_id']) : null;
+
+        if ($subjectType === '' || $subjectId === '' || $subjectType === null || $subjectId === null) {
+            return ['subjectType' => null, 'subjectId' => null];
+        }
+
+        if (! in_array($subjectType, ['company', 'catalog', 'catalog_item'], true)) {
+            return ['subjectType' => null, 'subjectId' => null];
+        }
+
+        if (! Str::isUlid($subjectId)) {
+            return ['subjectType' => null, 'subjectId' => null];
+        }
+
+        return ['subjectType' => $subjectType, 'subjectId' => $subjectId];
     }
 }

@@ -34,6 +34,19 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
+**Bugfix — DetectOpportunities crashing on AI-invented subject_id ✅ Complete**
+*Completed: 2026-07-11*
+
+Surfaced from a real queue log: after a first recommendation pipeline completed successfully, a later `DetectOpportunities` run failed repeatedly with `SQLSTATE[22001]: String data, right truncated: value too long for type character(26)`, retried 3 times, and left the affected company with facts extracted but 0 opportunities and 0 recommendations persisted.
+
+**Root cause:** `opportunities.subject_id` is a fixed `char(26)` column sized exactly for a ULID. All four rule-based detectors always supply a real Eloquent model's ULID, but `OpportunityDetectionAnalyst` (the AI-assisted detector) cast whatever `subject_type`/`subject_id` the LLM returned straight into an `OpportunityCandidate` with no validation — a hallucinated value (a product title, a SKU, free text) longer than 26 characters crashed the insert and failed the whole job. Non-deterministic by nature: safe on calls where the AI omitted or correctly matched a subject reference, crashing on calls where it invented one.
+
+**Fix:** `OpportunityDetectionAnalyst::normalizeSubjectReference()` now requires `subject_type` to be one of the known internal types (`company`, `catalog`, `catalog_item`) and `subject_id` to pass `Str::isUlid()` — either check failing sanitizes both to `null` rather than crashing the batch; the AI-detected opportunity still persists as a description-only candidate. `OpportunityDetectionPrompt` also gained explicit system-prompt guidance telling the model to prefer `null` over inventing a subject reference.
+
+One new regression test (`OpportunityDetectionAnalystTest::test_invalid_ai_subject_references_are_sanitized_to_null`) reproduces an AI response with a non-ULID, over-length `subject_id` and confirms it's sanitized to `null`. All 53 Opportunity-suite tests passing.
+
+**Previous milestone:**
+
 **Bugfix — Marketing Presence "Add channel" got stuck on "Adding…" ✅ Complete**
 *Completed: 2026-07-11*
 

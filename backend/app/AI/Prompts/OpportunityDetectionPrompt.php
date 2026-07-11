@@ -48,6 +48,9 @@ Rules:
 - Confidence scores for AI-detected opportunities must not exceed 75
 - Return an empty array if you find no additional opportunities worth suggesting
 - Each opportunity must have a clear, specific description grounded in the provided context
+- Only set subject_type/subject_id when the exact Atlas internal entity reference is explicitly provided in the prompt context
+- Never invent subject IDs, URLs, product labels, titles, SKUs, or external identifiers as subject_id
+- If you are not certain of an exact internal Atlas entity reference, set subject_type and subject_id to null
 
 Respond with valid JSON only. No markdown. No explanation.
 SYSTEM;

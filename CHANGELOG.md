@@ -6,6 +6,21 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Bugfix — DetectOpportunities crashing on AI-invented subject_id] — 2026-07-11
+
+Fixed a repeating queue failure surfaced after Instagram Observation testing: `DetectOpportunities` failed on retry after retry with `SQLSTATE[22001]: String data, right truncated: value too long for type character(26)`, silently leaving affected companies with facts extracted but zero opportunities/recommendations persisted.
+
+### Fixed
+
+- `app/Services/Analyst/OpportunityDetectionAnalyst.php` — the AI-assisted detector cast whatever `subject_type`/`subject_id` the LLM returned directly into an `OpportunityCandidate` with no validation. `opportunities.subject_id` is a fixed `char(26)` column sized for a ULID; every rule-based detector always supplies a real Eloquent model's ULID, but the AI analyst had no such guarantee — a hallucinated label (a product title, a SKU, a free-text description) longer than 26 characters crashed the insert and failed the whole job. Added `normalizeSubjectReference()`: `subject_type` must be one of the known internal types (`company`, `catalog`, `catalog_item`) and `subject_id` must pass `Str::isUlid()`, otherwise both are sanitized to `null` — the AI-detected opportunity still persists (with a description-only opportunity, no subject reference) instead of crashing the batch.
+- `app/AI/Prompts/OpportunityDetectionPrompt.php` — added explicit system-prompt instructions telling the model to only set `subject_type`/`subject_id` when it has an exact internal Atlas entity reference, and to prefer `null` over inventing one.
+
+### Added
+
+- `tests/Feature/Opportunity/OpportunityDetectionAnalystTest.php::test_invalid_ai_subject_references_are_sanitized_to_null` — reproduces an AI response with a non-ULID, over-length `subject_id` and confirms it's sanitized to `null` rather than reaching persistence.
+
+---
+
 ## [Bugfix — Marketing Presence "Add channel" stuck on "Adding…"] — 2026-07-11
 
 Fixed a live bug reported during Instagram Observation testing. Frontend-only fix, no backend changes.
