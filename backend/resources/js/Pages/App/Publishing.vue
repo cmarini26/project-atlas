@@ -5,6 +5,7 @@ import Badge from '@/Components/UI/Badge.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
 import ChannelCapabilityBadge from '@/Components/UI/ChannelCapabilityBadge.vue'
 import { channelLabel } from '@/lib/channelCapability'
+import { PaperAirplaneIcon } from '@heroicons/vue/24/outline'
 
 // Persistent layout: the sidebar/toast shell survives Inertia visits.
 defineOptions({ layout: AppLayout })
@@ -66,7 +67,9 @@ function formatDate(date: string | null): string {
       v-if="executions.data.length === 0"
       title="No publishing activity yet"
       description="Simulated publishing activity appears here once campaigns are approved and running."
-    />
+    >
+      <template #icon><PaperAirplaneIcon class="size-6" /></template>
+    </EmptyState>
 
     <div v-else>
       <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl divide-y divide-[var(--color-border)] mb-4">

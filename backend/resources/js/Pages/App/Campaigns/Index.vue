@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
+import { MegaphoneIcon } from '@heroicons/vue/24/outline'
 import type { Campaign } from '@/types'
 
 // Persistent layout: the sidebar/toast shell survives Inertia visits.
@@ -55,7 +56,10 @@ function formatDate(date: string | null): string {
       v-if="campaigns.data.length === 0"
       title="No campaigns yet"
       description="Campaigns are created when you approve a recommendation."
-    />
+      variant="accent"
+    >
+      <template #icon><MegaphoneIcon class="size-6" /></template>
+    </EmptyState>
 
     <div v-else>
       <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl divide-y divide-[var(--color-border)] mb-4">

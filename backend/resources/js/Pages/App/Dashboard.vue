@@ -7,6 +7,7 @@ import RecommendationPrompt from '@/Components/Dashboard/RecommendationPrompt.vu
 import EmptyState from '@/Components/UI/EmptyState.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import ChannelCapabilityBadge from '@/Components/UI/ChannelCapabilityBadge.vue'
+import { RectangleStackIcon, PaperAirplaneIcon } from '@heroicons/vue/24/outline'
 import { channelLabel } from '@/lib/channelCapability'
 import type { Recommendation, Campaign } from '@/types'
 
@@ -147,7 +148,9 @@ function formatDate(date: string | null): string {
           </div>
         </div>
 
-        <EmptyState v-else title="No campaigns yet" description="Campaigns appear here after you approve a recommendation." />
+        <EmptyState v-else title="No campaigns yet" description="Campaigns appear here after you approve a recommendation.">
+          <template #icon><RectangleStackIcon class="size-6" /></template>
+        </EmptyState>
       </div>
     </div>
 
@@ -181,7 +184,9 @@ function formatDate(date: string | null): string {
         </div>
       </div>
 
-      <EmptyState v-else title="No activity yet" description="Simulated publishing activity appears here once campaigns run — no live channels are connected yet." />
+      <EmptyState v-else title="No activity yet" description="Simulated publishing activity appears here once campaigns run — no live channels are connected yet.">
+        <template #icon><PaperAirplaneIcon class="size-6" /></template>
+      </EmptyState>
     </div>
   </div>
 </template>

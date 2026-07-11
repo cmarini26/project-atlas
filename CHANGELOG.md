@@ -6,6 +6,24 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [UI Polish Phase 1 — Visual refresh] — 2026-07-11
+
+First of three approved UI improvements (visual refresh → page descriptions → first-time walkthrough) after user feedback that the app "looks very basic." This phase fixes the flattest part of the UI: every empty list in the app rendered the same gray 3-dot ellipsis icon regardless of context.
+
+### Added
+
+- `resources/css/app.css` — `--color-warning-{surface,border,text}` and `--color-info-{surface,border,text}` token pairs, formalizing colors `Badge.vue` already used ad hoc (amber). The indigo accent scale is untouched — the single-accent restraint is a deliberate design choice, not an oversight.
+- `resources/js/Components/UI/Badge.vue` — new `info` variant, wired to the new tokens.
+- `resources/js/Components/UI/EmptyState.vue` — new optional `variant?: 'default' | 'accent' | 'success' | 'warning' | 'info'` prop that recolors the icon circle. Purely additive — existing `title`/`description`/`icon`/`action` contract unchanged, so every existing call site keeps its current look until it opts in.
+- `resources/js/Components/UI/EmptyState.spec.ts`, `Badge.spec.ts` (new, 12 tests) — cover the new `variant` prop (including a regression guard that the default variant preserves the pre-existing look) and the new `info` badge variant.
+
+### Changed
+
+- 13 `EmptyState` call sites across `Dashboard.vue`, `Recommendations/Index.vue`, `Opportunities.vue`, `Brain.vue` (×3: facts/knowledge/observations), `Campaigns/Index.vue`, `Campaigns/Show.vue`, `Publishing.vue`, `Analytics/Index.vue`, `Analytics/Show.vue`, `Learning.vue` — each now passes a context-appropriate Heroicon (`@heroicons/vue/24/outline`, already an installed dependency previously used only on the public marketing site, never inside the authenticated app) via the existing `icon` slot, plus a matching `variant` where it's not `default`.
+- `Recommendations/Index.vue` — replaced one hand-inlined sparkle `<svg>` with the real `LightBulbIcon` for consistency with the rest of the app.
+
+---
+
 ## [Bugfix — DetectOpportunities crashing on AI-invented subject_id] — 2026-07-11
 
 Fixed a repeating queue failure surfaced after Instagram Observation testing: `DetectOpportunities` failed on retry after retry with `SQLSTATE[22001]: String data, right truncated: value too long for type character(26)`, silently leaving affected companies with facts extracted but zero opportunities/recommendations persisted.

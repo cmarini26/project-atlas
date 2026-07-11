@@ -2,6 +2,7 @@
 import { Head, Link } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
+import { ChartBarIcon } from '@heroicons/vue/24/outline'
 import type { Campaign, CampaignKpiSnapshot, ExecutionMetric } from '@/types'
 
 // Persistent layout: the sidebar/toast shell survives Inertia visits.
@@ -108,7 +109,10 @@ function formatDate(date: string | null): string {
         v-if="metrics.length === 0"
         title="No channel data yet"
         description="Metrics appear here as content is published and measured."
-      />
+        variant="info"
+      >
+        <template #icon><ChartBarIcon class="size-6" /></template>
+      </EmptyState>
 
       <div v-else class="space-y-3">
         <div

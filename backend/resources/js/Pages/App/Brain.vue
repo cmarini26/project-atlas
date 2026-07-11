@@ -3,6 +3,7 @@ import { Head } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
+import { CpuChipIcon, BookOpenIcon, EyeIcon } from '@heroicons/vue/24/outline'
 import type { DigitalTwin, Fact, Knowledge, BrainObservation } from '@/types'
 
 // Persistent layout: the sidebar/toast shell survives Inertia visits.
@@ -69,7 +70,9 @@ function formatDate(date: string | null): string {
           v-if="facts.length === 0"
           title="No facts yet"
           description="Facts appear as Atlas learns about your business."
-        />
+        >
+          <template #icon><CpuChipIcon class="size-6" /></template>
+        </EmptyState>
 
         <div v-else class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl divide-y divide-[var(--color-border)]">
           <div
@@ -103,7 +106,9 @@ function formatDate(date: string | null): string {
           v-if="knowledge.length === 0"
           title="No knowledge yet"
           description="Knowledge appears as Atlas synthesizes what it learns."
-        />
+        >
+          <template #icon><BookOpenIcon class="size-6" /></template>
+        </EmptyState>
 
         <div v-else class="space-y-3">
           <div
@@ -131,7 +136,9 @@ function formatDate(date: string | null): string {
         v-if="recent_observations.length === 0"
         title="No observations yet"
         description="Observations appear as Atlas monitors your business activity."
-      />
+      >
+        <template #icon><EyeIcon class="size-6" /></template>
+      </EmptyState>
 
       <div v-else class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl divide-y divide-[var(--color-border)]">
         <div

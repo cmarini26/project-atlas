@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 963 tests (960 passing, 2 Redis + 1 backup-drill skipped where the local environment can't support it) + 37 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Marketing Presence "Add channel" stuck-on-adding bugfix, 3 new Vitest tests. |
+| Tests             | ✅ Strong | 964 tests (961 passing, 3 skipped where the local environment can't support it) + 49 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: UI visual refresh Phase 1 (`EmptyState`/`Badge` variants), 12 new Vitest tests. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,17 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**UI Polish Phase 1 — Visual refresh (color + icons) ✅ Complete**
+*Completed: 2026-07-11*
+
+First of three approved UI improvements (visual refresh → page descriptions → first-time walkthrough), requested after user feedback that the app "looks very basic." This phase targets the flattest part of the UI: `EmptyState.vue` was reused identically (same gray 3-dot ellipsis icon) across every empty list in the app — Dashboard, Recommendations, Opportunities, Business Brain (×3), Campaigns (index + show), Publishing, Analytics (index + show), and Learning, 13 call sites total.
+
+**What changed:** `resources/css/app.css` gained `--color-warning-*`/`--color-info-*` token pairs (formalizing colors `Badge.vue` already used ad hoc) — the existing single-indigo-accent restraint was deliberately left untouched. `Badge.vue` gained an `info` variant. `EmptyState.vue` gained an additive, optional `variant` prop (`default | accent | success | warning | info`) that recolors its icon circle; its existing `title`/`description`/`icon`/`action` contract is unchanged. Each of the 13 empty-state call sites now passes a context-appropriate Heroicon (`@heroicons/vue`, already an installed dependency previously used only on the public marketing site) plus a matching variant — e.g. `LightBulbIcon`/`accent` for "no recommendations," `MagnifyingGlassIcon`/`info` for "no open opportunities," `AcademicCapIcon`/`success` for "no learnings yet." `Recommendations/Index.vue`'s one hand-inlined sparkle SVG was replaced with the real `LightBulbIcon` for consistency.
+
+12 new Vitest tests (`EmptyState.spec.ts`, `Badge.spec.ts`) covering the new `variant` prop (including that the default variant preserves the pre-existing look) and the new `info` badge variant. 964 tests total on the PHP side (unaffected — no backend changes this phase), 49 Vitest tests (up from 37). PHPStan level 8 — 0 errors. Pint clean. Build green.
+
+**Previous milestone:**
 
 **Bugfix — DetectOpportunities crashing on AI-invented subject_id ✅ Complete**
 *Completed: 2026-07-11*

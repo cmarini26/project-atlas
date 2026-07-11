@@ -45,6 +45,12 @@
     --color-danger-surface: #fff1f2;
     --color-danger-border: #fecdd3;
     --color-danger-text: #9f1239;
+    --color-warning-surface: #fffbeb;
+    --color-warning-border: #fde68a;
+    --color-warning-text: #92400e;
+    --color-info-surface: #eff6ff;
+    --color-info-border: #bfdbfe;
+    --color-info-text: #1e40af;
 
     /* ── Transitions ──────────────────────────────────────────── */
     --duration-fast: 100ms;

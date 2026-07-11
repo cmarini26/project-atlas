@@ -4,6 +4,7 @@ import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import ScoreBar from '@/Components/UI/ScoreBar.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
+import { MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
 import type { Opportunity } from '@/types'
 
 // Persistent layout: the sidebar/toast shell survives Inertia visits.
@@ -67,7 +68,10 @@ const urgencyClass: Record<string, string> = {
       v-if="opportunities.length === 0"
       title="No open opportunities"
       description="Atlas is scanning your business for growth opportunities. Check back soon."
-    />
+      variant="info"
+    >
+      <template #icon><MagnifyingGlassIcon class="size-6" /></template>
+    </EmptyState>
 
     <div v-else class="space-y-3">
       <div

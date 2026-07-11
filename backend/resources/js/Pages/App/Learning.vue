@@ -3,6 +3,7 @@ import { Head } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
+import { AcademicCapIcon } from '@heroicons/vue/24/outline'
 import type { Learning, AppliedEffect } from '@/types'
 
 // Persistent layout: the sidebar/toast shell survives Inertia visits.
@@ -56,7 +57,10 @@ function formatDate(date: string | null): string {
       v-if="learnings.data.length === 0"
       title="No learnings yet"
       description="Atlas records what it learns after each campaign. Approve your first recommendation to get started."
-    />
+      variant="success"
+    >
+      <template #icon><AcademicCapIcon class="size-6" /></template>
+    </EmptyState>
 
     <div v-else>
       <!-- Applied effects section -->

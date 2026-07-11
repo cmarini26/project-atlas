@@ -2,6 +2,7 @@
 import { Head, Link } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
+import { ChartBarIcon } from '@heroicons/vue/24/outline'
 import type { CampaignKpiSnapshot } from '@/types'
 
 // Persistent layout: the sidebar/toast shell survives Inertia visits.
@@ -58,7 +59,10 @@ function pct(value: number | undefined): string {
         v-if="campaign_snapshots.length === 0"
         title="No campaign results yet"
         description="Results appear here after campaigns complete."
-      />
+        variant="info"
+      >
+        <template #icon><ChartBarIcon class="size-6" /></template>
+      </EmptyState>
 
       <div v-else class="space-y-3">
         <div

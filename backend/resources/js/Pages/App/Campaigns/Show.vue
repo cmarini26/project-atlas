@@ -5,6 +5,7 @@ import Badge from '@/Components/UI/Badge.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
 import ChannelCapabilityBadge from '@/Components/UI/ChannelCapabilityBadge.vue'
 import { channelLabel } from '@/lib/channelCapability'
+import { ClockIcon } from '@heroicons/vue/24/outline'
 import type { Campaign, ContentAsset, Execution, CampaignKpiSnapshot } from '@/types'
 
 // Persistent layout: the sidebar/toast shell survives Inertia visits.
@@ -119,7 +120,9 @@ function formatDate(date: string | null): string {
         v-if="executions.length === 0"
         title="No publishing activity"
         description="Executions appear here as content is scheduled and processed (simulated — not yet sent to a live channel)."
-      />
+      >
+        <template #icon><ClockIcon class="size-6" /></template>
+      </EmptyState>
 
       <div v-else class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl divide-y divide-[var(--color-border)]">
         <div
