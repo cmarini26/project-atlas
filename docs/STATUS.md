@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 963 tests (960 passing, 2 Redis + 1 backup-drill skipped where the local environment can't support it) + 34 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Milestone 12 Phase 1 — Instagram Observation, 27 new PHP tests. |
+| Tests             | ✅ Strong | 963 tests (960 passing, 2 Redis + 1 backup-drill skipped where the local environment can't support it) + 37 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Marketing Presence "Add channel" stuck-on-adding bugfix, 3 new Vitest tests. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,19 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**Bugfix — Marketing Presence "Add channel" got stuck on "Adding…" ✅ Complete**
+*Completed: 2026-07-11*
+
+Reported live during Instagram Observation testing: adding a marketing-presence channel appeared to hang forever on "Adding…". Confirmed via a real headless-browser reproduction (not just a hunch) that the server-side request always succeeded — the row was created every time — but the page crashed while re-rendering afterward: `Uncaught TypeError: Cannot read properties of undefined (reading 'status')` in `resources/js/Pages/App/Settings/MarketingPresence/Index.vue`.
+
+**Root cause:** `rowState` (the per-row status/importance/objective edit state) was built once, at component mount, from the initial `channels` prop. When a channel was added, Inertia's redirect brought back an updated `channels` prop with the new row — but `rowState` was never updated, so the new row's `<select v-model="rowState[channel.id].status">` read `.status` off `undefined` and crashed the whole render. This bug was pre-existing (Milestone 11), unrelated to the new Instagram Integration work, and would have affected adding *any* channel type once at least one channel already existed.
+
+**Fix:** `rowState` is now populated reactively via a `watch` on `props.channels` that adds an entry for any new row without touching entries that already exist — so in-progress edits to existing rows survive a reload triggered by adding another channel.
+
+Added `resources/js/Pages/App/Settings/MarketingPresence/Index.spec.ts` (3 tests) — one reproduces the exact crash against the pre-fix code (verified by temporarily reverting the fix and confirming the test fails with the same error message the user hit), one confirms the new row renders cleanly, and one confirms unsaved edits to existing rows survive. 37 Vitest tests total, all passing. No PHP/backend changes.
+
+**Previous milestone:**
 
 **Milestone 12 Phase 1 — Instagram Observation (Beta) ✅ Complete**
 *Completed: 2026-07-11*
@@ -802,6 +815,8 @@ All production-blocking items resolved. Remaining pre-production items:
 ---
 
 ## Last Updated
+
+**2026-07-11** — Fixed a live bug reported during Instagram Observation testing: adding a Marketing Presence channel got stuck on "Adding…" forever. Confirmed via headless-browser reproduction that the server-side request always succeeded (the row was created every time), but `resources/js/Pages/App/Settings/MarketingPresence/Index.vue` crashed while re-rendering afterward — `rowState` (per-row edit state) was only ever populated once at mount time, so a newly-added row's `<select v-model="rowState[channel.id].status">` read off `undefined` and threw, halting the render. Pre-existing bug from Milestone 11, unrelated to Instagram specifically — would affect adding any channel type once one already existed. Fixed with a `watch` on `props.channels` that adds missing rowState entries without clobbering in-progress edits to existing rows. 3 new Vitest tests, one of which reproduces the exact crash against the pre-fix code. 37 Vitest tests total, all passing. No backend changes. See [Index.spec.ts](../backend/resources/js/Pages/App/Settings/MarketingPresence/Index.spec.ts).
 
 **2026-07-11** — Milestone 12 Phase 1 (Instagram Observation, Beta) complete: Instagram is now Atlas's first observable Marketing Source alongside the website crawl. A new `InstagramConnector` reuses the existing `Connector`/`ConnectorRegistry` architecture to fetch a single current profile snapshot (account id, username, display name, profile picture, bio, website, follower/following counts) via the Instagram Graph API, given a company-entered access token (beta scope — no OAuth, no publishing, no historical import). The snapshot is recorded as an ordinary `Observation` and flows through the unchanged Observe → Understand → Decide loop — no separate AI pipeline. A new `InstagramAnalyst` maps the already-structured fields directly into Facts deterministically (no AI call), and `ProcessObservation` now resolves the right analyst via a new `AnalystRegistry` mirroring `ConnectorRegistry`'s pattern. Business Brain integration required zero code changes (`BusinessBrainService::assemble()` was already source-agnostic) and multi-channel recommendation reference was already correct and already tested (`DecisionEngineTest`, `MarketingChannelSelectorTest`) — both verified, neither modified. 27 new tests, including a real Postgres migration verification. 963 tests (960 passing, 3 skipped), PHPStan level 8 clean, Pint clean, build green.
 

@@ -6,6 +6,24 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Bugfix — Marketing Presence "Add channel" stuck on "Adding…"] — 2026-07-11
+
+Fixed a live bug reported during Instagram Observation testing. Frontend-only fix, no backend changes.
+
+### Fixed
+
+- `resources/js/Pages/App/Settings/MarketingPresence/Index.vue` — adding a channel left the "Add channel" button stuck on "Adding…" forever, even though the row was actually created successfully every time. Root cause: `rowState` (the per-row status/importance/objective edit state) was built once from the initial `channels` prop at component mount and never updated. When a channel was added, Inertia's redirect brought back an updated `channels` prop containing the new row, but `rowState` had no entry for it — the new row's `<select v-model="rowState[channel.id].status">` read `.status` off `undefined` and crashed the render. Confirmed via a real headless-browser reproduction (login → add channel → inspect console) that reproduced `Uncaught TypeError: Cannot read properties of undefined (reading 'status')` exactly. Fixed by replacing the one-time initialization with a `watch` on `props.channels` that adds an entry for any new row without touching rows that already exist, so unsaved edits to existing rows survive a reload triggered by adding another channel.
+
+### Added
+
+- `resources/js/Pages/App/Settings/MarketingPresence/Index.spec.ts` (3 tests) — one reproduces the exact crash against the pre-fix code (verified by temporarily reverting the fix and confirming the test fails with the same error), one confirms a newly-added row renders cleanly, one confirms unsaved edits to existing rows aren't clobbered.
+
+### Notes
+
+- This bug predates the Instagram Observation work (Milestone 11's Marketing Presence page) and is not specific to Instagram — it would have surfaced adding any channel type once at least one channel already existed. It was simply first noticed while testing the new Instagram integration.
+- Diagnosed with a real reproduction, not guesswork: a headless Chromium session logged into a real local test account confirmed the server request always succeeded (redirect 302, row created) while the page threw a render error immediately after.
+- 37 Vitest tests total, all passing. No PHP/backend files were touched; the full PHP suite (963 tests) and PHPStan/Pint remain unaffected and green.
+
 ## [Milestone 12 Phase 1 — Instagram Observation (Beta)] — 2026-07-11
 
 Instagram is now Atlas's first observable Marketing Source alongside the website crawl. Scoped strictly to the beta: profile observation only — no publishing, scheduling, Stories, DMs, ads, analytics dashboards, competitor analysis, multiple accounts, or other social networks.

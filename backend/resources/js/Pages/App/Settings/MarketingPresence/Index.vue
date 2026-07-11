@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { reactive, watch } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
@@ -73,13 +73,23 @@ function addChannel(): void {
 
 // ── Edit status / importance / objective (per row) ──────────────────────────
 
-const rowState = reactive<Record<string, { status: string; importance: string; objective: string[] }>>(
-  Object.fromEntries(
-    props.channels.map((channel) => [
-      channel.id,
-      { status: channel.status, importance: channel.importance, objective: [...channel.objective] },
-    ]),
-  ),
+const rowState = reactive<Record<string, { status: string; importance: string; objective: string[] }>>({})
+
+// Adding a channel (or any other Inertia reload of this page) brings back an
+// updated `channels` prop — including rows that weren't here at mount time.
+// Populate rowState for any new row without touching entries that already
+// exist, so unsaved edits to existing rows survive a reload triggered by a
+// different row's change.
+watch(
+  () => props.channels,
+  (channels) => {
+    for (const channel of channels) {
+      if (!(channel.id in rowState)) {
+        rowState[channel.id] = { status: channel.status, importance: channel.importance, objective: [...channel.objective] }
+      }
+    }
+  },
+  { immediate: true },
 )
 
 function saveStatus(channel: MarketingChannelData): void {
