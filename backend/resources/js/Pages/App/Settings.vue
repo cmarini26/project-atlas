@@ -3,6 +3,8 @@ import { ref } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
+import PageHeader from '@/Components/UI/PageHeader.vue'
+import { Cog6ToothIcon } from '@heroicons/vue/24/outline'
 
 // Persistent layout: the sidebar/toast shell survives Inertia visits.
 defineOptions({ layout: AppLayout })
@@ -89,7 +91,11 @@ function connectInstagram(): void {
 <template>
   <Head><title>Settings — Atlas</title></Head>
   <div class="max-w-2xl">
-    <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-6">Settings</h1>
+    <PageHeader
+      title="Settings"
+      description="Manage your company profile, integrations, and marketing presence."
+      :icon="Cog6ToothIcon"
+    />
 
     <!-- Company profile -->
     <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5 mb-6">

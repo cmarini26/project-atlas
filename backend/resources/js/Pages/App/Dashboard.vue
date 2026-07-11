@@ -6,8 +6,9 @@ import HealthCard from '@/Components/Dashboard/HealthCard.vue'
 import RecommendationPrompt from '@/Components/Dashboard/RecommendationPrompt.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
 import Badge from '@/Components/UI/Badge.vue'
+import PageHeader from '@/Components/UI/PageHeader.vue'
 import ChannelCapabilityBadge from '@/Components/UI/ChannelCapabilityBadge.vue'
-import { RectangleStackIcon, PaperAirplaneIcon } from '@heroicons/vue/24/outline'
+import { RectangleStackIcon, PaperAirplaneIcon, HomeIcon } from '@heroicons/vue/24/outline'
 import { channelLabel } from '@/lib/channelCapability'
 import type { Recommendation, Campaign } from '@/types'
 
@@ -81,17 +82,19 @@ function formatDate(date: string | null): string {
 <template>
   <Head><title>Overview — Atlas</title></Head>
   <div class="max-w-4xl">
-    <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-6">Overview</h1>
-
-    <!-- Pending recommendation prompt -->
-    <RecommendationPrompt
-      v-if="pending_recommendation"
-      :recommendation="pending_recommendation"
-      class="mb-6"
+    <PageHeader
+      title="Overview"
+      description="Your daily snapshot — see what needs a decision and how your brand twin is doing."
+      :icon="HomeIcon"
     />
 
+    <!-- Pending recommendation prompt -->
+    <div v-if="pending_recommendation" data-tour="recommendation-prompt">
+      <RecommendationPrompt :recommendation="pending_recommendation" class="mb-6" />
+    </div>
+
     <!-- Summary counts -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+    <div data-tour="summary-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
       <SummaryCard
         label="Pending"
         :value="counts.pending_recommendations"
@@ -114,7 +117,7 @@ function formatDate(date: string | null): string {
       />
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+    <div data-tour="health-card" class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
       <!-- Business Brain health -->
       <HealthCard
         :health="{
@@ -155,7 +158,7 @@ function formatDate(date: string | null): string {
     </div>
 
     <!-- Recent executions -->
-    <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5">
+    <div data-tour="recent-executions" class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-sm font-semibold text-[var(--color-text-primary)]">Recent Publishing Activity</h2>
         <Link href="/app/publishing" class="text-xs text-[var(--color-text-link)] hover:underline">View all</Link>

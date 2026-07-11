@@ -3,6 +3,7 @@ import { Head } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
+import PageHeader from '@/Components/UI/PageHeader.vue'
 import { CpuChipIcon, BookOpenIcon, EyeIcon } from '@heroicons/vue/24/outline'
 import type { DigitalTwin, Fact, Knowledge, BrainObservation } from '@/types'
 
@@ -37,7 +38,11 @@ function formatDate(date: string | null): string {
 <template>
   <Head><title>Business Brain — Atlas</title></Head>
   <div class="max-w-4xl">
-    <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-6">Business Brain</h1>
+    <PageHeader
+      title="Business Brain"
+      description="The facts and knowledge Atlas has learned about your business so far."
+      :icon="CpuChipIcon"
+    />
 
     <!-- Twin status -->
     <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5 mb-6">

@@ -3,6 +3,7 @@ import { Head } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
+import PageHeader from '@/Components/UI/PageHeader.vue'
 import ChannelCapabilityBadge from '@/Components/UI/ChannelCapabilityBadge.vue'
 import { channelLabel } from '@/lib/channelCapability'
 import { PaperAirplaneIcon } from '@heroicons/vue/24/outline'
@@ -58,10 +59,11 @@ function formatDate(date: string | null): string {
 <template>
   <Head><title>Publishing — Atlas</title></Head>
   <div class="max-w-3xl">
-    <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-2">Publishing Activity</h1>
-    <p class="text-sm text-[var(--color-text-muted)] mb-6">
-      Atlas doesn't publish to live external channels yet — every entry below is a simulated, internally logged send.
-    </p>
+    <PageHeader
+      title="Publishing Activity"
+      description="Atlas doesn't publish to live external channels yet — every entry below is a simulated, internally logged send."
+      :icon="PaperAirplaneIcon"
+    />
 
     <EmptyState
       v-if="executions.data.length === 0"

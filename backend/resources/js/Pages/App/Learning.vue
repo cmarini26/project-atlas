@@ -3,6 +3,7 @@ import { Head } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
+import PageHeader from '@/Components/UI/PageHeader.vue'
 import { AcademicCapIcon } from '@heroicons/vue/24/outline'
 import type { Learning, AppliedEffect } from '@/types'
 
@@ -50,8 +51,11 @@ function formatDate(date: string | null): string {
 <template>
   <Head><title>Learning — Atlas</title></Head>
   <div class="max-w-3xl">
-    <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-2">Learning</h1>
-    <p class="text-sm text-[var(--color-text-muted)] mb-6">How Atlas is improving its understanding of your business over time.</p>
+    <PageHeader
+      title="Learning"
+      description="How Atlas is improving its understanding of your business over time."
+      :icon="AcademicCapIcon"
+    />
 
     <EmptyState
       v-if="learnings.data.length === 0"

@@ -3,7 +3,9 @@ import { reactive, watch } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
+import PageHeader from '@/Components/UI/PageHeader.vue'
 import MarketingChannelCapabilityBadge from '@/Components/UI/MarketingChannelCapabilityBadge.vue'
+import { MegaphoneIcon } from '@heroicons/vue/24/outline'
 import { MARKETING_CHANNEL_TYPES, marketingChannelTypeLabel } from '@/lib/marketingChannelTypes'
 import type { MarketingChannelCapability } from '@/lib/marketingChannelCapability'
 
@@ -128,11 +130,11 @@ function reactivate(channel: MarketingChannelData): void {
   <div class="max-w-3xl">
     <Link href="/app/settings" class="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] mb-4 inline-block">← Settings</Link>
 
-    <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-1">Marketing Presence</h1>
-    <p class="text-sm text-[var(--color-text-muted)] mb-6">
-      Declaring a channel here means Atlas knows about it — not that Atlas can publish or read analytics there yet.
-      Those capabilities light up automatically once a real connection exists.
-    </p>
+    <PageHeader
+      title="Marketing Presence"
+      description="Declaring a channel here means Atlas knows about it — not that Atlas can publish or read analytics there yet. Those capabilities light up automatically once a real connection exists."
+      :icon="MegaphoneIcon"
+    />
 
     <!-- Add channel -->
     <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5 mb-6">

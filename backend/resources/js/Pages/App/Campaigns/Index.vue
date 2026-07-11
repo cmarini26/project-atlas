@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
+import PageHeader from '@/Components/UI/PageHeader.vue'
 import { MegaphoneIcon } from '@heroicons/vue/24/outline'
 import type { Campaign } from '@/types'
 
@@ -50,7 +51,11 @@ function formatDate(date: string | null): string {
 <template>
   <Head><title>Campaigns — Atlas</title></Head>
   <div class="max-w-3xl">
-    <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-6">Campaigns</h1>
+    <PageHeader
+      title="Campaigns"
+      description="Track every campaign from draft to completion in one place."
+      :icon="MegaphoneIcon"
+    />
 
     <EmptyState
       v-if="campaigns.data.length === 0"

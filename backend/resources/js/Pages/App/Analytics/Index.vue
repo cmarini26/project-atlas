@@ -2,6 +2,7 @@
 import { Head, Link } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
+import PageHeader from '@/Components/UI/PageHeader.vue'
 import { ChartBarIcon } from '@heroicons/vue/24/outline'
 import type { CampaignKpiSnapshot } from '@/types'
 
@@ -35,7 +36,11 @@ function pct(value: number | undefined): string {
 <template>
   <Head><title>Analytics — Atlas</title></Head>
   <div class="max-w-4xl">
-    <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-6">Analytics</h1>
+    <PageHeader
+      title="Analytics"
+      description="See how your published content is performing across channels."
+      :icon="ChartBarIcon"
+    />
 
     <!-- Recommendation KPIs -->
     <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5 mb-6">

@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 964 tests (961 passing, 3 skipped where the local environment can't support it) + 49 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: UI visual refresh Phase 1 (`EmptyState`/`Badge` variants), 12 new Vitest tests. |
+| Tests             | ✅ Strong | 964 tests (961 passing, 3 skipped where the local environment can't support it) + 53 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: UI Polish Phase 2 (`PageHeader.vue` + page descriptions), 4 new Vitest tests. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,19 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**UI Polish Phase 2 — Page descriptions ✅ Complete**
+*Completed: 2026-07-11*
+
+Second of three approved UI improvements. Every top-level app page except `MarketingPresence/Index.vue` rendered a bare `<h1>` with no explanation of what the page was for or what to do on it — no shared header component existed, so each page hand-rolled its own title markup with no room for description copy.
+
+**What changed:** New `resources/js/Components/UI/PageHeader.vue` (`title`, optional `description`, optional `icon`, an `actions` slot) reproduces `MarketingPresence/Index.vue`'s existing hand-rolled spacing so no page's vertical rhythm shifted. 9 pages migrated to it with a new one-sentence description and a matching Heroicon: Dashboard, Recommendations, Opportunities, Business Brain, Campaigns (index), Publishing, Analytics (index), Learning, Settings. `MarketingPresence/Index.vue` also migrated onto the shared component, deleting its now-redundant hand-rolled markup (copy preserved verbatim). `Campaigns/Show.vue` and `Analytics/Show.vue` were deliberately **not** migrated — direct inspection showed both already have a bespoke, richer header (back-link + status badge or subtitle) that `PageHeader`'s generic shape would have regressed; they weren't part of the "bare title" problem this phase targets.
+
+Also added 4 `data-tour="..."` attributes to `Dashboard.vue`'s recommendation-prompt, summary-cards, health-card, and recent-executions sections — stable anchors for Phase 3's walkthrough, added now to avoid touching `Dashboard.vue` a second time.
+
+4 new Vitest tests (`PageHeader.spec.ts`). 964 PHP tests unaffected (no backend changes this phase), 53 Vitest tests (up from 49). PHPStan level 8 — 0 errors. Pint clean. Build and `vue-tsc --noEmit` green.
+
+**Previous milestone:**
 
 **UI Polish Phase 1 — Visual refresh (color + icons) ✅ Complete**
 *Completed: 2026-07-11*

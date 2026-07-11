@@ -6,6 +6,27 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [UI Polish Phase 2 — Page descriptions] — 2026-07-11
+
+Second of three approved UI improvements. No shared page-header component existed — every top-level page hand-rolled its own bare `<h1>` with no description of what the page was for.
+
+### Added
+
+- `resources/js/Components/UI/PageHeader.vue` (new) — `title`, optional `description`, optional `icon` (rendered in an accent-tinted circle), and an `actions` slot. Reproduces `MarketingPresence/Index.vue`'s existing header spacing exactly.
+- `resources/js/Components/UI/PageHeader.spec.ts` (new, 4 tests) — title/description/icon/actions rendering.
+- `data-tour="..."` attributes on `Dashboard.vue`'s four main sections (recommendation prompt, summary cards, health card, recent executions) — stable anchors for the Phase 3 walkthrough, added now while already touching this file for its `PageHeader` migration.
+
+### Changed
+
+- Migrated 9 pages onto `PageHeader` with a new one-sentence description and Heroicon each: `Dashboard.vue`, `Recommendations/Index.vue`, `Opportunities.vue`, `Brain.vue`, `Campaigns/Index.vue`, `Publishing.vue`, `Analytics/Index.vue`, `Learning.vue`, `Settings.vue`.
+- `Settings/MarketingPresence/Index.vue` — migrated its existing hand-rolled `<h1>`+`<p>` onto `PageHeader`, copy preserved verbatim.
+
+### Notes
+
+- `Campaigns/Show.vue` and `Analytics/Show.vue` were deliberately left unmigrated: both already have a bespoke header (back-link + status badge, or back-link + subtitle) that `PageHeader`'s generic shape would have regressed. They weren't part of the "bare title" problem this phase targets.
+
+---
+
 ## [UI Polish Phase 1 — Visual refresh] — 2026-07-11
 
 First of three approved UI improvements (visual refresh → page descriptions → first-time walkthrough) after user feedback that the app "looks very basic." This phase fixes the flattest part of the UI: every empty list in the app rendered the same gray 3-dot ellipsis icon regardless of context.

@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
+import PageHeader from '@/Components/UI/PageHeader.vue'
 import { LightBulbIcon } from '@heroicons/vue/24/outline'
 import type { Recommendation } from '@/types'
 
@@ -43,7 +44,11 @@ function getRationalePreview(rec: Recommendation): string | null {
 <template>
   <Head><title>Recommendations — Atlas</title></Head>
   <div class="max-w-3xl">
-    <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-6">Recommendations</h1>
+    <PageHeader
+      title="Recommendations"
+      description="Review AI-generated marketing recommendations and approve the ones worth acting on."
+      :icon="LightBulbIcon"
+    />
 
     <!-- Pending (prominent) -->
     <section v-if="pending.length > 0" class="mb-8">

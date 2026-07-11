@@ -4,6 +4,7 @@ import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import ScoreBar from '@/Components/UI/ScoreBar.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
+import PageHeader from '@/Components/UI/PageHeader.vue'
 import { MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
 import type { Opportunity } from '@/types'
 
@@ -62,7 +63,11 @@ const urgencyClass: Record<string, string> = {
 <template>
   <Head><title>Opportunities — Atlas</title></Head>
   <div class="max-w-3xl">
-    <h1 class="text-xl font-semibold text-[var(--color-text-primary)] mb-6">Opportunities</h1>
+    <PageHeader
+      title="Opportunities"
+      description="Signals Atlas has noticed in your business that could turn into a recommendation."
+      :icon="MagnifyingGlassIcon"
+    />
 
     <EmptyState
       v-if="opportunities.length === 0"
