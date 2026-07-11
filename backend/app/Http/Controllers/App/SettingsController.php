@@ -6,14 +6,19 @@ use App\Http\Controllers\Controller;
 use App\Jobs\SyncIntegration;
 use App\Models\Company;
 use App\Models\CompanyMembership;
+use App\Models\InstagramAccount;
 use App\Models\Integration;
+use App\Services\Observatory\IntegrationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 class SettingsController extends Controller
 {
+    public function __construct(private readonly IntegrationService $integrationService) {}
+
     public function index(Request $request): Response
     {
         /** @var Company $company */
@@ -34,6 +39,8 @@ class SettingsController extends Controller
         /** @var CompanyMembership $membership */
         $membership = $request->attributes->get('membership');
 
+        $instagramAccount = InstagramAccount::where('company_id', $company->id)->first();
+
         return Inertia::render('App/Settings', [
             'company' => [
                 'id' => $company->id,
@@ -43,6 +50,16 @@ class SettingsController extends Controller
             ],
             'integrations' => $integrations->values()->all(),
             'membership_role' => $membership->role,
+            'instagram_account' => $instagramAccount !== null ? [
+                'username' => $instagramAccount->username,
+                'display_name' => $instagramAccount->display_name,
+                'profile_picture_url' => $instagramAccount->profile_picture_url,
+                'bio' => $instagramAccount->bio,
+                'website' => $instagramAccount->website,
+                'follower_count' => $instagramAccount->follower_count,
+                'following_count' => $instagramAccount->following_count,
+                'last_synced_at' => $instagramAccount->last_synced_at !== null ? (string) $instagramAccount->last_synced_at : null,
+            ] : null,
         ]);
     }
 
@@ -71,5 +88,48 @@ class SettingsController extends Controller
         SyncIntegration::dispatch($integration);
 
         return back()->with('success', 'Sync started. Check back in a few minutes.');
+    }
+
+    /**
+     * Connect (or reconnect) the company's Instagram account. Beta scope:
+     * a manually-entered access token, one account per company — no OAuth
+     * flow. See docs/plans (Milestone 12 Phase 1, Instagram Observation).
+     */
+    public function connectInstagram(Request $request): RedirectResponse
+    {
+        /** @var Company $company */
+        $company = $request->attributes->get('company');
+
+        $validated = $request->validate([
+            'access_token' => ['required', 'string', 'max:2000'],
+        ]);
+
+        $integration = Integration::where('company_id', $company->id)
+            ->where('type', 'instagram')
+            ->first();
+
+        if ($integration !== null) {
+            $integration->update([
+                'config' => ['access_token' => $validated['access_token']],
+                'status' => 'active',
+                'last_error' => null,
+            ]);
+        } else {
+            $integration = $this->integrationService->create(
+                $company,
+                'instagram',
+                ['access_token' => $validated['access_token']],
+            );
+        }
+
+        try {
+            SyncIntegration::dispatch($integration);
+        } catch (Throwable $e) {
+            $integration->markAsError($e->getMessage());
+
+            return back()->with('error', 'Could not connect to Instagram: '.$e->getMessage());
+        }
+
+        return back()->with('success', 'Instagram connected. Syncing your profile now.');
     }
 }

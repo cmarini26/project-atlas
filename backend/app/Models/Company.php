@@ -54,6 +54,12 @@ class Company extends Model
         return $this->hasOne(Catalog::class);
     }
 
+    /** @return HasOne<InstagramAccount, $this> */
+    public function instagramAccount(): HasOne
+    {
+        return $this->hasOne(InstagramAccount::class);
+    }
+
     /** @return HasMany<CompanyMembership, $this> */
     public function memberships(): HasMany
     {

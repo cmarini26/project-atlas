@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 936 tests (933 passing, 2 Redis + 1 backup-drill skipped where the local environment can't support it) + 34 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Marketing landing page build, 3 new PHP tests + 10 new Vitest tests. |
+| Tests             | ✅ Strong | 963 tests (960 passing, 2 Redis + 1 backup-drill skipped where the local environment can't support it) + 34 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Milestone 12 Phase 1 — Instagram Observation, 27 new PHP tests. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,27 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**Milestone 12 Phase 1 — Instagram Observation (Beta) ✅ Complete**
+*Completed: 2026-07-11*
+
+Instagram is now Atlas's first observable Marketing Source alongside the website crawl. A company connects an Instagram account from Settings (beta scope: a manually-entered access token, one account per company — no OAuth flow, no publishing, no historical import) and Atlas fetches a single, current profile snapshot (account id, username, display name, profile picture, bio, website, follower/following counts, last synced timestamp) via the Instagram Graph API.
+
+**Reused the existing architecture end-to-end, exactly as specced:** a new `InstagramConnector` implements the same `Connector` contract `WebsiteConnector` does and is resolved by the same `ConnectorRegistry`; the profile snapshot is recorded as an ordinary `Observation` (`source_type: social`) through the existing `ObservationService`; and it flows through the unchanged `Observe → Understand → Decide` loop. No separate AI pipeline was created — a new `InstagramAnalyst` maps the already-structured profile fields directly into `Fact` rows (`instagram.username`, `instagram.follower_count`, etc.) deterministically, with no AI call at all, for the same reason `MarketingPresenceSynthesizer` doesn't call an AI provider either: bucketing known-shape fields isn't a probabilistic task. `ProcessObservation` now resolves the right analyst via a new `AnalystRegistry` (mirroring `ConnectorRegistry`'s `supports()`/`resolve()` pattern) instead of hard-coding `WebsiteAnalyst` — adding a future observation source means adding its Analyst, never touching the job.
+
+**Business Brain integration required no code changes** — `BusinessBrainService::assemble()` was already fully source-agnostic (`activeFacts` pulls by `company_id` alone, not by source), so Instagram-derived Facts automatically appear in the same `BusinessBrain.activeFacts` collection website facts already populate. Verified end-to-end with a dedicated integration test running a real Instagram Observation through `ProcessObservation` and asserting both website and Instagram facts land in the same brain.
+
+**Multi-channel recommendation reference was already correct and untouched** — `DecisionEngine`'s channel-type affinity lists and `MarketingChannelSelector`'s primary/active preference logic already include Instagram (Milestone 11), and were already tested (`DecisionEngineTest`, `MarketingChannelSelectorTest`); this phase changed neither, confirming the existing Marketing-Presence-aware channel selection already extends naturally to a connected Instagram account.
+
+New `instagram_accounts` table (one row per company, typed profile fields, kept in sync by a new `InstagramAccountService` called from `InstagramAnalyst`) gives fast, typed access to "what does Atlas currently know about this account" without querying Facts — Facts remain the Business Brain's source of truth. `integrations.type` and `observations.source_type` both gained new enum values (`instagram`, `social`), added to the base migrations for fresh databases plus a Postgres-only constraint-rewrite migration for already-migrated databases, mirroring the existing `retrying`-status precedent exactly — verified against a real local PostgreSQL instance, not just sqlite.
+
+27 new tests across connector unit/feature tests, the Instagram Graph API fetcher (mocked HTTP), the analyst (fact mapping, account upsert, missing-field handling), the analyst registry, tenant isolation, the Business Brain integration, and the Settings connect/reconnect flow. 963 tests (960 passing, 3 skipped). PHPStan level 8 — 0 errors. Pint clean. Build green.
+
+See:
+- `specs/core/marketing-presence.md` — confirms `Integration` (observation source) and `MarketingChannel` (declared presence) are deliberately unrelated concepts; this phase only touches the former
+- `specs/core/domain-model.md` — `Integration`/`Observation`/`Fact` entity definitions this phase extends
+
+**Previous milestone:**
 
 **Private Beta Customer Success Toolkit ✅ Complete**
 *Completed: 2026-07-10*
@@ -781,6 +802,8 @@ All production-blocking items resolved. Remaining pre-production items:
 ---
 
 ## Last Updated
+
+**2026-07-11** — Milestone 12 Phase 1 (Instagram Observation, Beta) complete: Instagram is now Atlas's first observable Marketing Source alongside the website crawl. A new `InstagramConnector` reuses the existing `Connector`/`ConnectorRegistry` architecture to fetch a single current profile snapshot (account id, username, display name, profile picture, bio, website, follower/following counts) via the Instagram Graph API, given a company-entered access token (beta scope — no OAuth, no publishing, no historical import). The snapshot is recorded as an ordinary `Observation` and flows through the unchanged Observe → Understand → Decide loop — no separate AI pipeline. A new `InstagramAnalyst` maps the already-structured fields directly into Facts deterministically (no AI call), and `ProcessObservation` now resolves the right analyst via a new `AnalystRegistry` mirroring `ConnectorRegistry`'s pattern. Business Brain integration required zero code changes (`BusinessBrainService::assemble()` was already source-agnostic) and multi-channel recommendation reference was already correct and already tested (`DecisionEngineTest`, `MarketingChannelSelectorTest`) — both verified, neither modified. 27 new tests, including a real Postgres migration verification. 963 tests (960 passing, 3 skipped), PHPStan level 8 clean, Pint clean, build green.
 
 **2026-07-10** — Private Beta Customer Success Toolkit created (documentation only, no application code changed): `docs/beta/Customer-Interview-Guide.md` (structured questions for onboarding, first recommendation, week one, month one, plus open-ended discovery), `docs/beta/Founder-Learning-Log.md` (a reusable per-customer entry template plus a customer roster with only the one confirmed fact — CBB Auctions as Customer 1), and `docs/beta/Beta-Success-Metrics.md` (eight measurable Stage A success criteria — onboarding completion, time to first recommendation, approval rate, engagement, recommendation usefulness, weekly active companies, support burden, willingness to pay — each with a definition, measurement method, and target). All three operationalize `Version-1.0-Roadmap.md`'s Stage A objective and `Private-Beta-Execution.md`'s checklist, written with no fabricated example data since Stage A hasn't started yet. See [Customer-Interview-Guide.md](beta/Customer-Interview-Guide.md), [Founder-Learning-Log.md](beta/Founder-Learning-Log.md), [Beta-Success-Metrics.md](beta/Beta-Success-Metrics.md).
 

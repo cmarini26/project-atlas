@@ -23,10 +23,22 @@ interface CompanyData {
   website_url: string | null
 }
 
+interface InstagramAccountData {
+  username: string
+  display_name: string | null
+  profile_picture_url: string | null
+  bio: string | null
+  website: string | null
+  follower_count: number | null
+  following_count: number | null
+  last_synced_at: string | null
+}
+
 const props = defineProps<{
   company: CompanyData
   integrations: Integration[]
   membership_role: string
+  instagram_account: InstagramAccountData | null
 }>()
 
 const form = useForm({
@@ -61,6 +73,16 @@ const integrationStatusVariants: Record<string, 'success' | 'warning' | 'muted' 
 function formatDate(date: string | null): string {
   if (!date) return 'Never'
   return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+const instagramForm = useForm({
+  access_token: '',
+})
+
+function connectInstagram(): void {
+  instagramForm.post('/app/settings/integrations/instagram', {
+    onSuccess: () => instagramForm.reset(),
+  })
 }
 </script>
 
@@ -138,6 +160,62 @@ function formatDate(date: string | null): string {
           Manage →
         </Link>
       </div>
+    </div>
+
+    <!-- Instagram -->
+    <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5 mb-6">
+      <h2 class="text-sm font-semibold text-[var(--color-text-primary)] mb-4">Instagram</h2>
+
+      <div v-if="instagram_account" class="flex items-start gap-3">
+        <img
+          v-if="instagram_account.profile_picture_url"
+          :src="instagram_account.profile_picture_url"
+          :alt="`${instagram_account.username}'s Instagram profile picture`"
+          class="size-12 rounded-full object-cover shrink-0"
+        />
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-[var(--color-text-primary)]">
+            {{ instagram_account.display_name ?? instagram_account.username }}
+            <span class="text-[var(--color-text-muted)] font-normal">@{{ instagram_account.username }}</span>
+          </p>
+          <p v-if="instagram_account.bio" class="text-xs text-[var(--color-text-secondary)] mt-1">{{ instagram_account.bio }}</p>
+          <p class="text-xs text-[var(--color-text-muted)] mt-1">
+            <span v-if="instagram_account.follower_count !== null">{{ instagram_account.follower_count.toLocaleString() }} followers</span>
+            <span v-if="instagram_account.follower_count !== null && instagram_account.following_count !== null"> · </span>
+            <span v-if="instagram_account.following_count !== null">{{ instagram_account.following_count.toLocaleString() }} following</span>
+          </p>
+          <p class="text-xs text-[var(--color-text-muted)] mt-1">Last synced: {{ formatDate(instagram_account.last_synced_at) }}</p>
+        </div>
+      </div>
+
+      <form v-else class="space-y-3" @submit.prevent="connectInstagram">
+        <p class="text-xs text-[var(--color-text-muted)]">
+          Connect your Instagram account so Atlas can include it in your Business Brain.
+        </p>
+        <div>
+          <label for="instagram-access-token" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Access token</label>
+          <input
+            id="instagram-access-token"
+            v-model="instagramForm.access_token"
+            type="password"
+            required
+            :class="[
+              'w-full px-3 py-2 text-sm rounded-lg border bg-white text-[var(--color-text-primary)] transition-colors duration-[var(--duration-fast)]',
+              instagramForm.errors.access_token
+                ? 'border-rose-300 focus:outline-none focus:ring-1 focus:ring-rose-400'
+                : 'border-[var(--color-border)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)]',
+            ]"
+          />
+          <p v-if="instagramForm.errors.access_token" class="mt-1 text-xs text-rose-600">{{ instagramForm.errors.access_token }}</p>
+        </div>
+        <button
+          type="submit"
+          :disabled="instagramForm.processing"
+          class="py-2 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+        >
+          {{ instagramForm.processing ? 'Connecting…' : 'Connect Instagram' }}
+        </button>
+      </form>
     </div>
 
     <!-- Integrations -->

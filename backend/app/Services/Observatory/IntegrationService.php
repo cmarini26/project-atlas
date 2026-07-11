@@ -24,6 +24,7 @@ class IntegrationService
     {
         return match ($type) {
             'website_crawl' => 'Website',
+            'instagram' => 'Instagram',
             default => ucfirst(str_replace('_', ' ', $type)),
         };
     }

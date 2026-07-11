@@ -6,6 +6,36 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 12 Phase 1 — Instagram Observation (Beta)] — 2026-07-11
+
+Instagram is now Atlas's first observable Marketing Source alongside the website crawl. Scoped strictly to the beta: profile observation only — no publishing, scheduling, Stories, DMs, ads, analytics dashboards, competitor analysis, multiple accounts, or other social networks.
+
+### Added
+
+- `app/Models/InstagramAccount.php` + `database/migrations/2026_07_11_000300_create_instagram_accounts_table.php` — one row per company holding the latest known profile snapshot (account id, username, display name, profile picture, bio, website, follower/following counts, last synced timestamp). `Company::instagramAccount()` relation added.
+- `app/Services/Observatory/Connectors/Instagram/` — `InstagramConnector` (implements the existing `Connector` contract), `InstagramProfileFetcher` (Instagram Graph API client, one request, no pagination), `InstagramProfileData` (value object), `Exceptions/InstagramApiException`. Registered in `ConnectorServiceProvider` alongside the existing `WebsiteConnector` — no changes to `ConnectorRegistry` itself.
+- `config/instagram.php` — Graph API base URL and timeouts (the per-company access token lives encrypted on `Integration.config`, entered via Settings, not here).
+- `app/Services/Analyst/Contracts/ObservationAnalyst.php` + `app/Services/Analyst/AnalystRegistry.php` — a `supports()`/`resolve()` dispatch pair mirroring `ConnectorRegistry` exactly, so `ProcessObservation` no longer hard-codes `WebsiteAnalyst` and a future observation source only needs to register its own Analyst.
+- `app/Services/Analyst/InstagramAnalyst.php` — deterministic Fact mapper (`instagram.username`, `instagram.display_name`, `instagram.bio`, `instagram.website`, `instagram.follower_count`, `instagram.following_count`). Deliberately **not** an AI-calling Analyst — an Instagram profile snapshot already arrives structured, so mapping it is key/value translation, not extraction from prose, the same reasoning already applied to `MarketingPresenceSynthesizer`.
+- `app/Services/Observatory/InstagramAccountService.php` — keeps the typed `InstagramAccount` snapshot in sync as a side effect of `InstagramAnalyst` processing each Observation.
+- Settings UI (`resources/js/Pages/App/Settings.vue`) — a "Connect Instagram" card: an access-token form when no account is connected, or the profile snapshot (avatar, bio, follower/following counts, last synced) once one is. `SettingsController::connectInstagram()` + `POST /app/settings/integrations/instagram` route.
+- 27 new tests: `InstagramProfileFetcherTest` (mocked Graph API HTTP), `InstagramConnectorTest`, `ConnectorRegistryTest` (extended), `AnalystRegistryTest`, `InstagramAnalystTest`, `InstagramAccountServiceTest` (including tenant isolation), `InstagramBusinessBrainIntegrationTest`, and `SettingsControllerTest` (extended for connect/reconnect).
+
+### Changed
+
+- `database/migrations/2026_06_26_000800_create_integrations_table.php` / `2026_06_26_000900_create_observations_table.php` — added `instagram`/`social` to the base enum definitions for fresh databases, plus new supplementary migrations (`2026_07_11_000100`, `2026_07_11_000200`) rewriting the Postgres CHECK constraints for already-migrated databases — mirrors `2026_07_05_000100_add_retrying_status_to_observations.php`'s exact precedent. Verified against a real local PostgreSQL instance, not just sqlite.
+- `app/Services/Analyst/WebsiteAnalyst.php` — now also implements `ObservationAnalyst` (`supports()` returns true for `source_type: crawl`), alongside its existing AI-calling `Analyst` marker interface.
+- `app/Jobs/ProcessObservation.php` — resolves the Analyst via the new `AnalystRegistry` instead of a hard-coded `WebsiteAnalyst` type-hint. Behavior for website observations is unchanged; all existing tests updated to inject `AnalystRegistry` instead.
+- `app/Services/Observatory/IntegrationService.php` — `instagram` added to the default-name lookup.
+
+### Notes
+
+- **No separate AI pipeline was created**, per instruction. The Instagram snapshot reuses the existing Observation → Fact → Knowledge → Opportunity pipeline unchanged; `InstagramAnalyst` doesn't call an AI provider at all.
+- **Business Brain integration required zero code changes.** `BusinessBrainService::assemble()` was already fully source-agnostic — `activeFacts` is queried by `company_id` alone, not by source — so Instagram Facts automatically join the same collection website Facts already populate. Verified with a dedicated integration test rather than assumed.
+- **Multi-channel recommendation reference was already correct and already tested.** `DecisionEngine`'s channel-type affinity lists and `MarketingChannelSelector`'s primary/active preference logic already include Instagram (Milestone 11) and are covered by existing `DecisionEngineTest`/`MarketingChannelSelectorTest` — neither was touched by this phase.
+- **`Integration` (observation source) and `MarketingChannel` (declared marketing presence) remain deliberately unrelated**, per `specs/core/marketing-presence.md` §7 — this phase only adds to the former; no FK or correlation was introduced between a connected Instagram Integration and a declared Instagram `MarketingChannel`.
+- Full suite: 963 tests, 960 passing, 3 skipped. PHPStan level 8 — 0 errors. Pint clean. `npm run build` green. Vitest: 34 tests, all passing (no frontend regressions).
+
 ## [Private Beta Customer Success Toolkit] — 2026-07-10
 
 Documentation-only change — no application code was touched. Three new `docs/beta/` documents operationalize `docs/plans/Version-1.0-Roadmap.md`'s Stage A private beta objective and `docs/plans/Private-Beta-Execution.md`'s operational checklist into tools a founder actually uses once real customers onboard.

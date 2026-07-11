@@ -7,18 +7,24 @@ use App\AI\Prompts\FactExtractionPrompt;
 use App\AI\StructuredResponseParser;
 use App\Models\Observation;
 use App\Services\Analyst\Contracts\Analyst;
+use App\Services\Analyst\Contracts\ObservationAnalyst;
 use App\Services\Analyst\Exceptions\FactExtractionFailedException;
 use App\Services\Brain\Data\FactData;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 
-class WebsiteAnalyst implements Analyst
+class WebsiteAnalyst implements Analyst, ObservationAnalyst
 {
     public function __construct(
         private readonly AiProvider $ai,
         private readonly StructuredResponseParser $parser,
     ) {}
+
+    public function supports(Observation $observation): bool
+    {
+        return $observation->source_type === 'crawl';
+    }
 
     /**
      * Extract structured facts from a website crawl Observation.

@@ -11,7 +11,7 @@ return new class() extends Migration
         Schema::create('integrations', function (Blueprint $table) {
             $table->char('id', 26)->primary();
             $table->char('company_id', 26)->index();
-            $table->enum('type', ['website_crawl', 'rss_feed', 'api', 'csv_upload', 'manual']);
+            $table->enum('type', ['website_crawl', 'rss_feed', 'api', 'csv_upload', 'manual', 'instagram']);
             $table->string('name');
             $table->text('config');
             $table->enum('status', ['active', 'paused', 'error', 'disconnected'])->default('active');

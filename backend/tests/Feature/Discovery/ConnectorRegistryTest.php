@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\Integration;
 use App\Services\Observatory\Connectors\ConnectorRegistry;
 use App\Services\Observatory\Connectors\Exceptions\UnsupportedIntegrationException;
+use App\Services\Observatory\Connectors\Instagram\InstagramConnector;
 use App\Services\Observatory\Connectors\Website\WebsiteConnector;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -33,6 +34,27 @@ class ConnectorRegistryTest extends TestCase
         $connector = $registry->resolve($integration);
 
         $this->assertInstanceOf(WebsiteConnector::class, $connector);
+    }
+
+    public function test_resolves_instagram_connector_for_instagram_type(): void
+    {
+        $company = Company::withoutGlobalScopes()->create([
+            'name' => 'Test Co',
+            'slug' => 'test-co',
+        ]);
+
+        $integration = Integration::withoutGlobalScopes()->make([
+            'company_id' => $company->id,
+            'type' => 'instagram',
+            'name' => 'Instagram',
+            'config' => ['access_token' => 'token-123'],
+            'status' => 'active',
+        ]);
+
+        $registry = $this->app->make(ConnectorRegistry::class);
+        $connector = $registry->resolve($integration);
+
+        $this->assertInstanceOf(InstagramConnector::class, $connector);
     }
 
     public function test_throws_for_unsupported_integration_type(): void

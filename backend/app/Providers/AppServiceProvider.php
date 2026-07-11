@@ -28,6 +28,9 @@ use App\Listeners\TriggerRecommendationCreation;
 use App\Models\Catalog;
 use App\Models\CatalogItem;
 use App\Models\Company;
+use App\Services\Analyst\AnalystRegistry;
+use App\Services\Analyst\InstagramAnalyst;
+use App\Services\Analyst\WebsiteAnalyst;
 use App\Services\Analytics\AnalyticsProviderRegistry;
 use App\Services\Analytics\FakeAnalyticsProvider;
 use App\Services\Brain\BusinessBrainService;
@@ -60,6 +63,17 @@ class AppServiceProvider extends ServiceProvider
         } else {
             $this->app->singleton(AiProvider::class, AnthropicProvider::class);
         }
+
+        // Resolves the right Analyst per Observation source_type — mirrors
+        // ConnectorServiceProvider's ConnectorRegistry binding. Adding a new
+        // observation source (Milestone 12 Phase 1: Instagram) only means
+        // adding its Analyst here, never touching ProcessObservation.
+        $this->app->singleton(AnalystRegistry::class, function ($app): AnalystRegistry {
+            return new AnalystRegistry([
+                $app->make(WebsiteAnalyst::class),
+                $app->make(InstagramAnalyst::class),
+            ]);
+        });
 
         // Only 'null' has a real implementation today (no vendor package is
         // installed yet — see Critical-Production-Blockers.md Blocker 5).

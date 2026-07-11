@@ -12,7 +12,7 @@ return new class() extends Migration
             $table->char('id', 26)->primary();
             $table->char('company_id', 26)->index();
             $table->char('integration_id', 26)->nullable()->index();
-            $table->enum('source_type', ['crawl', 'feed', 'api', 'manual', 'internal']);
+            $table->enum('source_type', ['crawl', 'feed', 'api', 'manual', 'internal', 'social']);
             $table->string('source_identifier');
             $table->longText('raw_payload')->nullable();
             $table->string('raw_payload_ref')->nullable();

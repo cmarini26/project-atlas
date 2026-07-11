@@ -16,8 +16,8 @@ use App\Models\DigitalTwin;
 use App\Models\Integration;
 use App\Models\Observation;
 use App\Models\User;
+use App\Services\Analyst\AnalystRegistry;
 use App\Services\Analyst\Exceptions\FactExtractionFailedException;
-use App\Services\Analyst\WebsiteAnalyst;
 use App\Services\Brain\FactService;
 use App\Services\Brain\KnowledgeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -89,7 +89,7 @@ class ProcessObservationTest extends TestCase
         $this->fake->queueFixture('website-facts');
 
         (new ProcessObservation($this->observation))->handle(
-            $this->app->make(WebsiteAnalyst::class),
+            $this->app->make(AnalystRegistry::class),
             $this->app->make(FactService::class),
             $this->app->make(KnowledgeService::class),
         );
@@ -104,7 +104,7 @@ class ProcessObservationTest extends TestCase
         $this->fake->queueFixture('website-facts');
 
         (new ProcessObservation($this->observation))->handle(
-            $this->app->make(WebsiteAnalyst::class),
+            $this->app->make(AnalystRegistry::class),
             $this->app->make(FactService::class),
             $this->app->make(KnowledgeService::class),
         );
@@ -122,7 +122,7 @@ class ProcessObservationTest extends TestCase
         $this->fake->queueFixture('website-facts');
 
         (new ProcessObservation($this->observation))->handle(
-            $this->app->make(WebsiteAnalyst::class),
+            $this->app->make(AnalystRegistry::class),
             $this->app->make(FactService::class),
             $this->app->make(KnowledgeService::class),
         );
@@ -139,7 +139,7 @@ class ProcessObservationTest extends TestCase
         $this->fake->queueFixture('website-facts');
 
         (new ProcessObservation($this->observation))->handle(
-            $this->app->make(WebsiteAnalyst::class),
+            $this->app->make(AnalystRegistry::class),
             $this->app->make(FactService::class),
             $this->app->make(KnowledgeService::class),
         );
@@ -157,7 +157,7 @@ class ProcessObservationTest extends TestCase
         $this->fake->queueFixture('website-facts');
 
         (new ProcessObservation($this->observation))->handle(
-            $this->app->make(WebsiteAnalyst::class),
+            $this->app->make(AnalystRegistry::class),
             $this->app->make(FactService::class),
             $this->app->make(KnowledgeService::class),
         );
@@ -171,7 +171,7 @@ class ProcessObservationTest extends TestCase
 
         try {
             (new ProcessObservation($this->observation))->handle(
-                $this->app->make(WebsiteAnalyst::class),
+                $this->app->make(AnalystRegistry::class),
                 $this->app->make(FactService::class),
                 $this->app->make(KnowledgeService::class),
             );
@@ -191,7 +191,7 @@ class ProcessObservationTest extends TestCase
 
         try {
             (new ProcessObservation($this->observation))->handle(
-                $this->app->make(WebsiteAnalyst::class),
+                $this->app->make(AnalystRegistry::class),
                 $this->app->make(FactService::class),
                 $this->app->make(KnowledgeService::class),
             );
@@ -210,7 +210,7 @@ class ProcessObservationTest extends TestCase
 
         try {
             (new ProcessObservation($this->observation))->handle(
-                $this->app->make(WebsiteAnalyst::class),
+                $this->app->make(AnalystRegistry::class),
                 $this->app->make(FactService::class),
                 $this->app->make(KnowledgeService::class),
             );
@@ -246,7 +246,7 @@ class ProcessObservationTest extends TestCase
         $this->fake->queueFixture('website-facts');
 
         (new ProcessObservation($this->observation))->handle(
-            $this->app->make(WebsiteAnalyst::class),
+            $this->app->make(AnalystRegistry::class),
             $this->app->make(FactService::class),
             $this->app->make(KnowledgeService::class),
         );
@@ -266,7 +266,7 @@ class ProcessObservationTest extends TestCase
         $this->fake->queueFixture('website-facts');
 
         (new ProcessObservation($this->observation))->handle(
-            $this->app->make(WebsiteAnalyst::class),
+            $this->app->make(AnalystRegistry::class),
             $this->app->make(FactService::class),
             $this->app->make(KnowledgeService::class),
         );
@@ -284,7 +284,7 @@ class ProcessObservationTest extends TestCase
 
         try {
             (new ProcessObservation($this->observation))->handle(
-                $this->app->make(WebsiteAnalyst::class),
+                $this->app->make(AnalystRegistry::class),
                 $this->app->make(FactService::class),
                 $this->app->make(KnowledgeService::class),
             );
@@ -306,7 +306,7 @@ class ProcessObservationTest extends TestCase
 
         try {
             (new ProcessObservation($this->observation))->handle(
-                $this->app->make(WebsiteAnalyst::class),
+                $this->app->make(AnalystRegistry::class),
                 $this->app->make(FactService::class),
                 $this->app->make(KnowledgeService::class),
             );
@@ -377,7 +377,7 @@ class ProcessObservationTest extends TestCase
         $this->expectException(\RuntimeException::class);
 
         (new ProcessObservation($this->observation))->handle(
-            $this->app->make(WebsiteAnalyst::class),
+            $this->app->make(AnalystRegistry::class),
             $this->app->make(FactService::class),
             $this->app->make(KnowledgeService::class),
         );

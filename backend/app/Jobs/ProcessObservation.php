@@ -6,7 +6,7 @@ use App\AI\Exceptions\AiProviderOverloadedException;
 use App\Events\ObservationProcessed;
 use App\Models\Company;
 use App\Models\Observation;
-use App\Services\Analyst\WebsiteAnalyst;
+use App\Services\Analyst\AnalystRegistry;
 use App\Services\Brain\FactService;
 use App\Services\Brain\KnowledgeService;
 use Illuminate\Bus\Queueable;
@@ -39,7 +39,7 @@ class ProcessObservation implements ShouldQueue
     }
 
     public function handle(
-        WebsiteAnalyst $analyst,
+        AnalystRegistry $analysts,
         FactService $factService,
         KnowledgeService $knowledgeService,
     ): void {
@@ -52,6 +52,7 @@ class ProcessObservation implements ShouldQueue
         ]);
 
         try {
+            $analyst = $analysts->resolve($observation);
             $factData = $analyst->analyze($observation);
 
             Log::info('ProcessObservation: facts extracted.', [
