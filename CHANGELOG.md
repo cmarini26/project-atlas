@@ -6,6 +6,21 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Private Beta Customer Success Toolkit] — 2026-07-10
+
+Documentation-only change — no application code was touched. Three new `docs/beta/` documents operationalize `docs/plans/Version-1.0-Roadmap.md`'s Stage A private beta objective and `docs/plans/Private-Beta-Execution.md`'s operational checklist into tools a founder actually uses once real customers onboard.
+
+### Added
+
+- `docs/beta/Customer-Interview-Guide.md` — structured interview questions for four real customer-lifecycle checkpoints (onboarding, first recommendation, week one, month one) plus an open-ended discovery section, cross-referenced to the actual product (the four-part rationale, the three-action approval workflow, the marketing-presence onboarding step) rather than generic interview boilerplate.
+- `docs/beta/Founder-Learning-Log.md` — a reusable per-customer, per-checkpoint entry template (customer, industry, expectations, surprises, struggles, what they loved, bugs, feature requests, willingness to pay, follow-up actions), plus a customer roster seeded only with the one confirmed fact available today (CBB Auctions as Stage A Customer 1).
+- `docs/beta/Beta-Success-Metrics.md` — operationalizes the roadmap's Stage A success metric into eight specific, measurable criteria: onboarding completion rate, time to first recommendation, recommendation approval rate, customer engagement, recommendation usefulness (qualitative and quantitative), weekly active companies, support burden, and customer willingness to continue after beta — each with a definition, measurement method, data source, and target scoped explicitly to Stage A's 5–10 hand-picked customer scale.
+
+### Notes
+
+- Written with the same honesty discipline as the recent landing page work: no fabricated example customer entries, no invented metrics data, and an explicit, repeated acknowledgment that Stage A hasn't started yet (no production environment exists per `docs/STATUS.md`) — these are ready-to-use tools, not a record of beta activity that hasn't happened.
+- No code was implemented and no application behavior changed, per the task's explicit scope.
+
 ## [Marketing Landing Page] — 2026-07-10
 
 Built the public marketing landing page per `docs/marketing/Landing-Page.md`'s full 16-section specification, using the existing design system (`docs/design/System.md`).

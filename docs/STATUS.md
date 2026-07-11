@@ -34,6 +34,23 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
+**Private Beta Customer Success Toolkit ✅ Complete**
+*Completed: 2026-07-10*
+
+Documentation-only deliverable — no application code changed. Three new `docs/beta/` documents operationalize [Version-1.0-Roadmap.md](plans/Version-1.0-Roadmap.md)'s Stage A private beta and [Private-Beta-Execution.md](plans/Private-Beta-Execution.md)'s operational checklist into the actual tools a founder uses once real customers start onboarding:
+
+- [Customer-Interview-Guide.md](beta/Customer-Interview-Guide.md) — structured questions for the four real checkpoints in a customer's lifecycle (onboarding, first recommendation, week one, month one) plus an open-ended discovery section, cross-referenced to the actual product mechanics (the four-part rationale, the three-action approval workflow, the marketing-presence onboarding step) rather than generic interview boilerplate.
+- [Founder-Learning-Log.md](beta/Founder-Learning-Log.md) — a reusable per-customer, per-checkpoint entry template (customer, industry, expectations, surprises, struggles, what they loved, bugs, feature requests, willingness to pay, follow-up actions), plus a customer roster seeded only with the one real, confirmed fact available today (CBB Auctions as Customer 1) — left otherwise empty on purpose, since Stage A hasn't started and no other customers are named yet.
+- [Beta-Success-Metrics.md](beta/Beta-Success-Metrics.md) — operationalizes the roadmap's Stage A success metric into eight specific, measurable criteria (onboarding completion rate, time to first recommendation, approval rate, engagement, recommendation usefulness, weekly active companies, support burden, willingness to continue after beta), each with a definition, measurement method, data source, and target — explicitly scoped to Stage A's 5–10 hand-picked customer scale, not Stage B's.
+
+All three documents were written with the same honesty discipline as the recent landing page work: no fabricated example customer entries, no invented metrics data, and an explicit acknowledgment throughout that Stage A hasn't started yet (no production environment exists) — these are ready-to-use tools, not a record of beta activity that hasn't happened.
+
+See:
+- [Version-1.0-Roadmap.md](plans/Version-1.0-Roadmap.md) — the Stage A objective and metrics these tools operationalize
+- [Private-Beta-Execution.md](plans/Private-Beta-Execution.md) — the operational checklist these tools support
+
+**Previous milestone:**
+
 **Marketing Landing Page ✅ Complete**
 *Completed: 2026-07-10*
 
@@ -764,6 +781,8 @@ All production-blocking items resolved. Remaining pre-production items:
 ---
 
 ## Last Updated
+
+**2026-07-10** — Private Beta Customer Success Toolkit created (documentation only, no application code changed): `docs/beta/Customer-Interview-Guide.md` (structured questions for onboarding, first recommendation, week one, month one, plus open-ended discovery), `docs/beta/Founder-Learning-Log.md` (a reusable per-customer entry template plus a customer roster with only the one confirmed fact — CBB Auctions as Customer 1), and `docs/beta/Beta-Success-Metrics.md` (eight measurable Stage A success criteria — onboarding completion, time to first recommendation, approval rate, engagement, recommendation usefulness, weekly active companies, support burden, willingness to pay — each with a definition, measurement method, and target). All three operationalize `Version-1.0-Roadmap.md`'s Stage A objective and `Private-Beta-Execution.md`'s checklist, written with no fabricated example data since Stage A hasn't started yet. See [Customer-Interview-Guide.md](beta/Customer-Interview-Guide.md), [Founder-Learning-Log.md](beta/Founder-Learning-Log.md), [Beta-Success-Metrics.md](beta/Beta-Success-Metrics.md).
 
 **2026-07-10** — Marketing landing page built at `/` per `docs/marketing/Landing-Page.md`'s full 16-section spec, using the existing Vue/Inertia/Tailwind v4 design system. Copy was corrected against current product reality in several places the spec overstated: publishing claims reworded to describe the real approval gate rather than asserting live external delivery (no channel actually publishes externally yet, per the Channel Publishing Reality Audit); fabricated testimonials/stats were not published, replaced with an honest description of the real CBB Auctions design partnership; CTAs pointing at non-existent infrastructure (demo booking, pricing page, legal pages) were re-pointed at real routes or omitted. Filled a real gap in `docs/design/System.md`'s implementation — its typography scale was specified but never added to `app.css` — added now. `@heroicons/vue` installed (specified by the design system, never previously used). Accessibility: skip link, FAQ accordion with proper ARIA and focus management, progressbars with visible numeric labels, figure/figcaption on UI mockups, no skipped heading levels. Animations respect `prefers-reduced-motion` via new `useScrollReveal`/`useCountUp` composables. 14 new tests (3 PHP, 10 Vitest — one of which caught a real inverted-boolean bug in `ScoreBar` before it shipped). 936 PHP tests (933 passing, 3 skipped), 34 Vitest tests, PHPStan level 8 clean, Pint clean, build green. See [Landing-Page.md](marketing/Landing-Page.md).
 
