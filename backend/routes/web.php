@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\OnboardingStatusController;
 use App\Http\Controllers\App\AnalyticsController;
 use App\Http\Controllers\App\BusinessBrainController;
 use App\Http\Controllers\App\CampaignController;
@@ -48,6 +49,7 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/onboarding/integration', [OnboardingController::class, 'createIntegration'])->middleware('throttle:3,1')->name('onboarding.integration');
     Route::post('/onboarding/marketing-presence', [OnboardingController::class, 'saveMarketingPresence'])->name('onboarding.marketing-presence');
     Route::get('/onboarding/status', [OnboardingController::class, 'status'])->name('onboarding.status');
+    Route::get('/api/onboarding/status', [OnboardingStatusController::class, 'show'])->name('api.onboarding.status');
 });
 
 // ── Company selector (multiple memberships) ───────────────────────────────────
