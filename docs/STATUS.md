@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 933 tests (930 passing, 2 Redis + 1 backup-drill skipped where the local environment can't support it) + 24 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Critical Production Blocker 8 — backup/restore scripts + a real local restore drill, 12 new tests. |
+| Tests             | ✅ Strong | 936 tests (933 passing, 2 Redis + 1 backup-drill skipped where the local environment can't support it) + 34 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Marketing landing page build, 3 new PHP tests + 10 new Vitest tests. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,33 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**Marketing Landing Page ✅ Complete**
+*Completed: 2026-07-10*
+
+Built the public marketing landing page at `/` per `docs/marketing/Landing-Page.md`'s full 16-section specification (nav, hero, trust bar, problem statement, how-it-works loop, Business Brain, recommendation showcase, approval moment, features, learning-over-time, industries, social proof, trust & security, final CTA, FAQ, footer) using the existing Vue 3 + Inertia + Tailwind v4 design system (`docs/design/System.md`) — no new design tokens invented beyond the typography scale System.md itself specifies but that hadn't been added to `resources/css/app.css` yet. `routes/web.php`'s root route now renders `Marketing/Landing` for guests and redirects authenticated users to their dashboard, replacing the previous unconditional `/` → `/login` redirect.
+
+**Copy was corrected against current product reality, not copied verbatim from the spec, in several places the spec's own draft language overstated what's actually built:**
+- Every reference to campaigns "publishing"/"scheduling across channels" was reworded to describe the real, verifiable behavior (an approval record gating queuing for publishing) without asserting live external delivery — per the existing [Channel Publishing Reality Audit](reviews/Channel-Publishing-Reality-Audit.md), every channel today (including email) only logs a simulated result; nothing has ever left the application.
+- The spec's fabricated testimonials (`"Marcus T."`, `[Name placeholder]`) and fabricated stats (`312 campaigns approved`, `47 businesses served`) were **not** published. The Social Proof section instead honestly describes the real CBB Auctions design partnership, with no invented quotes or numbers.
+- CTAs that would have pointed at non-existent infrastructure (a demo-booking system, a pricing page, legal/company footer pages, a third "tell us about your business" contact form) were either re-pointed at real routes (`/register`, `/login`, in-page anchors) or omitted — no dead or misleading links.
+- The "Execute" step and every "Approval Workflow" description were reworded from "publishes" to "queues for delivery/publishing" for the same reason.
+
+**Design system gap filled:** `docs/design/System.md`'s typography scale (`text-display`, `text-heading-1` through `text-label-sm`) was specified but never actually added to `resources/css/app.css` — added now (additive, matches the spec's own Appendix A exactly) so the landing page (and any future page) can use it.
+
+**Accessibility:** skip-to-content link, `<nav aria-label="Main navigation">`, FAQ accordion with `aria-expanded`/`aria-hidden` and focus-moves-to-panel on expand, score/confidence bars as `role="progressbar"` with visible numeric labels (never color-only), `<figure>`/`<figcaption>` on both UI mockups describing their content, strict heading hierarchy with no skipped levels (one deliberate exception: FAQ questions are `<h3>` not the spec's literal `<h4>`, since jumping from the section's `<h2>` straight to `<h4>` would itself skip a level — the "never skip a heading level" rule in the same accessibility section takes precedence over the descriptive heading-level table). Mobile-first responsive throughout, matching System.md's breakpoints exactly.
+
+**Animation:** all scroll-triggered reveals and count-up numbers built on a new `useScrollReveal`/`useCountUp` composable pair (IntersectionObserver via the already-installed `@vueuse/core`), both resolving instantly with no motion when `prefers-reduced-motion: reduce` is set — layered on top of the existing blanket CSS override in `app.css` that already zeroes all animation/transition durations under reduced motion.
+
+`@heroicons/vue` (specified by System.md but never actually installed before this) was added — the first real icon usage in the codebase.
+
+14 new tests: 3 PHP (`tests/Feature/Marketing/LandingPageTest.php` — guest sees the landing page, authenticated user redirects to dashboard, route naming) and 10 Vitest (FAQ accordion expand/collapse/single-open behavior, mobile nav menu open/close/focus, `ScoreBar`'s accessible progressbar attributes and reveal-triggered fill — this last test caught a real inverted-boolean bug in the initial `ScoreBar` implementation before it shipped). Two pre-existing tests (`ApplicationBootTest`, `ExampleTest`) asserting the old `/` → `/login` redirect were updated to match the new, intentional behavior. 936 tests (933 passing, 3 skipped). PHPStan level 8 — 0 errors. Pint clean. Build green. 34 Vitest tests, all passing.
+
+See:
+- [Landing-Page.md](marketing/Landing-Page.md) — the full specification this build implements
+- [System.md](design/System.md) — the design system it's built on
+
+**Previous milestone:**
 
 **Critical Production Blocker 8 of 8 — Backup and Disaster Recovery Readiness 🟡 Partially Complete**
 *Completed: 2026-07-10 (repository-representable subset only — see below)*
@@ -737,6 +764,8 @@ All production-blocking items resolved. Remaining pre-production items:
 ---
 
 ## Last Updated
+
+**2026-07-10** — Marketing landing page built at `/` per `docs/marketing/Landing-Page.md`'s full 16-section spec, using the existing Vue/Inertia/Tailwind v4 design system. Copy was corrected against current product reality in several places the spec overstated: publishing claims reworded to describe the real approval gate rather than asserting live external delivery (no channel actually publishes externally yet, per the Channel Publishing Reality Audit); fabricated testimonials/stats were not published, replaced with an honest description of the real CBB Auctions design partnership; CTAs pointing at non-existent infrastructure (demo booking, pricing page, legal pages) were re-pointed at real routes or omitted. Filled a real gap in `docs/design/System.md`'s implementation — its typography scale was specified but never added to `app.css` — added now. `@heroicons/vue` installed (specified by the design system, never previously used). Accessibility: skip link, FAQ accordion with proper ARIA and focus management, progressbars with visible numeric labels, figure/figcaption on UI mockups, no skipped heading levels. Animations respect `prefers-reduced-motion` via new `useScrollReveal`/`useCountUp` composables. 14 new tests (3 PHP, 10 Vitest — one of which caught a real inverted-boolean bug in `ScoreBar` before it shipped). 936 PHP tests (933 passing, 3 skipped), 34 Vitest tests, PHPStan level 8 clean, Pint clean, build green. See [Landing-Page.md](marketing/Landing-Page.md).
 
 **2026-07-10** — Critical Production Blocker 8 of 8 (final blocker) partially resolved — repository-representable subset only; real backups against a real production database remain operator-executed and undone (gated on Blocker 7). Added `infrastructure/backup/atlas-db-backup.sh`/`atlas-db-verify.sh`/`atlas-db-restore.sh` (provider-neutral `pg_dump` wrapper, fails loudly, destructive restore requires exact-match confirmation) and `docs/operations/Backup-and-Recovery.md` (strategy, safety, retention/encryption/off-site guidance, explicit code-complete-vs-operator-complete distinction). A real automated local restore drill (`tests/Feature/Backup/BackupRestoreDrillTest.php`) round-trips data between two disposable scratch PostgreSQL databases, surfacing a documented pg_dump/server version-compatibility gotcha along the way. Confirmed no application-managed uploaded files exist today, so no speculative file-backup mechanism was added. 12 new tests. All eight Critical Production Blockers are now addressed to the extent this repository can address them — Blockers 7 and 8 each retain a genuine operator-executed remainder. See [Critical-Production-Blockers.md](plans/Critical-Production-Blockers.md).
 

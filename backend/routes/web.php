@@ -15,9 +15,14 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\OnboardingController;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 // ── Public ──────────────────────────────────────────────────────────────────
-Route::get('/', fn () => redirect()->route('login'));
+// Signed-in visitors go straight to their dashboard; everyone else sees the
+// marketing landing page (docs/marketing/Landing-Page.md).
+Route::get('/', fn () => auth()->check()
+    ? redirect()->route('app.dashboard')
+    : Inertia::render('Marketing/Landing'))->name('home');
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 Route::middleware('guest')->group(function (): void {

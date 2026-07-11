@@ -6,6 +6,31 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Marketing Landing Page] — 2026-07-10
+
+Built the public marketing landing page per `docs/marketing/Landing-Page.md`'s full 16-section specification, using the existing design system (`docs/design/System.md`).
+
+### Added
+
+- `resources/js/Pages/Marketing/Landing.vue` and 16 section components under `resources/js/Components/Marketing/` (nav, hero, trust bar, problem statement, how-it-works, Business Brain, recommendation showcase, approval moment, features, learning-over-time, industries, social proof, trust & security, final CTA, FAQ, footer), plus shared `ScoreBar.vue`, `SectionHeading.vue`, `MarketingButton.vue`, and `RecommendationMockup.vue`.
+- `resources/js/composables/useScrollReveal.ts` and `useCountUp.ts` — scroll-triggered reveal and count-up animations, both resolving instantly (no motion) under `prefers-reduced-motion: reduce`.
+- Typography scale tokens (`--text-display` through `--text-label-sm`) added to `resources/css/app.css` — specified in `docs/design/System.md` §2 but never actually implemented until now. Also added global `scroll-behavior: smooth` (with a `scroll-padding-top` offset for the fixed nav) for in-page anchor links, disabled under reduced motion.
+- `@heroicons/vue` — specified by the design system's icon section but not previously installed; this is the first real icon usage in the codebase.
+- `tests/Feature/Marketing/LandingPageTest.php` (3 tests) — guest sees the landing page, authenticated user redirects to their dashboard, root route is named `home`.
+- `resources/js/Components/Marketing/{FaqSection,MarketingNav,ScoreBar}.spec.ts` (10 tests) — FAQ accordion ARIA/expand-collapse behavior, mobile nav menu open/close and focus management, `ScoreBar`'s progressbar attributes and reveal-triggered fill.
+
+### Changed
+
+- `routes/web.php` — `GET /` now renders `Marketing/Landing` for guests and redirects authenticated users to `route('app.dashboard')`, replacing the previous unconditional `redirect()->route('login')`.
+- `tests/Feature/ApplicationBootTest.php` and `tests/Feature/ExampleTest.php` — updated to assert the new root-route behavior instead of the old redirect-to-login behavior they previously tested.
+
+### Notes
+
+- **Copy was corrected against current product reality, not copied verbatim, where the spec's draft language overstated what's built.** Every "publishes"/"schedules across channels" claim was reworded to describe the real, verifiable approval gate (an approval record must exist before anything is queued) without asserting live external delivery — per the existing [Channel-Publishing-Reality-Audit.md](docs/reviews/Channel-Publishing-Reality-Audit.md), every channel (including email) currently only logs a simulated result; nothing has ever left the application. The spec's fabricated testimonials (`"Marcus T."`, bracket placeholders) and fabricated stats (`312 campaigns approved`, `47 businesses served`) were not published — the Social Proof section instead honestly describes the real CBB Auctions design partnership. CTAs that would have pointed at non-existent infrastructure (demo booking, a pricing page, legal/company footer pages, a third lead-capture industry card) were re-pointed at real routes/anchors or omitted.
+- **Heading hierarchy:** one deliberate deviation from the spec's literal heading-level table — FAQ questions are `<h3>`, not the spec's stated `<h4>`, since jumping from the section's `<h2>` straight to `<h4>` would itself skip a level, and the same accessibility section's "no heading levels are skipped" rule takes precedence over the descriptive table.
+- A Vitest test (`ScoreBar.spec.ts`) caught a real inverted-boolean bug in the initial `ScoreBar` implementation (an unrevealed score bar rendered at full width instead of 0%) before it shipped — fixed in the same change.
+- Full suite: 936 PHP tests (933 passing, 3 skipped), 34 Vitest tests (all passing). PHPStan level 8 — 0 errors. Pint clean. `npm run build` green.
+
 ## [Critical Production Blocker 8 — Backup and Disaster Recovery Readiness] — 2026-07-10
 
 Eighth and final blocker from `docs/reviews/Production-Deployment-Audit.md`. Like Blocker 7, this blocker's original acceptance criteria are entirely operator-executed (real backups against a real production database) and remain undone — no production database exists yet. This entry covers only the repository-representable subset the live task scoped.

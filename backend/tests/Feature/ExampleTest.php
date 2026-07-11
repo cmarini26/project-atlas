@@ -14,7 +14,7 @@ class ExampleTest extends TestCase
     {
         $response = $this->get('/');
 
-        // Root redirects to /login
-        $response->assertRedirect('/login');
+        // Root renders the marketing landing page for guests.
+        $response->assertOk();
     }
 }

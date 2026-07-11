@@ -53,6 +53,40 @@
     --duration-slow: 300ms;
     --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
     --ease-out: cubic-bezier(0, 0, 0.2, 1);
+
+    /* ── Typography scale (docs/design/System.md §2) ─────────────── */
+    --text-display: 1.875rem;
+    --text-display--line-height: 1.2;
+    --text-display--font-weight: 600;
+
+    --text-heading-1: 1.5rem;
+    --text-heading-1--line-height: 1.333;
+    --text-heading-1--font-weight: 600;
+
+    --text-heading-2: 1.25rem;
+    --text-heading-2--line-height: 1.4;
+    --text-heading-2--font-weight: 600;
+
+    --text-heading-3: 1rem;
+    --text-heading-3--line-height: 1.5;
+    --text-heading-3--font-weight: 600;
+
+    --text-body-lg: 1rem;
+    --text-body-lg--line-height: 1.625;
+
+    --text-body: 0.875rem;
+    --text-body--line-height: 1.571;
+
+    --text-body-sm: 0.8125rem;
+    --text-body-sm--line-height: 1.538;
+
+    --text-label: 0.75rem;
+    --text-label--line-height: 1.333;
+    --text-label--font-weight: 500;
+
+    --text-label-sm: 0.6875rem;
+    --text-label-sm--line-height: 1.454;
+    --text-label-sm--font-weight: 500;
 }
 
 /* Skeleton pulse animation */
@@ -73,4 +107,15 @@
         animation-duration: 0.01ms !important;
         transition-duration: 0.01ms !important;
     }
+
+    html {
+        scroll-behavior: auto !important;
+    }
+}
+
+/* In-page nav anchors (marketing landing page) scroll smoothly, offset for
+   the fixed nav bar's height. Disabled above under prefers-reduced-motion. */
+html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 4rem;
 }
