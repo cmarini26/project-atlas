@@ -41,6 +41,15 @@ return [
         'base_url' => env('ANTHROPIC_BASE_URL', 'https://api.anthropic.com'),
     ],
 
+    // Meta Graph API (Instagram/Facebook publishing OAuth). No Meta App is
+    // registered yet — these are config stubs only, unusable until real
+    // values are set.
+    'meta' => [
+        'app_id' => env('META_APP_ID'),
+        'app_secret' => env('META_APP_SECRET'),
+        'redirect_uri' => env('META_REDIRECT_URI'),
+    ],
+
     // Abstraction only for now — no real vendor (Sentry or equivalent) is
     // installed yet. 'null' (the default) binds NullErrorTracker, a no-op.
     // See docs/plans/Critical-Production-Blockers.md, Blocker 5, for exactly

@@ -4,6 +4,8 @@ namespace App\Http\Controllers\App;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\SyncIntegration;
+use App\Models\Channel;
+use App\Models\ChannelCredentials;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\InstagramAccount;
@@ -41,6 +43,29 @@ class SettingsController extends Controller
 
         $instagramAccount = InstagramAccount::where('company_id', $company->id)->first();
 
+        $metaCredentials = ChannelCredentials::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->whereIn('channel_type', ['facebook', 'instagram'])
+            ->where('status', '!=', 'revoked')
+            ->get()
+            ->keyBy('channel_type');
+
+        $metaChannels = Channel::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->whereIn('type', ['facebook', 'instagram'])
+            ->get()
+            ->map(function (Channel $c) use ($metaCredentials) {
+                $credentials = $metaCredentials->get($c->type);
+
+                return $credentials === null ? null : [
+                    'type' => $c->type,
+                    'name' => $c->name,
+                    'status' => $credentials->status,
+                ];
+            })
+            ->filter()
+            ->values();
+
         return Inertia::render('App/Settings', [
             'company' => [
                 'id' => $company->id,
@@ -60,6 +85,7 @@ class SettingsController extends Controller
                 'following_count' => $instagramAccount->following_count,
                 'last_synced_at' => $instagramAccount->last_synced_at !== null ? (string) $instagramAccount->last_synced_at : null,
             ] : null,
+            'meta_channels' => $metaChannels->all(),
         ]);
     }
 

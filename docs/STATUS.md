@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 1037 tests (1034 passing, 3 skipped where the local environment can't support it) + 78 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Milestone 18 groundwork — Meta/Postmark analytics providers, 24 new PHP tests. |
+| Tests             | ✅ Strong | 1075 tests (1072 passing, 3 skipped where the local environment can't support it) + 78 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Milestone 17 groundwork — Meta OAuth social publishing, 38 new PHP tests. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,21 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**Milestone 17 groundwork — Meta OAuth social publishing ✅ Complete (Phase 4 of 4 — groundwork effort finished)**
+*Completed: 2026-07-11*
+
+Fourth and final phase prepping Version 0.2 Milestones 16-19. Adds a real OAuth/PKCE flow for connecting Meta (Facebook Page + linked Instagram Business Account) and publishing through the existing registry-based pipeline — the first OAuth flow in this codebase, with no prior pattern to build against.
+
+`App\Services\Publishing\MetaOAuthService` (Guzzle-injectable, matching `PostmarkEmailProvider`/`MetaAnalyticsProvider`'s testability convention) builds the authorization URL with a PKCE `code_challenge` (`S256`), exchanges the returned code for a short-lived then long-lived token, lists the user's Facebook Pages, and resolves each Page's linked Instagram Business Account ID (a separate Graph ID from the Page ID, required for Instagram publishing). `App\Http\Controllers\App\MetaOAuthController` (deliberately separate from `SettingsController` — isolates OAuth's higher security surface) drives the redirect/callback/revoke round trip, storing `code_verifier`/`state` in the session (matching `OnboardingController`'s existing session convention) and upserting one `Channel` + `ChannelCredentials` row per connected platform. `ChannelCredentials.credentials` now carries a small JSON blob (`{"access_token", "target_id"}`) for Meta, since publishing needs both a token and a target Graph ID — a genuine requirement discovered while designing the publisher, not in the original sketch.
+
+`App\Services\Publishing\MetaRenderer` (registered ahead of `GenericRenderer`) truncates captions to Meta's 2,200-char limit and appends hashtags. `App\Services\Publishing\MetaMediaUploader` + `MetaChannelPublisher` (registered ahead of `LogChannelPublisher`) implement the two-step Instagram container→publish flow and the one-step Facebook photo post, mapping Meta's content-policy error codes to the existing `ContentPolicyViolationException` (found reused from Milestone 11's publishing work rather than duplicated). `App\Jobs\CheckChannelHealth` now notifies the company owner (`App\Notifications\ChannelNeedsReauth`) exactly once on an active→error credential transition, not on every 30-minute poll tick. A new "Publishing" section in `Settings.vue` shows connected Pages with a Disconnect action, or a plain (non-Inertia) link to `/app/settings/meta/connect` — OAuth requires a full-page navigation to Meta's real domain.
+
+38 new PHP tests across 5 new test files + 2 additions to `SettingsControllerTest`. 1075 PHP tests (1072 passing, 3 skipped) + 78 Vitest tests. PHPStan level 8 — 0 errors. Pint clean. As with Phases 2-3, the OAuth round-trip itself cannot be verified end-to-end without a real registered Meta App — only HTTP-mocked (Guzzle `MockHandler`) unit/feature tests exist.
+
+**This completes the full 4-phase Version 0.2 Milestones 16-19 groundwork effort** (Milestone 19 — Feedback Tooling; Milestone 16 — Postmark email; Milestone 18 — Meta/Postmark analytics; Milestone 17 — Meta OAuth publishing).
+
+**Previous milestone:**
 
 **Milestone 18 groundwork — Meta/Postmark analytics providers ✅ Complete (Phase 3 of 3 — groundwork effort finished)**
 *Completed: 2026-07-11*

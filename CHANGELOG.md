@@ -6,6 +6,27 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 17 groundwork — Meta OAuth social publishing] — 2026-07-11
+
+Fourth and final phase prepping Version 0.2 Milestones 16-19 — completes the groundwork effort. The first OAuth flow in this codebase (PKCE + state validation), with no prior pattern to build against. Cannot be verified end-to-end without a real registered Meta App — HTTP-mocked (Guzzle `MockHandler`) unit/feature tests only.
+
+### Added
+
+- `app/Services/Publishing/MetaOAuthService.php` — builds the Meta authorization URL (PKCE `S256` challenge), exchanges code → short-lived → long-lived token, lists Facebook Pages, resolves each Page's linked Instagram Business Account ID.
+- `app/Http/Controllers/App/MetaOAuthController.php` (`redirect`/`callback`/`revoke`) + routes `GET /app/settings/meta/connect`, `GET /app/settings/meta/callback`, `POST /app/settings/meta/revoke`. Stores `code_verifier`/`state` in session, matching `OnboardingController`'s convention. Upserts `Channel` + `ChannelCredentials` (JSON `{"access_token","target_id"}`) per connected platform (`facebook`, and `instagram` when linked).
+- `app/Services/Publishing/MetaRenderer.php` (registered ahead of `GenericRenderer`) — truncates captions to Meta's 2,200-char limit, appends hashtags.
+- `app/Services/Publishing/MetaMediaUploader.php` + `MetaChannelPublisher.php` (registered ahead of `LogChannelPublisher`) — two-step Instagram container→publish, one-step Facebook photo post; maps Meta content-policy error codes to the existing `ContentPolicyViolationException`.
+- `app/Notifications/ChannelNeedsReauth.php` — `App\Jobs\CheckChannelHealth` now notifies the company owner exactly once on an active→error credential transition (not on every poll tick).
+- New "Publishing" section in `resources/js/Pages/App/Settings.vue` — shows connected Pages with a Disconnect action, or a plain (non-Inertia) link to `/app/settings/meta/connect`.
+- `config/services.php` `meta` block + `.env.example` `META_APP_ID`/`META_APP_SECRET`/`META_REDIRECT_URI` stubs.
+- 38 new tests: `MetaOAuthServiceTest`, `MetaOAuthControllerTest`, `MetaRendererTest`, `MetaChannelPublisherTest`, `CheckChannelHealthTest` (new file), plus 2 additions to `SettingsControllerTest`.
+
+### Notes
+
+- This closes out the full 4-phase Version 0.2 Milestones 16-19 groundwork effort (Milestone 19 — Feedback Tooling; Milestone 16 — Postmark email; Milestone 18 — Meta/Postmark analytics; Milestone 17 — this phase).
+
+---
+
 ## [Milestone 18 groundwork — Meta/Postmark analytics providers] — 2026-07-11
 
 Third and final phase prepping Version 0.2 Milestones 16-19. Phase 4 (Meta OAuth social publishing) remains deliberately deferred to its own session. Cannot be verified against real Meta/Postmark accounts — HTTP-mocked unit tests only.

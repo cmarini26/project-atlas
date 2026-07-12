@@ -3,6 +3,8 @@
 namespace Tests\Feature\App;
 
 use App\Jobs\SyncIntegration;
+use App\Models\Channel;
+use App\Models\ChannelCredentials;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\InstagramAccount;
@@ -50,6 +52,46 @@ class SettingsControllerTest extends TestCase
                 ->where('company.name', 'Test Co')
                 ->has('integrations', 1)
             );
+    }
+
+    public function test_index_includes_connected_meta_channels(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+
+        Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'type' => 'facebook', 'name' => 'CBB Auctions', 'is_active' => true,
+        ]);
+        ChannelCredentials::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'channel_type' => 'facebook', 'provider_type' => 'meta',
+            'credentials' => 'page-token', 'status' => 'active',
+        ]);
+
+        $this->actingAs($user)
+            ->get('/app/settings')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('meta_channels', 1)
+                ->where('meta_channels.0.name', 'CBB Auctions')
+                ->where('meta_channels.0.type', 'facebook')
+            );
+    }
+
+    public function test_index_omits_revoked_meta_channels(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+
+        Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'type' => 'facebook', 'name' => 'CBB Auctions', 'is_active' => true,
+        ]);
+        ChannelCredentials::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'channel_type' => 'facebook', 'provider_type' => 'meta',
+            'credentials' => 'page-token', 'status' => 'revoked',
+        ]);
+
+        $this->actingAs($user)
+            ->get('/app/settings')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->has('meta_channels', 0));
     }
 
     public function test_update_saves_company_name(): void

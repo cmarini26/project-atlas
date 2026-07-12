@@ -37,12 +37,28 @@ interface InstagramAccountData {
   last_synced_at: string | null
 }
 
+interface MetaChannel {
+  type: string
+  name: string
+  status: string
+}
+
 const props = defineProps<{
   company: CompanyData
   integrations: Integration[]
   membership_role: string
   instagram_account: InstagramAccountData | null
+  meta_channels: MetaChannel[]
 }>()
+
+const metaChannelLabels: Record<string, string> = {
+  facebook: 'Facebook',
+  instagram: 'Instagram',
+}
+
+function revokeMeta(): void {
+  router.post('/app/settings/meta/revoke', {}, { preserveScroll: true })
+}
 
 const form = useForm({
   name: props.company.name,
@@ -232,6 +248,46 @@ function retakeTour(): void {
           {{ instagramForm.processing ? 'Connecting…' : 'Connect Instagram' }}
         </button>
       </form>
+    </div>
+
+    <!-- Publishing -->
+    <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5 mb-6">
+      <h2 class="text-sm font-semibold text-[var(--color-text-primary)] mb-4">Publishing</h2>
+
+      <div v-if="meta_channels.length > 0" class="space-y-3">
+        <div
+          v-for="channel in meta_channels"
+          :key="channel.type"
+          class="flex items-center gap-3 p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-subtle)]"
+        >
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-0.5">
+              <p class="text-sm font-medium text-[var(--color-text-primary)]">{{ channel.name }}</p>
+              <Badge :variant="channel.status === 'active' ? 'success' : 'muted'">{{ metaChannelLabels[channel.type] ?? channel.type }}</Badge>
+            </div>
+            <p class="text-xs text-[var(--color-text-muted)]">Status: {{ channel.status }}</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="py-1.5 px-3 text-xs font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)] transition-colors duration-[var(--duration-fast)]"
+          @click="revokeMeta"
+        >
+          Disconnect
+        </button>
+      </div>
+
+      <div v-else class="space-y-3">
+        <p class="text-xs text-[var(--color-text-muted)]">
+          Connect Instagram &amp; Facebook so Atlas can publish campaigns directly to your Pages.
+        </p>
+        <a
+          href="/app/settings/meta/connect"
+          class="inline-block py-2 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] transition-colors duration-[var(--duration-fast)]"
+        >
+          Connect Instagram &amp; Facebook
+        </a>
+      </div>
     </div>
 
     <!-- Integrations -->

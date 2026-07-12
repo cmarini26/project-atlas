@@ -9,6 +9,7 @@ use App\Http\Controllers\App\DashboardController;
 use App\Http\Controllers\App\FeedbackController;
 use App\Http\Controllers\App\LearningController;
 use App\Http\Controllers\App\MarketingPresenceController;
+use App\Http\Controllers\App\MetaOAuthController;
 use App\Http\Controllers\App\OnboardingChecklistController;
 use App\Http\Controllers\App\OpportunityController;
 use App\Http\Controllers\App\ProductTourController;
@@ -96,6 +97,13 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
     Route::patch('/settings', [SettingsController::class, 'update'])->name('settings.update');
     Route::post('/settings/integrations/{integration}/sync', [SettingsController::class, 'syncIntegration'])->name('settings.integrations.sync');
     Route::post('/settings/integrations/instagram', [SettingsController::class, 'connectInstagram'])->name('settings.integrations.instagram.connect');
+
+    // Meta publishing OAuth (Instagram/Facebook) — distinct from the
+    // Instagram *observation* integration above, which uses a manually
+    // pasted access token and feeds the Business Brain, not publishing.
+    Route::get('/settings/meta/connect', [MetaOAuthController::class, 'redirect'])->name('settings.meta.connect');
+    Route::get('/settings/meta/callback', [MetaOAuthController::class, 'callback'])->name('settings.meta.callback');
+    Route::post('/settings/meta/revoke', [MetaOAuthController::class, 'revoke'])->name('settings.meta.revoke');
 
     // Marketing Presence
     Route::get('/settings/marketing-presence', [MarketingPresenceController::class, 'index'])->name('settings.marketing-presence');
