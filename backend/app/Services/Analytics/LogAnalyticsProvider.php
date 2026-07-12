@@ -33,7 +33,7 @@ class LogAnalyticsProvider implements AnalyticsProvider
         return 0;
     }
 
-    public function repollingIntervalHours(): int
+    public function repollingIntervalHours(Execution $execution): int
     {
         return 0;
     }

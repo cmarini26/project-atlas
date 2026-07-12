@@ -48,6 +48,26 @@ class CampaignKpiServiceTest extends AnalyticsTestCase
         $this->assertEquals(0.05, $result['total_engagement_rate']);
     }
 
+    public function test_aggregate_sums_clicks_and_computes_click_rate(): void
+    {
+        $this->makeMetric(['normalised_reach' => 1000, 'normalised_clicks' => 40]);
+        $this->makeMetric(['normalised_reach' => 500, 'normalised_clicks' => 10]);
+
+        $result = $this->service->aggregate($this->campaign->id);
+
+        $this->assertEquals(50, $result['total_clicks']);
+        $this->assertEqualsWithDelta(0.0333, $result['total_click_rate'], 0.001);
+    }
+
+    public function test_click_rate_is_null_without_reach(): void
+    {
+        $this->makeMetric(['normalised_clicks' => 10]);
+
+        $result = $this->service->aggregate($this->campaign->id);
+
+        $this->assertNull($result['total_click_rate']);
+    }
+
     public function test_best_channel_returns_channel_with_highest_rate(): void
     {
         $channelBreakdown = [

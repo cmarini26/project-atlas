@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 1013 tests (1010 passing, 3 skipped where the local environment can't support it) + 78 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Milestone 16 groundwork — PostmarkEmailProvider, 11 new PHP tests. |
+| Tests             | ✅ Strong | 1037 tests (1034 passing, 3 skipped where the local environment can't support it) + 78 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Milestone 18 groundwork — Meta/Postmark analytics providers, 24 new PHP tests. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,23 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**Milestone 18 groundwork — Meta/Postmark analytics providers ✅ Complete (Phase 3 of 3 — groundwork effort finished)**
+*Completed: 2026-07-11*
+
+Third and final phase prepping Version 0.2 Milestones 16-19 (Phase 4 — Meta OAuth social publishing — was explicitly deferred to its own session; it introduces OAuth/PKCE token handling with no existing pattern in this codebase to build against). `MetaAnalyticsProvider` and `PostmarkAnalyticsProvider` implement the existing `AnalyticsProvider` contract; the analytics pipeline (`AnalyticsProviderRegistry`, `RetrieveExecutionMetrics`'s self-rescheduling poll loop, `CampaignKpiService`, `LearningService`'s signal-generation framework) was already fully built and needed no rework — just real providers feeding it.
+
+**One deliberate interface change:** `repollingIntervalHours()` gained an `Execution $execution` parameter (matching `isWindowClosed(Execution $execution)`'s existing shape), since the roadmap's 6h → 12h → 24h → 48h → 7d progressive backoff is fully derivable from time elapsed since publication — no new stored poll-count needed. `LogAnalyticsProvider`/`FakeAnalyticsProvider` updated trivially (ignore the param).
+
+**New Learning signals**: `reach_exceeded`, `engagement_low`, `click_rate_high` — three new `LearningService::check*()` methods reusing `CampaignKpiService::ratePerformance()`'s existing exceeded/met/below comparison logic against `Decision.expected_impact` baselines, just applied to reach/click-rate instead of only engagement rate. `click_rate_high` needed one small, additive prerequisite: `CampaignKpiService::aggregate()` now also sums `normalised_clicks` into `total_clicks`/`total_click_rate` (previously untracked — no click-producing provider existed before this phase).
+
+**Also closed a small gap while touching `ExecutionResource`**: its Filament infolist showed reach/engagement/engagement-rate but not clicks or the raw provider payload — added both, since the roadmap explicitly asked for "raw payload" visibility and the new providers now populate `normalised_clicks`.
+
+24 new PHP tests (`MetaAnalyticsProviderTest`, `PostmarkAnalyticsProviderTest`, `CampaignKpiServiceTest` click aggregation, `LearningServiceMetricsTest` new-signal coverage). 1037 PHP tests (1034 passing, 3 skipped). PHPStan level 8 — 0 errors. Pint clean. As with Phases 2, this cannot be verified against real Meta/Postmark accounts — HTTP-mocked (Guzzle `MockHandler`) unit tests only.
+
+**This closes out the 3-phase groundwork effort** (Milestone 19 — Feedback Tooling fully shipped; Milestone 16 — Postmark email provider; Milestone 18 — Meta/Postmark analytics providers). Milestone 17 (Meta OAuth social publishing) remains deliberately unstarted, flagged for its own dedicated session.
+
+**Previous milestone:**
 
 **Milestone 16 groundwork — PostmarkEmailProvider ✅ Complete (Phase 2 of a 3-phase groundwork effort)**
 *Completed: 2026-07-11*

@@ -25,6 +25,9 @@ class LearningService
         $this->checkHighUnsubscribeRate($campaign, $snapshot);
         $this->checkContentAngleEngaged($campaign, $snapshot);
         $this->checkOptimalTiming($campaign, $snapshot);
+        $this->checkReachExceeded($campaign, $snapshot, $kpis);
+        $this->checkEngagementLow($campaign, $snapshot, $kpis);
+        $this->checkClickRateHigh($campaign, $snapshot, $kpis);
     }
 
     /**
@@ -292,6 +295,76 @@ class LearningService
             'open_rate' => $currentOpenRate,
             'q3_open_rate' => $q3,
             'published_hour' => $publishedHour,
+        ]);
+    }
+
+    /**
+     * Reuses the same exceeded/met/below comparison CampaignKpiService::
+     * ratePerformance() already applies at the campaign level, but against
+     * total_reach specifically rather than engagement rate.
+     *
+     * @param  array<string, mixed>  $kpis
+     */
+    private function checkReachExceeded(Campaign $campaign, CampaignKpiSnapshot $snapshot, array $kpis): void
+    {
+        $actual = $kpis['total_reach'] ?? null;
+        $baseline = $snapshot->expected_impact['target_reach'] ?? null;
+
+        if ($actual === null || $baseline === null || ! is_numeric($baseline) || (float) $baseline <= 0) {
+            return;
+        }
+
+        if ((float) $actual < (float) $baseline * 1.25) {
+            return;
+        }
+
+        $this->createIfAbsent($campaign, $snapshot, 'reach_exceeded', [
+            'total_reach' => $actual,
+            'target_reach' => $baseline,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $kpis
+     */
+    private function checkEngagementLow(Campaign $campaign, CampaignKpiSnapshot $snapshot, array $kpis): void
+    {
+        $actual = $kpis['total_engagement_rate'] ?? null;
+        $baseline = $snapshot->expected_impact['target_engagement_rate'] ?? null;
+
+        if ($actual === null || $baseline === null || ! is_numeric($baseline) || (float) $baseline <= 0) {
+            return;
+        }
+
+        if ((float) $actual >= (float) $baseline * 0.75) {
+            return;
+        }
+
+        $this->createIfAbsent($campaign, $snapshot, 'engagement_low', [
+            'total_engagement_rate' => $actual,
+            'target_engagement_rate' => $baseline,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $kpis
+     */
+    private function checkClickRateHigh(Campaign $campaign, CampaignKpiSnapshot $snapshot, array $kpis): void
+    {
+        $actual = $kpis['total_click_rate'] ?? null;
+        $baseline = $snapshot->expected_impact['target_click_rate'] ?? null;
+
+        if ($actual === null || $baseline === null || ! is_numeric($baseline) || (float) $baseline <= 0) {
+            return;
+        }
+
+        if ((float) $actual < (float) $baseline * 1.25) {
+            return;
+        }
+
+        $this->createIfAbsent($campaign, $snapshot, 'click_rate_high', [
+            'total_click_rate' => $actual,
+            'target_click_rate' => $baseline,
         ]);
     }
 

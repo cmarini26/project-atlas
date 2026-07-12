@@ -148,6 +148,17 @@ class ExecutionResource extends Resource
                         ->state(fn (Execution $record): string => isset($record->metric?->metrics['normalised_engagement_rate'])
                             ? number_format((float) $record->metric->metrics['normalised_engagement_rate'] * 100, 2).'%'
                             : '—'),
+
+                    Infolists\Components\TextEntry::make('normalised_clicks')
+                        ->label('Clicks')
+                        ->state(fn (Execution $record): string => (string) ($record->metric?->metrics['normalised_clicks'] ?? '—')),
+
+                    Infolists\Components\TextEntry::make('metric.raw')
+                        ->label('Raw Provider Payload')
+                        ->state(fn (Execution $record): string => $record->metric?->raw !== null
+                            ? json_encode($record->metric->raw, JSON_PRETTY_PRINT)
+                            : '—')
+                        ->columnSpanFull(),
                 ])->columns(3),
         ]);
     }

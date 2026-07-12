@@ -24,6 +24,7 @@ class CampaignKpiService
 
         $totalReach = 0;
         $totalEngagement = 0;
+        $totalClicks = 0;
         $channelBreakdown = [];
 
         foreach ($metrics as $metric) {
@@ -32,10 +33,12 @@ class CampaignKpiService
 
             $reach = (int) ($m['normalised_reach'] ?? 0);
             $engagement = (int) ($m['normalised_engagement'] ?? 0);
+            $clicks = (int) ($m['normalised_clicks'] ?? 0);
             $channelType = $metric->channel_type;
 
             $totalReach += $reach;
             $totalEngagement += $engagement;
+            $totalClicks += $clicks;
 
             if (! isset($channelBreakdown[$channelType])) {
                 $channelBreakdown[$channelType] = [
@@ -56,6 +59,7 @@ class CampaignKpiService
         }
 
         $totalEngagementRate = $totalReach > 0 ? ($totalEngagement / $totalReach) : null;
+        $totalClickRate = $totalReach > 0 ? ($totalClicks / $totalReach) : null;
 
         $bestChannel = $this->bestChannel($channelBreakdown);
 
@@ -63,6 +67,8 @@ class CampaignKpiService
             'total_reach' => $totalReach,
             'total_engagement' => $totalEngagement,
             'total_engagement_rate' => $totalEngagementRate,
+            'total_clicks' => $totalClicks,
+            'total_click_rate' => $totalClickRate,
             'channel_breakdown' => $channelBreakdown,
             'best_channel' => $bestChannel,
         ];

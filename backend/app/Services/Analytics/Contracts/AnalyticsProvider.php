@@ -36,9 +36,12 @@ interface AnalyticsProvider
     public function pollingDelayHours(): int;
 
     /**
-     * Hours between subsequent retrieval attempts while the window is open.
+     * Hours to wait before the next retrieval attempt while the window is
+     * open. Takes the Execution (matching isWindowClosed()'s signature)
+     * since a progressive backoff schedule is naturally derived from time
+     * elapsed since publication, not a fixed interval.
      */
-    public function repollingIntervalHours(): int;
+    public function repollingIntervalHours(Execution $execution): int;
 
     /**
      * Returns true if this provider handles the given provider type string.

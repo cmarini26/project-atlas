@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Services\Analytics\AnalyticsProviderRegistry;
 use App\Services\Analytics\LogAnalyticsProvider;
+use App\Services\Analytics\MetaAnalyticsProvider;
+use App\Services\Analytics\PostmarkAnalyticsProvider;
 use App\Services\Analytics\WebhookHandlerRegistry;
 use App\Services\Analytics\Webhooks\PostmarkWebhookHandler;
 use Illuminate\Support\ServiceProvider;
@@ -19,6 +21,8 @@ class AnalyticsServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $providerRegistry = $this->app->make(AnalyticsProviderRegistry::class);
+        $providerRegistry->register($this->app->make(MetaAnalyticsProvider::class));
+        $providerRegistry->register($this->app->make(PostmarkAnalyticsProvider::class));
         $providerRegistry->register($this->app->make(LogAnalyticsProvider::class));
 
         $webhookRegistry = $this->app->make(WebhookHandlerRegistry::class);

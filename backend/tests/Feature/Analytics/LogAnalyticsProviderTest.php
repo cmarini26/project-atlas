@@ -62,6 +62,6 @@ class LogAnalyticsProviderTest extends TestCase
 
     public function test_repolling_interval_is_zero(): void
     {
-        $this->assertEquals(0, (new LogAnalyticsProvider())->repollingIntervalHours());
+        $this->assertEquals(0, (new LogAnalyticsProvider())->repollingIntervalHours(new Execution()));
     }
 }

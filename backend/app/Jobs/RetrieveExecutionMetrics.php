@@ -98,7 +98,7 @@ class RetrieveExecutionMetrics implements ShouldQueue
             if ($windowClosed) {
                 $kpiService->snapshotIfReady($execution->campaign_id);
             } else {
-                $delay = $provider->repollingIntervalHours();
+                $delay = $provider->repollingIntervalHours($execution);
                 $pending = self::dispatch($this->executionId)->onQueue('observations');
                 if ($delay > 0) {
                     $pending->delay(now()->addHours($delay));

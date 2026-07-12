@@ -28,13 +28,14 @@ class LearningServiceMetricsTest extends AnalyticsTestCase
         $this->decision->save();
     }
 
-    private function makeSnapshot(string $rating, array $kpis = []): CampaignKpiSnapshot
+    private function makeSnapshot(string $rating, array $kpis = [], ?array $expectedImpact = null): CampaignKpiSnapshot
     {
         return CampaignKpiSnapshot::withoutGlobalScopes()->create([
             'company_id' => $this->company->id, 'campaign_id' => $this->campaign->id,
             'snapshot_type' => 'final', 'snapshotted_at' => now(),
             'channels_included' => ['email'],
             'actual_kpis' => $kpis,
+            'expected_impact' => $expectedImpact,
             'performance_rating' => $rating,
         ]);
     }
@@ -190,5 +191,76 @@ class LearningServiceMetricsTest extends AnalyticsTestCase
         $this->service->recordFromMetrics($this->campaign, $snapshot);
 
         $this->assertDatabaseMissing('learnings', ['signal' => 'campaign_type_underperformed']);
+    }
+
+    public function test_creates_reach_exceeded_when_actual_reach_beats_target_by_25_percent(): void
+    {
+        $snapshot = $this->makeSnapshot('met', ['total_reach' => 1300, 'channel_breakdown' => []], ['target_reach' => 1000]);
+
+        $this->service->recordFromMetrics($this->campaign, $snapshot);
+
+        $this->assertDatabaseHas('learnings', ['signal' => 'reach_exceeded', 'source_id' => $snapshot->id]);
+    }
+
+    public function test_does_not_create_reach_exceeded_when_reach_is_only_slightly_above_target(): void
+    {
+        $snapshot = $this->makeSnapshot('met', ['total_reach' => 1050, 'channel_breakdown' => []], ['target_reach' => 1000]);
+
+        $this->service->recordFromMetrics($this->campaign, $snapshot);
+
+        $this->assertDatabaseMissing('learnings', ['signal' => 'reach_exceeded']);
+    }
+
+    public function test_creates_engagement_low_when_actual_rate_is_well_below_target(): void
+    {
+        $snapshot = $this->makeSnapshot('below', ['total_engagement_rate' => 0.02, 'channel_breakdown' => []], ['target_engagement_rate' => 0.05]);
+
+        $this->service->recordFromMetrics($this->campaign, $snapshot);
+
+        $this->assertDatabaseHas('learnings', ['signal' => 'engagement_low', 'source_id' => $snapshot->id]);
+    }
+
+    public function test_does_not_create_engagement_low_when_rate_is_close_to_target(): void
+    {
+        $snapshot = $this->makeSnapshot('met', ['total_engagement_rate' => 0.045, 'channel_breakdown' => []], ['target_engagement_rate' => 0.05]);
+
+        $this->service->recordFromMetrics($this->campaign, $snapshot);
+
+        $this->assertDatabaseMissing('learnings', ['signal' => 'engagement_low']);
+    }
+
+    public function test_creates_click_rate_high_when_actual_click_rate_beats_target_by_25_percent(): void
+    {
+        $snapshot = $this->makeSnapshot('met', ['total_click_rate' => 0.10, 'channel_breakdown' => []], ['target_click_rate' => 0.08]);
+
+        $this->service->recordFromMetrics($this->campaign, $snapshot);
+
+        $this->assertDatabaseHas('learnings', ['signal' => 'click_rate_high', 'source_id' => $snapshot->id]);
+    }
+
+    public function test_no_new_signals_fire_without_an_expected_impact_baseline(): void
+    {
+        $snapshot = $this->makeSnapshot('met', [
+            'total_reach' => 5000, 'total_engagement_rate' => 0.01, 'total_click_rate' => 0.5, 'channel_breakdown' => [],
+        ]);
+
+        $this->service->recordFromMetrics($this->campaign, $snapshot);
+
+        $this->assertDatabaseMissing('learnings', ['signal' => 'reach_exceeded']);
+        $this->assertDatabaseMissing('learnings', ['signal' => 'engagement_low']);
+        $this->assertDatabaseMissing('learnings', ['signal' => 'click_rate_high']);
+    }
+
+    public function test_new_signals_are_not_duplicated_on_a_repeat_call(): void
+    {
+        $snapshot = $this->makeSnapshot('met', ['total_reach' => 1300, 'channel_breakdown' => []], ['target_reach' => 1000]);
+
+        $this->service->recordFromMetrics($this->campaign, $snapshot);
+        $this->service->recordFromMetrics($this->campaign, $snapshot);
+
+        $this->assertEquals(
+            1,
+            Learning::withoutGlobalScopes()->where('signal', 'reach_exceeded')->where('source_id', $snapshot->id)->count(),
+        );
     }
 }

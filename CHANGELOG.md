@@ -6,6 +6,24 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 18 groundwork — Meta/Postmark analytics providers] — 2026-07-11
+
+Third and final phase prepping Version 0.2 Milestones 16-19. Phase 4 (Meta OAuth social publishing) remains deliberately deferred to its own session. Cannot be verified against real Meta/Postmark accounts — HTTP-mocked unit tests only.
+
+### Added
+
+- `app/Services/Analytics/MetaAnalyticsProvider.php`, `PostmarkAnalyticsProvider.php` implementing the existing `AnalyticsProvider` contract. Registered in `AnalyticsServiceProvider`. The analytics pipeline (`RetrieveExecutionMetrics`'s self-rescheduling poll loop, `CampaignKpiService`, `LearningService`) needed no rework — just real providers.
+- Three new `LearningService` signals: `reach_exceeded`, `engagement_low`, `click_rate_high` (added to `SignalTier::SIGNAL_TIERS`, all `PERFORMANCE` tier), reusing `CampaignKpiService::ratePerformance()`'s existing exceeded/met/below comparison logic against `Decision.expected_impact` baselines.
+- `tests/Feature/Analytics/MetaAnalyticsProviderTest.php`, `PostmarkAnalyticsProviderTest.php`, plus `CampaignKpiServiceTest`/`LearningServiceMetricsTest` additions (24 new tests total).
+
+### Changed
+
+- `AnalyticsProvider::repollingIntervalHours()` gained an `Execution $execution` parameter (matching `isWindowClosed(Execution $execution)`'s shape) — the roadmap's 6h → 12h → 24h → 48h → 7d backoff schedule is derivable from time elapsed since publication, no new stored poll-count needed. `LogAnalyticsProvider`/`FakeAnalyticsProvider` updated trivially.
+- `CampaignKpiService::aggregate()` now also sums `normalised_clicks` into `total_clicks`/`total_click_rate` — needed for `click_rate_high`, previously untracked since no click-producing provider existed.
+- `app/Filament/Resources/ExecutionResource.php` — infolist gained a Clicks field and the raw provider payload (previously showed reach/engagement/engagement-rate only).
+
+---
+
 ## [Milestone 16 groundwork — PostmarkEmailProvider] — 2026-07-11
 
 Second of three phases prepping Version 0.2 Milestones 16-19. Cannot be verified against a real Postmark account (none exists yet) — HTTP-mocked (Guzzle `MockHandler`) unit tests only, matching the codebase's established `AnthropicProvider` test convention.
