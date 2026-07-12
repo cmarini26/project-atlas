@@ -6,6 +6,36 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 13 Phase 1 — Marketing Health MVP] — 2026-07-13
+
+Implements the deterministic scoring subsystem designed in `docs/specs/Marketing-Health.md`, MVP scope only: no Opportunity/Decision Engine influence, no trend history, no AI scoring, no historical charts, no notifications.
+
+### Added
+
+- `marketing_health_scores` table + `App\Models\MarketingHealthScore` — current-value-with-supersession, mirroring `Fact` exactly.
+- `App\Domain\MarketingHealth\ValueObjects\{MarketingHealthScoreResult,MarketingHealthEvidence}`, `App\Services\MarketingHealth\Contracts\MarketingHealthScorer`.
+- Seven scorer implementations (`app/Services/MarketingHealth/Scorers/`): `WebsiteHealthScorer`, `SocialActivityScorer`, `CampaignConsistencyScorer`, `BrandConsistencyScorer`, `ContentDiversityScorer`, `CtaStrengthScorer`, `PresenceCoverageScorer` — each fully deterministic, reading only Facts/Knowledge/Campaigns/ContentAssets/MarketingChannels already stored. Returns `null` (not zero) when there isn't enough evidence.
+- `App\Services\MarketingHealth\{MarketingHealthRegistry,MarketingHealthService}` — `recompute()` persists scores with supersession; `currentFor()` reads current rows; `compositeFor()` computes the confidence-weighted overall score on read (no snapshot table this phase — trend history is out of scope).
+- `App\Providers\MarketingHealthServiceProvider` registers the seven scorers.
+- `config/marketing_health.php` — per-dimension scoring constants.
+- `ProcessObservation` gains one additional call, `MarketingHealthService::recompute()`, alongside the existing `KnowledgeService::synthesizeForCompany()` call.
+- `App\Http\Controllers\App\MarketingHealthController` + route `GET /app/marketing-health` + nav entry under "Understand".
+- `resources/js/Pages/App/MarketingHealth.vue` — read-only: overall score with a qualitative band, seven dimension cards, expandable evidence per dimension.
+- 49 new PHP tests + 4 new Vitest tests.
+
+### Fixed
+
+- `WebsiteHealthScorer`'s day-since-crawl calculation used a Carbon `diffInDays()` call direction that returns a *signed* result — a 45-day-old crawl computed as `-44` and scored as freshly crawled. Fixed with `abs()`; caught by a dedicated stale-crawl test before it shipped.
+- The `marketing_health_scores` migration's self-referencing `superseded_by_id` foreign key failed against real PostgreSQL (a self-FK can't reference its own table's primary key inside the same `CREATE TABLE` statement). Fixed by dropping the FK, matching `Fact.superseded_by_id`'s existing plain-column, no-DB-constraint precedent for the identical case.
+
+### Notes
+
+- Source-agnostic verified in practice: `SocialActivityScorer` checks a documented, explicit Fact-key-prefix list (currently `['instagram']`) rather than a platform-specific "is X connected" check — a future connector extends the dimension by appending a string, not by changing scorer logic.
+- Migration verified against a real local PostgreSQL instance (up/rollback/up), not just sqlite.
+- Opportunity Engine, Decision Engine, trend snapshots, AI-generated narrative, and notifications remain deliberately unbuilt — future-phase work per the original design docs.
+
+---
+
 ## [Milestone 13 — Marketing Health Engine (design only)] — 2026-07-12
 
 Design-only session, no code written. Designs a deterministic scoring subsystem between the Business Brain and the Opportunity Engine.

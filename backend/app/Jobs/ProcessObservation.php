@@ -9,6 +9,7 @@ use App\Models\Observation;
 use App\Services\Analyst\AnalystRegistry;
 use App\Services\Brain\FactService;
 use App\Services\Brain\KnowledgeService;
+use App\Services\MarketingHealth\MarketingHealthService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -42,6 +43,7 @@ class ProcessObservation implements ShouldQueue
         AnalystRegistry $analysts,
         FactService $factService,
         KnowledgeService $knowledgeService,
+        MarketingHealthService $marketingHealthService,
     ): void {
         $observation = $this->observation;
         $observation->markProcessing();
@@ -70,6 +72,12 @@ class ProcessObservation implements ShouldQueue
                 ]);
 
                 $knowledgeService->synthesizeForCompany($company);
+
+                Log::info('ProcessObservation: recomputing marketing health.', [
+                    'company_id' => $company->id,
+                ]);
+
+                $marketingHealthService->recompute($company);
             }
 
             $observation->markProcessed();

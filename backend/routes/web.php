@@ -8,6 +8,7 @@ use App\Http\Controllers\App\CompanySelectorController;
 use App\Http\Controllers\App\DashboardController;
 use App\Http\Controllers\App\FeedbackController;
 use App\Http\Controllers\App\LearningController;
+use App\Http\Controllers\App\MarketingHealthController;
 use App\Http\Controllers\App\MarketingPresenceController;
 use App\Http\Controllers\App\MetaOAuthController;
 use App\Http\Controllers\App\OnboardingChecklistController;
@@ -68,6 +69,8 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::get('/brain', [BusinessBrainController::class, 'index'])->name('brain');
+
+    Route::get('/marketing-health', [MarketingHealthController::class, 'index'])->name('marketing-health');
 
     Route::get('/opportunities', [OpportunityController::class, 'index'])->name('opportunities');
 

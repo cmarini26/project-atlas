@@ -14,6 +14,7 @@ use App\Services\Analyst\AnalystRegistry;
 use App\Services\Brain\BusinessBrainService;
 use App\Services\Brain\FactService;
 use App\Services\Brain\KnowledgeService;
+use App\Services\MarketingHealth\MarketingHealthService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Event;
@@ -79,6 +80,7 @@ class InstagramBusinessBrainIntegrationTest extends TestCase
             $this->app->make(AnalystRegistry::class),
             $this->app->make(FactService::class),
             $this->app->make(KnowledgeService::class),
+            $this->app->make(MarketingHealthService::class),
         );
 
         $brain = $this->app->make(BusinessBrainService::class)->for($company);

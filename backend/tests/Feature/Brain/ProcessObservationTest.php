@@ -20,6 +20,7 @@ use App\Services\Analyst\AnalystRegistry;
 use App\Services\Analyst\Exceptions\FactExtractionFailedException;
 use App\Services\Brain\FactService;
 use App\Services\Brain\KnowledgeService;
+use App\Services\MarketingHealth\MarketingHealthService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
@@ -92,6 +93,7 @@ class ProcessObservationTest extends TestCase
             $this->app->make(AnalystRegistry::class),
             $this->app->make(FactService::class),
             $this->app->make(KnowledgeService::class),
+            $this->app->make(MarketingHealthService::class),
         );
 
         $this->observation->refresh();
@@ -107,6 +109,7 @@ class ProcessObservationTest extends TestCase
             $this->app->make(AnalystRegistry::class),
             $this->app->make(FactService::class),
             $this->app->make(KnowledgeService::class),
+            $this->app->make(MarketingHealthService::class),
         );
 
         $this->assertDatabaseCount('facts', 4);
@@ -125,6 +128,7 @@ class ProcessObservationTest extends TestCase
             $this->app->make(AnalystRegistry::class),
             $this->app->make(FactService::class),
             $this->app->make(KnowledgeService::class),
+            $this->app->make(MarketingHealthService::class),
         );
 
         $this->assertDatabaseHas('knowledge_entries', [
@@ -142,6 +146,7 @@ class ProcessObservationTest extends TestCase
             $this->app->make(AnalystRegistry::class),
             $this->app->make(FactService::class),
             $this->app->make(KnowledgeService::class),
+            $this->app->make(MarketingHealthService::class),
         );
 
         $twin = DigitalTwin::withoutGlobalScopes()
@@ -160,6 +165,7 @@ class ProcessObservationTest extends TestCase
             $this->app->make(AnalystRegistry::class),
             $this->app->make(FactService::class),
             $this->app->make(KnowledgeService::class),
+            $this->app->make(MarketingHealthService::class),
         );
 
         Event::assertDispatched(ObservationProcessed::class);
@@ -174,6 +180,7 @@ class ProcessObservationTest extends TestCase
                 $this->app->make(AnalystRegistry::class),
                 $this->app->make(FactService::class),
                 $this->app->make(KnowledgeService::class),
+                $this->app->make(MarketingHealthService::class),
             );
             $this->fail('Expected FactExtractionFailedException was not thrown.');
         } catch (FactExtractionFailedException) {
@@ -194,6 +201,7 @@ class ProcessObservationTest extends TestCase
                 $this->app->make(AnalystRegistry::class),
                 $this->app->make(FactService::class),
                 $this->app->make(KnowledgeService::class),
+                $this->app->make(MarketingHealthService::class),
             );
             $this->fail('Expected FactExtractionFailedException was not thrown.');
         } catch (FactExtractionFailedException) {
@@ -213,6 +221,7 @@ class ProcessObservationTest extends TestCase
                 $this->app->make(AnalystRegistry::class),
                 $this->app->make(FactService::class),
                 $this->app->make(KnowledgeService::class),
+                $this->app->make(MarketingHealthService::class),
             );
         } catch (FactExtractionFailedException) {
             // expected
@@ -249,6 +258,7 @@ class ProcessObservationTest extends TestCase
             $this->app->make(AnalystRegistry::class),
             $this->app->make(FactService::class),
             $this->app->make(KnowledgeService::class),
+            $this->app->make(MarketingHealthService::class),
         );
 
         Bus::assertDispatched(
@@ -269,6 +279,7 @@ class ProcessObservationTest extends TestCase
             $this->app->make(AnalystRegistry::class),
             $this->app->make(FactService::class),
             $this->app->make(KnowledgeService::class),
+            $this->app->make(MarketingHealthService::class),
         );
 
         $this->observation->refresh();
@@ -287,6 +298,7 @@ class ProcessObservationTest extends TestCase
                 $this->app->make(AnalystRegistry::class),
                 $this->app->make(FactService::class),
                 $this->app->make(KnowledgeService::class),
+                $this->app->make(MarketingHealthService::class),
             );
             $this->fail('Expected AiProviderOverloadedException was not thrown.');
         } catch (AiProviderOverloadedException) {
@@ -309,6 +321,7 @@ class ProcessObservationTest extends TestCase
                 $this->app->make(AnalystRegistry::class),
                 $this->app->make(FactService::class),
                 $this->app->make(KnowledgeService::class),
+                $this->app->make(MarketingHealthService::class),
             );
         } catch (AiProviderOverloadedException) {
             // expected
@@ -380,6 +393,7 @@ class ProcessObservationTest extends TestCase
             $this->app->make(AnalystRegistry::class),
             $this->app->make(FactService::class),
             $this->app->make(KnowledgeService::class),
+            $this->app->make(MarketingHealthService::class),
         );
 
         $this->observation->refresh();

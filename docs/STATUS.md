@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 1134 tests (1131 passing, 3 skipped where the local environment can't support it) + 81 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Milestone 12 Phase 2 — Instagram Content Intelligence, 37 new PHP tests. |
+| Tests             | ✅ Strong | 1183 tests (1180 passing, 3 skipped where the local environment can't support it) + 85 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Milestone 13 Phase 1 — Marketing Health MVP, 49 new PHP tests. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,27 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**Milestone 13 Phase 1 — Marketing Health MVP ✅ Complete**
+*Completed: 2026-07-13*
+
+Implements the deterministic scoring subsystem designed in [Marketing-Health.md](specs/Marketing-Health.md) and [Milestone-13-Marketing-Health-Plan.md](plans/Milestone-13-Marketing-Health-Plan.md) — MVP scope only. Per this phase's explicit boundaries: does **not** touch the Opportunity Engine or Decision Engine, generates no trend history, uses no AI scoring, has no historical charts, and sends no notifications. Those remain future-phase work per the original design.
+
+All seven dimensions are implemented as deterministic `MarketingHealthScorer` classes (`app/Services/MarketingHealth/Scorers/`) reading only Facts/Knowledge/Campaigns/ContentAssets/MarketingChannels Atlas already stores — no AI provider call anywhere in this code. Each scorer returns `null` (not zero) when there isn't enough evidence, a real and honest state distinct from "scored poorly." `MarketingHealthService::recompute()` runs every scorer and persists results as `MarketingHealthScore` rows using the exact same current-value-with-supersession pattern `Fact` already established (`is_current`/`superseded_by_id`) — a re-score never updates or deletes the prior row. `MarketingHealthService::compositeFor()` computes the confidence-weighted overall score on read (no snapshot table in this phase, since trend history is explicitly out of scope — the overall score is derived fresh from current dimension scores each time, not pre-computed and stored).
+
+Recompute is triggered the same way `KnowledgeService::synthesizeForCompany()` already is — one additional call inside `ProcessObservation`, after fact/knowledge processing completes, for the same company, same request. No new job, no new event, no scheduled task in this phase (the plan's daily-recompute job for date-decay dimensions is deferred, since MVP scope doesn't require scores to move without a new Observation).
+
+**Two real bugs found and fixed while implementing:**
+1. `WebsiteHealthScorer` initially computed days-since-crawl as `now()->diffInDays($observation->observed_at)` (flipped from the natural direction to dodge a Larastan false-positive on the cast property's inferred type) — but Carbon's `diffInDays()` returns a *signed*, not absolute, result as of the Carbon version in use, so a 45-day-old crawl computed as `-44` and scored as if freshly crawled. Caught by a dedicated stale-crawl test, fixed with `abs()`.
+2. The `marketing_health_scores` migration's self-referencing `superseded_by_id` foreign key failed against real PostgreSQL (`there is no unique constraint matching given keys` — a self-FK can't reference its own table's not-yet-committed primary key inside the same `CREATE TABLE` statement). Fixed by dropping the FK entirely and keeping `superseded_by_id` a plain column with no DB-level constraint — exactly the precedent `Fact.superseded_by_id` (checked first) already set for the identical situation.
+
+A new "Marketing Health" page (`resources/js/Pages/App/MarketingHealth.vue`), reached via a new nav entry under "Understand" (alongside Business Brain and Opportunities), shows the overall score with a qualitative band (Strong/Developing/Needs attention), all seven dimension cards (score, confidence, or an explicit "not enough data yet" state), and an expandable evidence list per dimension — entirely read-only, no editing affordances, matching this phase's read-only-dashboard requirement.
+
+Source-agnostic by construction, verified in practice: `SocialActivityScorer` reads a documented, explicit Fact-key-prefix list (currently just `['instagram']`) rather than checking "is Instagram connected" — a future platform's posting-cadence Fact extends the same dimension by appending a string, no branching logic, no code change to the scorer itself.
+
+49 new PHP tests (7 scorer test files, `MarketingHealthServiceTest`, `MarketingHealthControllerTest`, `ProcessObservation`/Instagram brain-integration test updates for the new constructor param) + 4 new Vitest tests. 1183 PHP tests (1180 passing, 3 skipped) + 85 Vitest tests. PHPStan level 8 — 0 errors. Pint clean. Build green. Migration verified against a real local PostgreSQL instance (up/rollback/up), not just sqlite.
+
+**Previous milestone:**
 
 **Milestone 13 — Marketing Health Engine 📐 Designed (not implemented)**
 *Completed: 2026-07-12*

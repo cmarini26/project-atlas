@@ -5,6 +5,7 @@ use App\Providers\AppServiceProvider;
 use App\Providers\ConnectorServiceProvider;
 use App\Providers\Filament\AdminPanelProvider;
 use App\Providers\LearningServiceProvider;
+use App\Providers\MarketingHealthServiceProvider;
 use App\Providers\PublisherServiceProvider;
 
 return [
@@ -14,4 +15,5 @@ return [
     AdminPanelProvider::class,
     PublisherServiceProvider::class,
     LearningServiceProvider::class,
+    MarketingHealthServiceProvider::class,
 ];
