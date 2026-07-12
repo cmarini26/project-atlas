@@ -12,6 +12,7 @@ use App\Events\CampaignAssetsReady;
 use App\Events\DecisionCommitted;
 use App\Events\ExecutionCompleted;
 use App\Events\FactExtracted;
+use App\Events\FeedbackSubmitted;
 use App\Events\KnowledgeSynthesized;
 use App\Events\MarketingPresenceUpdated;
 use App\Events\ObservationProcessed;
@@ -22,6 +23,7 @@ use App\Events\RecommendationCreated;
 use App\Listeners\DispatchCampaignPreparation;
 use App\Listeners\DispatchObservationProcessing;
 use App\Listeners\ScheduleMetricRetrieval;
+use App\Listeners\SendFeedbackNotification;
 use App\Listeners\SendWelcomeEmailOnFirstRecommendation;
 use App\Listeners\TriggerCampaignPublishing;
 use App\Listeners\TriggerDecisionEvaluation;
@@ -139,6 +141,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(RecommendationApproved::class, TriggerCampaignPublishing::class);
         Event::listen(RecommendationCreated::class, SendWelcomeEmailOnFirstRecommendation::class);
         Event::listen(ExecutionCompleted::class, ScheduleMetricRetrieval::class);
+        Event::listen(FeedbackSubmitted::class, SendFeedbackNotification::class);
 
         // Named limiter (not a bare `throttle:N,M` string) so this endpoint
         // gets its own isolated bucket and a place to log rejections — bare

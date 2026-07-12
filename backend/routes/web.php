@@ -6,6 +6,7 @@ use App\Http\Controllers\App\BusinessBrainController;
 use App\Http\Controllers\App\CampaignController;
 use App\Http\Controllers\App\CompanySelectorController;
 use App\Http\Controllers\App\DashboardController;
+use App\Http\Controllers\App\FeedbackController;
 use App\Http\Controllers\App\LearningController;
 use App\Http\Controllers\App\MarketingPresenceController;
 use App\Http\Controllers\App\OnboardingChecklistController;
@@ -107,4 +108,7 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
 
     // Post-onboarding checklist
     Route::post('/checklist/dismiss', [OnboardingChecklistController::class, 'dismiss'])->name('checklist.dismiss');
+
+    // Feedback
+    Route::post('/feedback', [FeedbackController::class, 'store'])->name('feedback.store');
 });

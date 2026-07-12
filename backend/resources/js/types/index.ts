@@ -208,4 +208,5 @@ export interface SharedProps {
     company: Company | null
     companies: CompanyOption[]
     flash: { success: string | null; error: string | null }
+    show_feedback_prompt: boolean
 }

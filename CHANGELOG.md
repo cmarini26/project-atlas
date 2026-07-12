@@ -6,6 +6,23 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 19 — Early Customer Feedback Tooling] — 2026-07-11
+
+First of three phases prepping Version 0.2 Milestones 16-19. Milestones 16-18 (real email/social publishing, real analytics) need real Postmark/Meta accounts that don't exist yet; Milestone 19 needs no external credentials and ships complete.
+
+### Added
+
+- `database/migrations/2026_07_11_000600_create_feedback_table.php`, `app/Models/Feedback.php` — score (1-10), optional comment (≤500 chars), optional context JSON.
+- `app/Http/Controllers/App/FeedbackController.php` (`POST /app/feedback`), `app/Events/FeedbackSubmitted.php`.
+- `app/Listeners/SendFeedbackNotification.php`, `app/Notifications/FeedbackReceived.php` — notifies every `is_superadmin` user (the existing Filament-panel "team" population, no new config).
+- `app/Filament/Resources/FeedbackResource.php` (+ `Pages/ListFeedback.php`, `Pages/ViewFeedback.php`) — read-only, score-range filter.
+- `app/Jobs/SendFeedbackDigest.php`, `app/Notifications/FeedbackDigestReady.php` — weekly (Mondays 07:00 UTC, `routes/console.php`) NPS distribution + up to 5 notable comments from the past 7 days.
+- `app/Services/Feedback/FeedbackPromptEligibility.php` — server-side eligibility check (role `owner`/`admin`, a `Recommendation` approval more than 24h old via `Approval.acted_at`, no `Feedback` submitted by this user in 90 days), shared via a new deferred `show_feedback_prompt` closure in `HandleInertiaRequests` (same deferred-evaluation pattern as the existing `company` prop, since `EnsureCompanyMembership`'s `membership` request attribute isn't set when global middleware's `share()` runs).
+- `resources/js/composables/useFeedback.ts`, `resources/js/Components/App/FeedbackPrompt.vue` — mounted in `AppLayout.vue`. A bare dismiss only suppresses for the current browser session (`sessionStorage`) — the 90-day suppression is tied to having submitted, not to every dismissal.
+- 23 new PHP tests, 9 new Vitest tests.
+
+---
+
 ## [Milestone 15 — Customer Onboarding Improvements] — 2026-07-11
 
 A verification pass against `Version-0.2-Roadmap.md`'s Milestone 15 found most of its 10 listed deliverables already resolved by prior sessions, leaving 6 genuine gaps plus one real bug surfaced along the way. Email verification was scoped out entirely — no real mail provider is configured, so gating registration behind it would only be verifiable via a log file, not an actual inbox.

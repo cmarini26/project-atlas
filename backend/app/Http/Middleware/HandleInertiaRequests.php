@@ -4,6 +4,8 @@ namespace App\Http\Middleware;
 
 use App\Models\Company;
 use App\Models\CompanyMembership;
+use App\Models\User;
+use App\Services\Feedback\FeedbackPromptEligibility;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -70,6 +72,20 @@ class HandleInertiaRequests extends Middleware
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),
             ],
+            // Deferred for the same reason as 'company' above — 'membership'
+            // is a request attribute set by EnsureCompanyMembership, which
+            // runs after this global middleware.
+            'show_feedback_prompt' => function () use ($request): bool {
+                $user = $request->user();
+                /** @var CompanyMembership|null $membership */
+                $membership = $request->attributes->get('membership');
+
+                if (! $user instanceof User || $membership === null) {
+                    return false;
+                }
+
+                return app(FeedbackPromptEligibility::class)->shouldShow($user, $membership);
+            },
         ]);
     }
 }

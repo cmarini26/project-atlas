@@ -5,6 +5,7 @@ use App\Jobs\CheckChannelHealth;
 use App\Jobs\ExpireOpportunities;
 use App\Jobs\PruneRawMetrics;
 use App\Jobs\PublishScheduledContent;
+use App\Jobs\SendFeedbackDigest;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -44,3 +45,8 @@ Schedule::job(new PruneRawMetrics())->monthly()
 // the schedule tick itself.
 Schedule::job(new ApplyLearnings())->dailyAt('02:00')
     ->withoutOverlapping();
+
+// Weekly NPS digest for the team — Mondays, before the week's standup.
+Schedule::job(new SendFeedbackDigest())->weeklyOn(1, '07:00')
+    ->withoutOverlapping()
+    ->onOneServer();

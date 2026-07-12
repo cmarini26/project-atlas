@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 979 tests (976 passing, 3 skipped where the local environment can't support it) + 69 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Milestone 15 onboarding improvements, 12 new PHP tests + 2 new Vitest tests. |
+| Tests             | ✅ Strong | 1002 tests (999 passing, 3 skipped where the local environment can't support it) + 78 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Milestone 19 — Feedback Tooling, 23 new PHP tests + 9 new Vitest tests. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,19 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**Milestone 19 — Early Customer Feedback Tooling ✅ Complete (Phase 1 of a 3-phase groundwork effort)**
+*Completed: 2026-07-11*
+
+First of three phases prepping Version 0.2 Milestones 16-19 (real email publishing, real social publishing, real analytics, feedback tooling). Milestones 16-18 need real Postmark/Meta accounts that don't exist yet; Milestone 19 needs no external credentials at all and ships as a complete, working feature today.
+
+**What shipped:** a `Feedback` model (score 1-10, optional comment, context JSON) submitted via `POST /app/feedback`; a `FeedbackSubmitted` event notifying every superadmin user (this app's existing "team" concept, already gated into the Filament panel — no new config needed) via `FeedbackReceived`; a read-only Filament `FeedbackResource` (score/comment/company/user, score-range filter); a weekly `SendFeedbackDigest` job (Mondays 07:00 UTC) summarizing the NPS distribution (promoters/passives/detractors) and up to 5 notable comments from the past 7 days; and an in-app NPS prompt (`FeedbackPrompt.vue`, mounted in `AppLayout.vue` alongside the toast stack and product tour).
+
+**Eligibility is computed server-side**, not via client-side date math: a new `App\Services\Feedback\FeedbackPromptEligibility` checks the user's role (`owner`/`admin`), that a `Recommendation` approval happened more than 24h ago (via `Approval.acted_at`), and that this user hasn't submitted feedback in the last 90 days — shared to the frontend as `show_feedback_prompt` via a deferred `HandleInertiaRequests` closure (matching the existing `company` closure's pattern, since `EnsureCompanyMembership`'s `membership` request attribute isn't set yet when global middleware's `share()` runs). A bare dismiss (✕, no score) only suppresses the prompt for the current browser session — the 90-day window is tied to having *submitted*, not to every dismissal.
+
+23 new PHP tests, 9 new Vitest tests. 1002 PHP tests (999 passing, 3 skipped), 78 Vitest tests. PHPStan level 8 — 0 errors. Pint clean. Build and `vue-tsc --noEmit` green.
+
+**Previous milestone:**
 
 **Milestone 15 — Customer Onboarding Improvements ✅ Complete**
 *Completed: 2026-07-11*

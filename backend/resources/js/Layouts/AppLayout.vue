@@ -4,6 +4,7 @@ import { usePage, Link, router } from '@inertiajs/vue3'
 import CompanySwitcher from '@/Components/App/CompanySwitcher.vue'
 import ToastStack from '@/Components/UI/ToastStack.vue'
 import ProductTourOverlay from '@/Components/Tour/ProductTourOverlay.vue'
+import FeedbackPrompt from '@/Components/App/FeedbackPrompt.vue'
 import { useToasts } from '@/composables/useToasts'
 import { useProductTour } from '@/composables/useProductTour'
 import type { SharedProps } from '@/types'
@@ -235,5 +236,8 @@ function logout(): void {
 
     <!-- First-time-user product tour (Dashboard-only) -->
     <ProductTourOverlay />
+
+    <!-- NPS-style feedback prompt (shown 24h after a first approval) -->
+    <FeedbackPrompt />
   </div>
 </template>
