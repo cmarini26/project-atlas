@@ -5,6 +5,8 @@ namespace Tests\Feature\App;
 use App\Models\Channel;
 use App\Models\Company;
 use App\Models\CompanyMembership;
+use App\Models\Fact;
+use App\Models\Integration;
 use App\Models\MarketingChannel;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -306,6 +308,111 @@ class MarketingPresenceControllerTest extends TestCase
             ->assertNotFound();
 
         $this->assertDatabaseHas('marketing_channels', ['id' => $channel->id, 'status' => 'active']);
+    }
+
+    // ── instagram_insights (Milestone 12 Phase 2) ───────────────────────────────
+
+    public function test_instagram_insights_is_null_without_an_instagram_integration(): void
+    {
+        [$user] = $this->userWithCompany();
+
+        $this->actingAs($user)
+            ->get('/app/settings/marketing-presence')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('instagram_insights', null));
+    }
+
+    public function test_instagram_insights_is_null_when_no_content_facts_exist_yet(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+
+        Integration::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'type' => 'instagram', 'name' => 'Instagram',
+            'config' => ['access_token' => 'token'], 'status' => 'active',
+        ]);
+
+        $this->actingAs($user)
+            ->get('/app/settings/marketing-presence')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('instagram_insights', null));
+    }
+
+    public function test_instagram_insights_surfaces_content_facts(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+
+        $integration = Integration::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'type' => 'instagram', 'name' => 'Instagram',
+            'config' => ['access_token' => 'token'], 'status' => 'active',
+            'last_run_at' => now(),
+        ]);
+
+        Fact::create([
+            'company_id' => $company->id, 'key' => 'instagram.username', 'value' => 'cbb_auctions',
+            'data_type' => 'string', 'confidence' => 100, 'is_current' => true, 'valid_from' => now(),
+        ]);
+        Fact::create([
+            'company_id' => $company->id, 'key' => 'instagram.posting_cadence', 'value' => 2.5,
+            'data_type' => 'float', 'confidence' => 90, 'is_current' => true, 'valid_from' => now(),
+        ]);
+        Fact::create([
+            'company_id' => $company->id, 'key' => 'instagram.media_mix', 'value' => ['IMAGE' => 3],
+            'data_type' => 'json', 'confidence' => 100, 'is_current' => true, 'valid_from' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->get('/app/settings/marketing-presence')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('instagram_insights.username', 'cbb_auctions')
+                ->where('instagram_insights.posting_cadence', 2.5)
+                ->where('instagram_insights.media_mix.IMAGE', 3)
+                ->where('instagram_insights.last_synced_at', (string) $integration->last_run_at)
+            );
+    }
+
+    public function test_instagram_insights_omits_superseded_facts(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+
+        Integration::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'type' => 'instagram', 'name' => 'Instagram',
+            'config' => ['access_token' => 'token'], 'status' => 'active',
+        ]);
+
+        Fact::create([
+            'company_id' => $company->id, 'key' => 'instagram.posting_cadence', 'value' => 1.0,
+            'data_type' => 'float', 'confidence' => 90, 'is_current' => false, 'valid_from' => now()->subDay(),
+        ]);
+        Fact::create([
+            'company_id' => $company->id, 'key' => 'instagram.media_mix', 'value' => ['IMAGE' => 1],
+            'data_type' => 'json', 'confidence' => 100, 'is_current' => true, 'valid_from' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->get('/app/settings/marketing-presence')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('instagram_insights.posting_cadence', null));
+    }
+
+    public function test_instagram_insights_does_not_leak_across_companies(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $other = Company::withoutGlobalScopes()->create(['name' => 'Other', 'slug' => 'other']);
+
+        Integration::withoutGlobalScopes()->create([
+            'company_id' => $other->id, 'type' => 'instagram', 'name' => 'Instagram',
+            'config' => ['access_token' => 'token'], 'status' => 'active',
+        ]);
+        Fact::create([
+            'company_id' => $other->id, 'key' => 'instagram.media_mix', 'value' => ['IMAGE' => 9],
+            'data_type' => 'json', 'confidence' => 100, 'is_current' => true, 'valid_from' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->get('/app/settings/marketing-presence')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('instagram_insights', null));
     }
 
     /** @return array{User, Company} */

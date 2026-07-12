@@ -27,4 +27,19 @@ return [
 
     'request_timeout' => (int) env('INSTAGRAM_REQUEST_TIMEOUT', 10),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Recent post retrieval (Milestone 12 Phase 2)
+    |--------------------------------------------------------------------------
+    |
+    | media_limit: how many of the account's most recent posts to fetch on
+    | each sync for content-intelligence facts (posting cadence, media mix,
+    | hashtag usage, etc.). Configurable per the spec; 20 is a reasonable
+    | default that covers roughly a month of typical posting activity
+    | without an excessively large API response.
+    |
+    */
+
+    'media_limit' => (int) env('INSTAGRAM_MEDIA_LIMIT', 20),
+
 ];

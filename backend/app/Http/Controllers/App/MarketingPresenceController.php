@@ -8,6 +8,8 @@ use App\Enums\MarketingChannelStatus;
 use App\Enums\MarketingChannelType;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
+use App\Models\Fact;
+use App\Models\Integration;
 use App\Models\MarketingChannel;
 use App\Services\MarketingPresence\MarketingChannelCapabilityResolver;
 use App\Services\MarketingPresence\MarketingPresenceService;
@@ -56,7 +58,58 @@ class MarketingPresenceController extends Controller
             'statuses' => MarketingChannelStatus::values(),
             'importances' => MarketingChannelImportance::values(),
             'objectives' => MarketingChannelObjective::values(),
+            'instagram_insights' => $this->instagramInsights($company),
         ]);
+    }
+
+    /**
+     * Milestone 12 Phase 2 — Instagram Content Intelligence. Read-only:
+     * surfaces the deterministic facts InstagramAnalyst already derived
+     * into the Business Brain, alongside the same page's channel
+     * declarations. Null when the company has never synced Instagram.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function instagramInsights(Company $company): ?array
+    {
+        $integration = Integration::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->where('type', 'instagram')
+            ->first();
+
+        if ($integration === null) {
+            return null;
+        }
+
+        $facts = Fact::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->where('is_current', true)
+            ->whereIn('key', [
+                'instagram.username',
+                'instagram.posting_cadence',
+                'instagram.media_mix',
+                'instagram.hashtag_usage',
+                'instagram.cta_usage',
+                'instagram.content_distribution',
+                'instagram.engagement_trend',
+            ])
+            ->get()
+            ->keyBy('key');
+
+        if ($facts->isEmpty()) {
+            return null;
+        }
+
+        return [
+            'username' => $facts->get('instagram.username')?->value,
+            'last_synced_at' => $integration->last_run_at !== null ? (string) $integration->last_run_at : null,
+            'posting_cadence' => $facts->get('instagram.posting_cadence')?->value,
+            'media_mix' => $facts->get('instagram.media_mix')?->value,
+            'hashtag_usage' => $facts->get('instagram.hashtag_usage')?->value,
+            'cta_usage' => $facts->get('instagram.cta_usage')?->value,
+            'content_distribution' => $facts->get('instagram.content_distribution')?->value,
+            'engagement_trend' => $facts->get('instagram.engagement_trend')?->value,
+        ];
     }
 
     public function store(Request $request): RedirectResponse

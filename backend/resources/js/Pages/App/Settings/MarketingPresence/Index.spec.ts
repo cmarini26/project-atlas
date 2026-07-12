@@ -111,4 +111,61 @@ describe('MarketingPresence/Index', () => {
     const firstRowSelectAfter = wrapper.findAll('select')[1]
     expect((firstRowSelectAfter.element as HTMLSelectElement).value).toBe('inactive')
   })
+
+  // Milestone 12 Phase 2 — Instagram Insights (read-only)
+  describe('instagram_insights', () => {
+    it('renders nothing when instagram_insights is null', () => {
+      const wrapper = mount(Index, {
+        props: { ...baseProps, channels: [], instagram_insights: null },
+      })
+
+      expect(wrapper.text()).not.toContain('Instagram Insights')
+    })
+
+    it('renders posting cadence, media mix, and top hashtags', () => {
+      const wrapper = mount(Index, {
+        props: {
+          ...baseProps,
+          channels: [],
+          instagram_insights: {
+            username: 'cbb_auctions',
+            last_synced_at: '2026-07-12T00:00:00Z',
+            posting_cadence: 2.5,
+            media_mix: { IMAGE: 3, VIDEO: 1 },
+            hashtag_usage: { avg_per_post: 1.5, top: [{ tag: 'comics', count: 4 }] },
+            cta_usage: 25,
+            content_distribution: { Monday: 1, Tuesday: 0, Wednesday: 0, Thursday: 0, Friday: 0, Saturday: 0, Sunday: 0 },
+            engagement_trend: { avg_likes: 100, avg_comments: 10, trend: 'increasing' },
+          },
+        },
+      })
+
+      expect(wrapper.text()).toContain('Instagram Insights')
+      expect(wrapper.text()).toContain('2.5 posts/week')
+      expect(wrapper.text()).toContain('IMAGE: 3')
+      expect(wrapper.text()).toContain('#comics (4)')
+      expect(wrapper.text()).toContain('increasing')
+    })
+
+    it('shows a fallback message when posting cadence has not been computed yet', () => {
+      const wrapper = mount(Index, {
+        props: {
+          ...baseProps,
+          channels: [],
+          instagram_insights: {
+            username: 'cbb_auctions',
+            last_synced_at: null,
+            posting_cadence: null,
+            media_mix: null,
+            hashtag_usage: null,
+            cta_usage: null,
+            content_distribution: null,
+            engagement_trend: null,
+          },
+        },
+      })
+
+      expect(wrapper.text()).toContain('Not enough posts yet')
+    })
+  })
 })

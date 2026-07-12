@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Services\Observatory\Connectors\ConnectorRegistry;
 use App\Services\Observatory\Connectors\Instagram\InstagramConnector;
+use App\Services\Observatory\Connectors\Instagram\InstagramMediaFetcher;
 use App\Services\Observatory\Connectors\Instagram\InstagramProfileFetcher;
 use App\Services\Observatory\Connectors\Website\WebPageCrawler;
 use App\Services\Observatory\Connectors\Website\WebsiteConnector;
@@ -20,11 +21,19 @@ class ConnectorServiceProvider extends ServiceProvider
                     requestTimeout: (int) config('crawler.request_timeout', 10),
                     connectTimeout: (int) config('crawler.connect_timeout', 5),
                 )),
-                new InstagramConnector(new InstagramProfileFetcher(
-                    baseUrl: (string) config('instagram.base_url', 'https://graph.instagram.com'),
-                    requestTimeout: (int) config('instagram.request_timeout', 10),
-                    connectTimeout: (int) config('instagram.connect_timeout', 5),
-                )),
+                new InstagramConnector(
+                    new InstagramProfileFetcher(
+                        baseUrl: (string) config('instagram.base_url', 'https://graph.instagram.com'),
+                        requestTimeout: (int) config('instagram.request_timeout', 10),
+                        connectTimeout: (int) config('instagram.connect_timeout', 5),
+                    ),
+                    new InstagramMediaFetcher(
+                        baseUrl: (string) config('instagram.base_url', 'https://graph.instagram.com'),
+                        requestTimeout: (int) config('instagram.request_timeout', 10),
+                        connectTimeout: (int) config('instagram.connect_timeout', 5),
+                    ),
+                    mediaLimit: (int) config('instagram.media_limit', 20),
+                ),
             ]);
         });
     }

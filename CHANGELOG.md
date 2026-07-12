@@ -6,6 +6,29 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 12 Phase 2 — Instagram Content Intelligence] — 2026-07-12
+
+Builds on Phase 1's Instagram Observation (Beta). Spec: `docs/specs/Marketing-Intelligence.md`. Publishing, scheduling, Stories, Comments, DMs, Ads, competitor analysis, and other platforms remain out of scope.
+
+### Added
+
+- `app/Services/Observatory/Connectors/Instagram/InstagramMediaFetcher.php` + `InstagramMediaItemData.php` — fetches up to a configurable number (default 20, `INSTAGRAM_MEDIA_LIMIT`) of recent posts via the Graph API's `/me/media`, extracting hashtags/mentions from each caption at fetch time.
+- `InstagramConnector::sync()` now returns a second `ConnectorResult` (`source_type: 'social_content'`) alongside the existing profile snapshot. New `'social_content'` observation source type (base migration + Postgres constraint-rewrite migration, mirroring how `'social'` was added in Phase 1).
+- `InstagramAnalyst` gained `analyzeContent()` (dispatched from the now dual-purpose `analyze()`/`supports()`) deriving six deterministic Facts: `instagram.posting_cadence`, `.media_mix`, `.hashtag_usage`, `.cta_usage`, `.content_distribution`, `.engagement_trend` (the last only when the API provides engagement counts).
+- `MarketingPresenceController` gained an `instagram_insights` prop (last sync, posting cadence, content mix, top hashtags) and a new read-only "Instagram Insights" section in `resources/js/Pages/App/Settings/MarketingPresence/Index.vue`.
+- 37 new PHP tests (`InstagramMediaFetcherTest`, `InstagramConnectorTest` additions, `InstagramContentAnalystTest`, `InstagramContentBusinessBrainIntegrationTest`, `MarketingPresenceControllerTest` additions, `KnowledgeServiceTest` regression) + 3 new Vitest tests.
+
+### Fixed
+
+- `KnowledgeService::buildBody()` threw "Array to string conversion" for any Fact whose value contains a nested array (e.g. `hashtag_usage`'s `{avg_per_post, top: [...]}` shape) — the first Fact values in this codebase to do so. Now falls back to compact JSON for nested arrays; flat arrays render exactly as before.
+
+### Notes
+
+- No changes needed to `ProcessObservation`, `AnalystRegistry`, or `BusinessBrainService` — confirmed via a dedicated integration test that content Facts flow into the same Business Brain automatically, same as Phase 1.
+- Migration verified against a real local PostgreSQL instance (up/rollback/up), not just sqlite.
+
+---
+
 ## [Real image sourcing + WordPress publishing] — 2026-07-12
 
 Closes the real gap behind the Meta OAuth phase's `MalformedPayloadException` — `ContentAsset.media` was hardcoded to `null` everywhere content gets generated. There is no catalog-item ingestion pipeline in production (confirmed: nothing outside tests/seeders ever creates a `CatalogItem` row), so this is a pragmatic best-effort fix — real crawled images, not per-product photo matching — rather than a full catalog-photo pipeline. Also adds WordPress as a publishable channel, reusing the already-unused `'blog'` channel type.

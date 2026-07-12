@@ -22,12 +22,37 @@ interface MarketingChannelData {
   capability: MarketingChannelCapability
 }
 
-const props = defineProps<{
-  channels: MarketingChannelData[]
-  statuses: string[]
-  importances: string[]
-  objectives: string[]
-}>()
+interface InstagramHashtagUsage {
+  avg_per_post: number
+  top: { tag: string; count: number }[]
+}
+
+interface InstagramInsights {
+  username: string | null
+  last_synced_at: string | null
+  posting_cadence: number | null
+  media_mix: Record<string, number> | null
+  hashtag_usage: InstagramHashtagUsage | null
+  cta_usage: number | null
+  content_distribution: Record<string, number> | null
+  engagement_trend: { avg_likes: number; avg_comments: number; trend: string } | null
+}
+
+const props = withDefaults(
+  defineProps<{
+    channels: MarketingChannelData[]
+    statuses: string[]
+    importances: string[]
+    objectives: string[]
+    instagram_insights?: InstagramInsights | null
+  }>(),
+  { instagram_insights: null },
+)
+
+function formatDate(date: string | null): string {
+  if (!date) return 'Never'
+  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
 
 const STATUS_LABELS: Record<string, string> = {
   active: 'Active',
@@ -173,6 +198,53 @@ function reactivate(channel: MarketingChannelData): void {
       </form>
       <p v-if="addForm.errors.display_name" class="mt-2 text-xs text-rose-600">{{ addForm.errors.display_name }}</p>
       <p v-if="addForm.errors.type" class="mt-2 text-xs text-rose-600">{{ addForm.errors.type }}</p>
+    </div>
+
+    <!-- Instagram Insights (Milestone 12 Phase 2) — read-only -->
+    <div v-if="instagram_insights" class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-semibold text-[var(--color-text-primary)]">Instagram Insights</h2>
+        <span class="text-xs text-[var(--color-text-muted)]">Last synced: {{ formatDate(instagram_insights.last_synced_at) }}</span>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div>
+          <p class="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Posting frequency</p>
+          <p class="text-sm text-[var(--color-text-primary)]">
+            <template v-if="instagram_insights.posting_cadence !== null">{{ instagram_insights.posting_cadence }} posts/week</template>
+            <template v-else>Not enough posts yet</template>
+          </p>
+        </div>
+
+        <div>
+          <p class="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Call-to-action usage</p>
+          <p class="text-sm text-[var(--color-text-primary)]">
+            <template v-if="instagram_insights.cta_usage !== null">{{ instagram_insights.cta_usage }}% of posts</template>
+            <template v-else>—</template>
+          </p>
+        </div>
+
+        <div v-if="instagram_insights.media_mix">
+          <p class="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Content mix</p>
+          <div class="flex flex-wrap gap-1.5">
+            <Badge v-for="(count, type) in instagram_insights.media_mix" :key="type" variant="neutral">{{ type }}: {{ count }}</Badge>
+          </div>
+        </div>
+
+        <div v-if="instagram_insights.engagement_trend">
+          <p class="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Engagement trend</p>
+          <p class="text-sm text-[var(--color-text-primary)]">
+            {{ instagram_insights.engagement_trend.trend }} — avg {{ instagram_insights.engagement_trend.avg_likes }} likes, {{ instagram_insights.engagement_trend.avg_comments }} comments
+          </p>
+        </div>
+      </div>
+
+      <div v-if="instagram_insights.hashtag_usage && instagram_insights.hashtag_usage.top.length > 0" class="mt-4">
+        <p class="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Top hashtags</p>
+        <div class="flex flex-wrap gap-1.5">
+          <Badge v-for="tag in instagram_insights.hashtag_usage.top" :key="tag.tag" variant="accent">#{{ tag.tag }} ({{ tag.count }})</Badge>
+        </div>
+      </div>
     </div>
 
     <!-- Declared channels -->

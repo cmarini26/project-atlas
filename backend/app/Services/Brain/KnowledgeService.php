@@ -105,11 +105,30 @@ class KnowledgeService
 
         foreach ($structured as $key => $value) {
             $label = str_replace('.', ' ', (string) $key);
-            $display = is_array($value) ? implode(', ', $value) : (string) $value;
+            $display = is_array($value) ? $this->displayArray($value) : (string) $value;
             $lines[] = "{$label}: {$display}";
         }
 
         return ucfirst($domain).' — '.implode('; ', $lines);
+    }
+
+    /**
+     * A flat array of scalars (e.g. hashtags) reads naturally as a
+     * comma-separated list; a nested array (e.g. a fact whose value is
+     * itself a structured object, like instagram.hashtag_usage) can't be
+     * implode()'d directly, so it falls back to a compact JSON rendering.
+     *
+     * @param  array<array-key, mixed>  $value
+     */
+    private function displayArray(array $value): string
+    {
+        foreach ($value as $item) {
+            if (is_array($item)) {
+                return (string) json_encode($value);
+            }
+        }
+
+        return implode(', ', $value);
     }
 
     private function updateTwin(Company $company): void

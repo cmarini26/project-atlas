@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 1107 tests (1104 passing, 3 skipped where the local environment can't support it) + 78 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: real image sourcing + WordPress publishing, 46 new PHP tests. |
+| Tests             | ✅ Strong | 1134 tests (1131 passing, 3 skipped where the local environment can't support it) + 81 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Milestone 12 Phase 2 — Instagram Content Intelligence, 37 new PHP tests. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,25 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**Milestone 12 Phase 2 — Instagram Content Intelligence ✅ Complete**
+*Completed: 2026-07-12*
+
+Builds on Phase 1's Instagram Observation (Beta): Atlas now understands not just that a company has an Instagram account, but how they actually use it. Spec: [Marketing-Intelligence.md](../specs/Marketing-Intelligence.md). Publishing, scheduling, Stories, Comments, DMs, Ads, competitor analysis, and every platform besides Instagram remain explicitly out of scope, per the spec.
+
+`InstagramConnector` gained a second collaborator, `InstagramMediaFetcher` (mirrors `InstagramProfileFetcher`'s shape and Guzzle-injection convention exactly), fetching a configurable number of recent posts (default 20, `INSTAGRAM_MEDIA_LIMIT`) via the Graph API's `/me/media` endpoint. Each post's hashtags and mentions are extracted from its caption at fetch time (`InstagramMediaItemData`). `sync()` now returns two `ConnectorResult`s — the existing profile snapshot plus a new one, recorded as an `Observation` with a new `source_type: 'social_content'` (added the same way Phase 1 added `'social'`: base migration updated for fresh databases, Postgres-only constraint-rewrite migration for existing ones — verified against a real local PostgreSQL instance, not just sqlite).
+
+`InstagramAnalyst` is extended, not replaced: `supports()` now matches both source types, and `analyze()` branches to a new deterministic `analyzeContent()` alongside the unchanged Phase 1 profile logic. It derives six new `instagram.*` Facts — `posting_cadence`, `media_mix`, `hashtag_usage`, `cta_usage`, `content_distribution`, and (only when the API provides engagement counts) `engagement_trend` — all pure computation over already-structured data, no AI call, same reasoning as Phase 1. An empty post list produces no facts and is not an error; a payload missing the `posts` key is malformed and throws, consistent with the existing error convention.
+
+**No changes needed to `ProcessObservation`, `AnalystRegistry`, or `BusinessBrainService`** — confirmed with a dedicated integration test mirroring Phase 1's: content Facts appear in the same `BusinessBrain.activeFacts` collection as everything else, automatically.
+
+**A real bug found and fixed along the way:** `KnowledgeService::buildBody()` used `implode(', ', $value)` for array-valued Facts, which throws "Array to string conversion" the moment a Fact's value contains a *nested* array (e.g. `hashtag_usage`'s `{avg_per_post, top: [...]}` shape) — the first Fact values in this codebase to do so. Fixed by falling back to a compact JSON rendering for nested arrays while leaving flat arrays (e.g. `media_mix`, existing hashtag-list-style facts) exactly as they rendered before.
+
+New read-only "Instagram Insights" section on the Marketing Presence page (`MarketingPresenceController` gained an `instagram_insights` prop — last sync from the existing `Integration.last_run_at`, posting cadence, content mix, top hashtags — null when the company has no Instagram Facts yet). Deliberately not folded into the existing editable channel cards; this section has no edit affordances.
+
+37 new PHP tests (fetcher, connector, analyst content-fact derivation, brain integration, controller prop, `KnowledgeService` regression) + 3 new Vitest tests. 1134 PHP tests (1131 passing, 3 skipped) + 81 Vitest tests. PHPStan level 8 — 0 errors. Pint clean. Build green.
+
+**Previous milestone:**
 
 **Real image sourcing + WordPress publishing ✅ Complete**
 *Completed: 2026-07-12*

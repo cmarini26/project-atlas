@@ -163,4 +163,25 @@ class KnowledgeServiceTest extends TestCase
 
         $this->assertTrue($twin->last_enriched_at->isAfter($firstEnrichedAt));
     }
+
+    public function test_synthesizes_a_domain_containing_a_fact_with_a_nested_array_value(): void
+    {
+        Event::fake([DigitalTwinActivated::class]);
+
+        Fact::create([
+            'company_id' => $this->company->id,
+            'key' => 'instagram.hashtag_usage',
+            'value' => ['avg_per_post' => 1.5, 'top' => [['tag' => 'comics', 'count' => 2]]],
+            'data_type' => 'json',
+            'confidence' => 90,
+            'is_current' => true,
+            'valid_from' => now(),
+        ]);
+
+        $entries = $this->service->synthesizeForCompany($this->company);
+
+        $entry = $entries->firstWhere('subject', 'instagram');
+        $this->assertNotNull($entry);
+        $this->assertStringContainsString('avg_per_post', $entry->body);
+    }
 }
