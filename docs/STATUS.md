@@ -34,6 +34,21 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
+**Milestone 13 — Marketing Health Engine 📐 Designed (not implemented)**
+*Completed: 2026-07-12*
+
+Design-only session — no code was written. Deliverables: [Marketing-Health.md](specs/Marketing-Health.md) (domain spec) and [Milestone-13-Marketing-Health-Plan.md](plans/Milestone-13-Marketing-Health-Plan.md) (phased implementation plan).
+
+Designs a deterministic scoring subsystem sitting between the Business Brain and the Opportunity Engine — seven health dimensions (Website Health, Social Activity, Campaign Consistency, Brand Consistency, Content Diversity, CTA Strength, Marketing Presence Coverage), each scored 0–100 by pure arithmetic over Facts/Knowledge/Campaigns Atlas already stores, no AI scoring in Version 1 (same reasoning already applied to `InstagramAnalyst` and `MarketingPresenceSynthesizer`). A confidence-weighted composite (not a fixed-weight average like `OpportunityScorer`'s, since dimensions are frequently and legitimately N/A) rolls the seven up into one overall score.
+
+Every integration point was designed against the actual current code, not assumed: Opportunity detection gains a new `LowMarketingHealthDetector` (additive, no existing detector touched) plus a modifier composed into `OpportunityScorer`'s existing `$typeModifiers` parameter (`OpportunityScorer.php:20,34` — already the mechanism `WeightCalibrator`/Learning Engine uses, confirmed by direct code read, not assumption). Decision Engine prioritization gets a tiebreaker among already-guard-passed candidates, deliberately not a sixth guard — Marketing Health can never block a Decision that would otherwise be committed. Recommendation rationale gets Marketing Health as additional `BusinessBrain` context for `RationaleGenerationAnalyst`, not a new rationale field or a bypass of the existing four-key structural requirement.
+
+Two new tables designed (`marketing_health_scores` — current-value-with-supersession, mirroring the `Fact` pattern; `marketing_health_snapshots` — append-only, for the trend-over-time UI design), no changes to any existing table, no new `observations.source_type` value needed (Marketing Health isn't a connector — it has no Observation shape of its own). Source-agnostic by construction: every scorer reads only domain-model entities already agnostic to their origin, so a future Google Business/LinkedIn/Facebook/Search Console/GA4 connector should require zero Marketing Health code changes to contribute — verified against how Milestone 12's own `InstagramAnalyst` extension already proved this pattern (one Fact-key-prefix list grows by a string, no branching logic).
+
+Also includes full sequence diagrams (computation trigger, scheduled recompute, Opportunity Engine consumption, Decision Engine/rationale consumption), the evidence model (every score traces to a real Fact/Knowledge/Campaign id, denormalized so it survives raw-payload pruning), and a UI design (overall score, seven-dimension card grid, evidence drill-down, trend charts — explicitly design-only, no implementation).
+
+**Previous milestone:**
+
 **Milestone 12 Phase 2 — Instagram Content Intelligence ✅ Complete**
 *Completed: 2026-07-12*
 

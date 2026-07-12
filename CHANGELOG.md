@@ -6,6 +6,24 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 13 — Marketing Health Engine (design only)] — 2026-07-12
+
+Design-only session, no code written. Designs a deterministic scoring subsystem between the Business Brain and the Opportunity Engine.
+
+### Added
+
+- `docs/specs/Marketing-Health.md` — domain model (`MarketingHealthScore` current-value-with-supersession, `MarketingHealthSnapshot` append-only), seven health dimensions and their evidence sources, confidence-weighted composite scoring formula, evidence model, source-agnostic architecture discipline, sequence diagrams, and UI design.
+- `docs/plans/Milestone-13-Marketing-Health-Plan.md` — phased implementation plan (8 phases: domain model, scorer contracts, service/registry, Opportunity Engine integration, Decision Engine tiebreaking, Business Brain/rationale integration, read-only UI, tests), migration DDL, file structure, acceptance criteria, and open questions for the implementing session.
+
+### Notes
+
+- No AI scoring in Version 1 — every dimension score is arithmetic over Facts/Knowledge/Campaigns already stored, consistent with `InstagramAnalyst`/`MarketingPresenceSynthesizer`'s existing deterministic-when-structured precedent.
+- All three integration points (Opportunity detection, Decision Engine prioritization, Recommendation rationale) were designed against the actual current implementation of `OpportunityScorer`, `DecisionEngine`, and `RationaleGenerationAnalyst` — confirmed by direct code reads, not assumed from other spec docs.
+- No existing detector, the `OpportunityDetector` interface, the base opportunity composite formula, or any Decision Engine guard condition is modified by this design — Marketing Health integrates additively at every point.
+- Implementation is a future session's work, sequenced by the plan document.
+
+---
+
 ## [Milestone 12 Phase 2 — Instagram Content Intelligence] — 2026-07-12
 
 Builds on Phase 1's Instagram Observation (Beta). Spec: `docs/specs/Marketing-Intelligence.md`. Publishing, scheduling, Stories, Comments, DMs, Ads, competitor analysis, and other platforms remain out of scope.
