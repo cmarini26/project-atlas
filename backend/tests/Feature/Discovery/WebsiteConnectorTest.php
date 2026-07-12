@@ -29,6 +29,7 @@ class WebsiteConnectorTest extends TestCase
                 metaDescription: 'Welcome',
                 headings: ['h1' => ['Home'], 'h2' => [], 'h3' => []],
                 bodyText: 'Welcome to our site.',
+                images: [],
                 crawledAt: $crawledAt,
             ),
             new WebPageData(
@@ -38,6 +39,7 @@ class WebsiteConnectorTest extends TestCase
                 metaDescription: '',
                 headings: ['h1' => ['About Us'], 'h2' => [], 'h3' => []],
                 bodyText: 'Learn about us.',
+                images: [],
                 crawledAt: $crawledAt,
             ),
         ]);

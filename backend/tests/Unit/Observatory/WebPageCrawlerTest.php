@@ -38,6 +38,96 @@ class WebPageCrawlerTest extends TestCase
         $this->assertSame('Acme Co', $results->first()->title);
     }
 
+    public function test_crawl_extracts_og_image_first(): void
+    {
+        $html = <<<'HTML'
+            <!DOCTYPE html>
+            <html><head><title>Acme Co</title>
+            <meta property="og:image" content="https://1.2.3.4/hero.jpg">
+            </head>
+            <body><img src="/other.jpg"></body>
+            </html>
+            HTML;
+
+        $crawler = $this->makeCrawler(new Response(200, ['Content-Type' => 'text/html'], $html));
+
+        $results = $crawler->crawl(self::TEST_URL);
+
+        $this->assertSame(
+            ['https://1.2.3.4/hero.jpg', 'https://1.2.3.4/other.jpg'],
+            $results->first()->images,
+        );
+    }
+
+    public function test_crawl_falls_back_to_body_images_without_og_image(): void
+    {
+        $html = <<<'HTML'
+            <!DOCTYPE html>
+            <html><head><title>Acme Co</title></head>
+            <body><img src="/product.jpg"></body>
+            </html>
+            HTML;
+
+        $crawler = $this->makeCrawler(new Response(200, ['Content-Type' => 'text/html'], $html));
+
+        $results = $crawler->crawl(self::TEST_URL);
+
+        $this->assertSame(['https://1.2.3.4/product.jpg'], $results->first()->images);
+    }
+
+    public function test_crawl_skips_logo_icon_and_data_uri_images(): void
+    {
+        $html = <<<'HTML'
+            <!DOCTYPE html>
+            <html><head><title>Acme Co</title></head>
+            <body>
+              <img src="/logo.png">
+              <img src="/icon-sprite.svg">
+              <img src="data:image/png;base64,abc123">
+              <img src="/product.jpg">
+            </body>
+            </html>
+            HTML;
+
+        $crawler = $this->makeCrawler(new Response(200, ['Content-Type' => 'text/html'], $html));
+
+        $results = $crawler->crawl(self::TEST_URL);
+
+        $this->assertSame(['https://1.2.3.4/product.jpg'], $results->first()->images);
+    }
+
+    public function test_crawl_excludes_nav_and_footer_images(): void
+    {
+        $html = <<<'HTML'
+            <!DOCTYPE html>
+            <html><head><title>Acme Co</title></head>
+            <body>
+              <nav><img src="/nav-banner.jpg"></nav>
+              <p>Content</p>
+              <footer><img src="/footer-banner.jpg"></footer>
+            </body>
+            </html>
+            HTML;
+
+        $crawler = $this->makeCrawler(new Response(200, ['Content-Type' => 'text/html'], $html));
+
+        $results = $crawler->crawl(self::TEST_URL);
+
+        $this->assertSame([], $results->first()->images);
+    }
+
+    public function test_crawl_caps_images_at_five(): void
+    {
+        $imgs = implode('', array_map(fn ($i) => "<img src=\"/img{$i}.jpg\">", range(1, 8)));
+        $html = "<!DOCTYPE html><html><head><title>Acme Co</title></head><body>{$imgs}</body></html>";
+
+        $crawler = $this->makeCrawler(new Response(200, ['Content-Type' => 'text/html'], $html));
+
+        $results = $crawler->crawl(self::TEST_URL);
+
+        $this->assertCount(5, $results->first()->images);
+    }
+
     public function test_crawl_skips_non_html_responses(): void
     {
         $crawler = $this->makeCrawler(new Response(200, ['Content-Type' => 'application/json'], '{}'));

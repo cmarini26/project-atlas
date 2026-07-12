@@ -13,6 +13,8 @@ use App\Services\Publishing\GenericRenderer;
 use App\Services\Publishing\LogChannelPublisher;
 use App\Services\Publishing\MetaChannelPublisher;
 use App\Services\Publishing\MetaRenderer;
+use App\Services\Publishing\WordPressPublisher;
+use App\Services\Publishing\WordPressRenderer;
 use Illuminate\Support\ServiceProvider;
 
 class PublisherServiceProvider extends ServiceProvider
@@ -31,6 +33,7 @@ class PublisherServiceProvider extends ServiceProvider
         // over GenericRenderer for their respective channel types.
         $rendererRegistry->register($this->app->make(EmailRenderer::class));
         $rendererRegistry->register($this->app->make(MetaRenderer::class));
+        $rendererRegistry->register($this->app->make(WordPressRenderer::class));
         $rendererRegistry->register($this->app->make(GenericRenderer::class));
 
         $emailProviderRegistry = $this->app->make(EmailProviderRegistry::class);
@@ -46,6 +49,7 @@ class PublisherServiceProvider extends ServiceProvider
         // priority over LogChannelPublisher for their respective channels.
         $publisherRegistry->register($this->app->make(EmailPublisher::class));
         $publisherRegistry->register($this->app->make(MetaChannelPublisher::class));
+        $publisherRegistry->register($this->app->make(WordPressPublisher::class));
         $publisherRegistry->register($this->app->make(LogChannelPublisher::class));
     }
 }

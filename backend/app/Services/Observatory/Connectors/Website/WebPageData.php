@@ -13,6 +13,7 @@ readonly class WebPageData
 {
     /**
      * @param  array<string, string[]>  $headings  Keys: 'h1', 'h2', 'h3'
+     * @param  string[]  $images  Absolute image URLs found on the page, og:image first
      */
     public function __construct(
         public string $url,
@@ -21,6 +22,7 @@ readonly class WebPageData
         public string $metaDescription,
         public array $headings,
         public string $bodyText,
+        public array $images,
         public DateTimeImmutable $crawledAt,
     ) {}
 
@@ -34,6 +36,7 @@ readonly class WebPageData
             'meta_description' => $this->metaDescription,
             'headings' => $this->headings,
             'body_text' => $this->bodyText,
+            'images' => $this->images,
             'crawled_at' => $this->crawledAt->format('c'),
         ];
     }

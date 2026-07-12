@@ -43,12 +43,19 @@ interface MetaChannel {
   status: string
 }
 
+interface WordPressChannel {
+  name: string
+  site_url: string
+  status: string
+}
+
 const props = defineProps<{
   company: CompanyData
   integrations: Integration[]
   membership_role: string
   instagram_account: InstagramAccountData | null
   meta_channels: MetaChannel[]
+  wordpress_channel: WordPressChannel | null
 }>()
 
 const metaChannelLabels: Record<string, string> = {
@@ -58,6 +65,22 @@ const metaChannelLabels: Record<string, string> = {
 
 function revokeMeta(): void {
   router.post('/app/settings/meta/revoke', {}, { preserveScroll: true })
+}
+
+const wordPressForm = useForm({
+  site_url: '',
+  username: '',
+  app_password: '',
+})
+
+function connectWordPress(): void {
+  wordPressForm.post('/app/settings/wordpress/connect', {
+    onSuccess: () => wordPressForm.reset(),
+  })
+}
+
+function revokeWordPress(): void {
+  router.post('/app/settings/wordpress/revoke', {}, { preserveScroll: true })
 }
 
 const form = useForm({
@@ -288,6 +311,78 @@ function retakeTour(): void {
           Connect Instagram &amp; Facebook
         </a>
       </div>
+    </div>
+
+    <!-- WordPress -->
+    <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5 mb-6">
+      <h2 class="text-sm font-semibold text-[var(--color-text-primary)] mb-4">WordPress</h2>
+
+      <div v-if="wordpress_channel" class="flex items-start gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-0.5">
+            <p class="text-sm font-medium text-[var(--color-text-primary)]">{{ wordpress_channel.name }}</p>
+            <Badge :variant="wordpress_channel.status === 'active' ? 'success' : 'muted'">Blog</Badge>
+          </div>
+          <p class="text-xs text-[var(--color-text-muted)]">{{ wordpress_channel.site_url }}</p>
+          <p class="text-xs text-[var(--color-text-muted)] mt-1">Status: {{ wordpress_channel.status }}</p>
+          <button
+            type="button"
+            class="mt-3 py-1.5 px-3 text-xs font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)] transition-colors duration-[var(--duration-fast)]"
+            @click="revokeWordPress"
+          >
+            Disconnect
+          </button>
+        </div>
+      </div>
+
+      <form v-else class="space-y-3" @submit.prevent="connectWordPress">
+        <p class="text-xs text-[var(--color-text-muted)]">
+          Connect your WordPress site so Atlas can publish campaign blog posts directly to it. Create an
+          <a href="https://wordpress.org/documentation/article/application-passwords/" target="_blank" rel="noopener noreferrer" class="text-[var(--color-text-link)] hover:underline">Application Password</a>
+          under your WordPress user profile — no plugin required.
+        </p>
+        <div>
+          <label for="wordpress-site-url" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Site URL</label>
+          <input
+            id="wordpress-site-url"
+            v-model="wordPressForm.site_url"
+            type="url"
+            placeholder="https://yourblog.com"
+            required
+            class="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)] transition-colors duration-[var(--duration-fast)]"
+          />
+          <p v-if="wordPressForm.errors.site_url" class="mt-1 text-xs text-rose-600">{{ wordPressForm.errors.site_url }}</p>
+        </div>
+        <div>
+          <label for="wordpress-username" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Username</label>
+          <input
+            id="wordpress-username"
+            v-model="wordPressForm.username"
+            type="text"
+            required
+            class="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)] transition-colors duration-[var(--duration-fast)]"
+          />
+          <p v-if="wordPressForm.errors.username" class="mt-1 text-xs text-rose-600">{{ wordPressForm.errors.username }}</p>
+        </div>
+        <div>
+          <label for="wordpress-app-password" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Application password</label>
+          <input
+            id="wordpress-app-password"
+            v-model="wordPressForm.app_password"
+            type="password"
+            required
+            class="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)] transition-colors duration-[var(--duration-fast)]"
+          />
+          <p v-if="wordPressForm.errors.app_password" class="mt-1 text-xs text-rose-600">{{ wordPressForm.errors.app_password }}</p>
+        </div>
+        <button
+          type="submit"
+          :disabled="wordPressForm.processing"
+          class="py-2 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+        >
+          {{ wordPressForm.processing ? 'Connecting…' : 'Connect WordPress' }}
+        </button>
+      </form>
     </div>
 
     <!-- Integrations -->

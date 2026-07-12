@@ -66,6 +66,20 @@ class SettingsController extends Controller
             ->filter()
             ->values();
 
+        $wordPressChannel = Channel::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->where('type', 'blog')
+            ->first();
+
+        $wordPressCredentials = $wordPressChannel === null ? null : ChannelCredentials::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->where('channel_type', 'blog')
+            ->where('status', '!=', 'revoked')
+            ->first();
+
+        /** @var array<string, mixed> $wordPressChannelConfig */
+        $wordPressChannelConfig = $wordPressChannel->config ?? [];
+
         return Inertia::render('App/Settings', [
             'company' => [
                 'id' => $company->id,
@@ -86,6 +100,11 @@ class SettingsController extends Controller
                 'last_synced_at' => $instagramAccount->last_synced_at !== null ? (string) $instagramAccount->last_synced_at : null,
             ] : null,
             'meta_channels' => $metaChannels->all(),
+            'wordpress_channel' => $wordPressCredentials === null ? null : [
+                'name' => $wordPressChannel->name,
+                'site_url' => (string) ($wordPressChannelConfig['site_url'] ?? ''),
+                'status' => $wordPressCredentials->status,
+            ],
         ]);
     }
 
@@ -157,5 +176,57 @@ class SettingsController extends Controller
         }
 
         return back()->with('success', 'Instagram connected. Syncing your profile now.');
+    }
+
+    /**
+     * Connect (or reconnect) the company's WordPress site for blog
+     * publishing. WordPress Application Passwords (a native WP feature, no
+     * app registration) authenticate via HTTP Basic Auth — no OAuth needed.
+     */
+    public function connectWordPress(Request $request): RedirectResponse
+    {
+        /** @var Company $company */
+        $company = $request->attributes->get('company');
+
+        $validated = $request->validate([
+            'site_url' => ['required', 'url', 'max:255'],
+            'username' => ['required', 'string', 'max:255'],
+            'app_password' => ['required', 'string', 'max:255'],
+        ]);
+
+        $siteUrl = rtrim($validated['site_url'], '/');
+
+        Channel::withoutGlobalScopes()->updateOrCreate(
+            ['company_id' => $company->id, 'type' => 'blog'],
+            ['name' => (string) parse_url($siteUrl, PHP_URL_HOST), 'config' => ['site_url' => $siteUrl], 'is_active' => true],
+        );
+
+        ChannelCredentials::withoutGlobalScopes()->updateOrCreate(
+            ['company_id' => $company->id, 'channel_type' => 'blog'],
+            [
+                'provider_type' => 'wordpress',
+                'credentials' => json_encode([
+                    'username' => $validated['username'],
+                    'app_password' => $validated['app_password'],
+                ]),
+                'status' => 'active',
+                'expires_at' => null,
+            ],
+        );
+
+        return back()->with('success', 'WordPress connected.');
+    }
+
+    public function disconnectWordPress(Request $request): RedirectResponse
+    {
+        /** @var Company $company */
+        $company = $request->attributes->get('company');
+
+        ChannelCredentials::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->where('channel_type', 'blog')
+            ->update(['status' => 'revoked']);
+
+        return back()->with('success', 'WordPress disconnected.');
     }
 }

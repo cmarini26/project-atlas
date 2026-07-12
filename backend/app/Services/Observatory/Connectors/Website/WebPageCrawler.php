@@ -134,12 +134,14 @@ class WebPageCrawler
         $xpath = new DOMXPath($dom);
 
         $links = $this->extractInternalLinks($xpath, $url, $baseDomain);
-        $page = $this->parseDom($url, $statusCode, $xpath);
+        $ogImage = $this->extractOgImage($xpath, $url);
+        $this->stripNonContentNodes($xpath);
+        $page = $this->parseDom($url, $statusCode, $xpath, $ogImage);
 
         return [$page, $links];
     }
 
-    private function parseDom(string $url, int $statusCode, DOMXPath $xpath): WebPageData
+    private function parseDom(string $url, int $statusCode, DOMXPath $xpath, ?string $ogImage): WebPageData
     {
         return new WebPageData(
             url: $url,
@@ -148,8 +150,101 @@ class WebPageCrawler
             metaDescription: $this->extractMetaDescription($xpath),
             headings: $this->extractHeadings($xpath),
             bodyText: $this->extractBodyText($xpath),
+            images: $this->extractImages($xpath, $url, $ogImage),
             crawledAt: new DateTimeImmutable(),
         );
+    }
+
+    /**
+     * Removes script/style/nav/header/footer nodes once, up front, so both
+     * body-text extraction and body-image extraction see the same
+     * content-only DOM (nav/footer logos and icons shouldn't surface as a
+     * page's representative image).
+     */
+    private function stripNonContentNodes(DOMXPath $xpath): void
+    {
+        foreach (['script', 'style', 'nav', 'footer', 'header'] as $tag) {
+            $nodes = $xpath->query("//{$tag}");
+
+            if ($nodes === false) {
+                continue;
+            }
+
+            foreach (iterator_to_array($nodes) as $node) {
+                if ($node instanceof DOMNode) {
+                    $node->parentNode?->removeChild($node);
+                }
+            }
+        }
+    }
+
+    private function extractOgImage(DOMXPath $xpath, string $pageUrl): ?string
+    {
+        $nodes = $xpath->query('//meta[@property="og:image"]/@content');
+
+        if ($nodes === false || $nodes->length === 0) {
+            return null;
+        }
+
+        $node = $nodes->item(0);
+        $content = $node instanceof DOMNode ? trim($node->textContent) : '';
+
+        if ($content === '') {
+            return null;
+        }
+
+        $base = parse_url($pageUrl);
+
+        return $this->toAbsoluteUrl($content, $base === false ? [] : $base);
+    }
+
+    /**
+     * @return string[] Up to 5 absolute image URLs, og:image first, then the
+     *                  first content-area <img> tags — skipping data URIs
+     *                  and filenames that look like logos/icons/sprites.
+     */
+    private function extractImages(DOMXPath $xpath, string $pageUrl, ?string $ogImage): array
+    {
+        $images = [];
+
+        if ($ogImage !== null) {
+            $images[] = $ogImage;
+        }
+
+        $base = parse_url($pageUrl);
+        $base = $base === false ? [] : $base;
+
+        $nodes = $xpath->query('//img[@src]');
+
+        if ($nodes !== false) {
+            foreach ($nodes as $node) {
+                if (count($images) >= 5) {
+                    break;
+                }
+
+                if (! $node instanceof DOMElement) {
+                    continue;
+                }
+
+                $src = trim($node->getAttribute('src'));
+
+                if ($src === '' || str_starts_with($src, 'data:')) {
+                    continue;
+                }
+
+                if (preg_match('/logo|icon|sprite/i', $src) === 1) {
+                    continue;
+                }
+
+                $absolute = $this->toAbsoluteUrl($src, $base);
+
+                if (! in_array($absolute, $images, true)) {
+                    $images[] = $absolute;
+                }
+            }
+        }
+
+        return array_slice($images, 0, 5);
     }
 
     private function extractTitle(DOMXPath $xpath): string
@@ -210,18 +305,6 @@ class WebPageCrawler
 
     private function extractBodyText(DOMXPath $xpath): string
     {
-        foreach (['script', 'style', 'nav', 'footer', 'header'] as $tag) {
-            $nodes = $xpath->query("//{$tag}");
-
-            if ($nodes !== false) {
-                foreach (iterator_to_array($nodes) as $node) {
-                    if ($node instanceof DOMNode) {
-                        $node->parentNode?->removeChild($node);
-                    }
-                }
-            }
-        }
-
         $body = $xpath->query('//body');
 
         if ($body === false || $body->length === 0) {

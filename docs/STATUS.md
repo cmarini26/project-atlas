@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 1075 tests (1072 passing, 3 skipped where the local environment can't support it) + 78 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Milestone 17 groundwork — Meta OAuth social publishing, 38 new PHP tests. |
+| Tests             | ✅ Strong | 1107 tests (1104 passing, 3 skipped where the local environment can't support it) + 78 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: real image sourcing + WordPress publishing, 46 new PHP tests. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,19 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**Real image sourcing + WordPress publishing ✅ Complete**
+*Completed: 2026-07-12*
+
+Closes a real gap surfaced while reviewing the Meta OAuth publishing work: `ContentAsset.media` was hardcoded to `null` in every content-generation path, so Instagram/Facebook publishing threw `MalformedPayloadException` the moment it was actually exercised. Investigation found the gap was bigger than one field — there is no catalog-item ingestion pipeline anywhere in production (`CatalogItem` is fully modeled but no code path outside tests/seeders ever creates a row); building full product-photo-per-campaign matching is a much bigger feature than this fix. Took the pragmatic real fix instead: capture images during the website crawl that already runs today, and surface them as best-effort media for generated content.
+
+`app/Services/Observatory/Connectors/Website/WebPageCrawler.php` now extracts up to 5 image URLs per crawled page — `<meta property="og:image">` first (the page's own curated representative image), then the first content-area `<img>` tags, skipping `data:` URIs and filenames that look like logos/icons/sprites. A `stripNonContentNodes()` cleanup step runs once before both body-text and image extraction, replacing `extractBodyText()`'s own inline removal — nav/header/footer images no longer surface as a page's "representative" photo. `WebPageData` gained an `images: array<string>` field, serialized into `Observation.raw_payload` (a JSON column, no migration needed). `App\Services\Analyst\Content\ContentGenerationAnalyst` gained `resolveMediaFallback()`, reading `BusinessBrain::$recentObservations` (already fetched, last 10) for the most recent `crawl` observation with at least one image — returns `null` when nothing's ever been crawled, which is honest behavior (visual channels correctly fail to publish), not a new failure mode. This is deliberately best-effort, not per-product matching: a post about "vintage comics" and one about "weekend hours" get the same site image if that's all that's been crawled.
+
+Also added WordPress as a publishable channel — turned out to need no schema change, since `channels.type` already had an unused `'blog'` enum value. WordPress's REST API natively supports **Application Passwords** (username + auto-generated password, HTTP Basic Auth) — no OAuth app registration needed, unlike Meta. `App\Services\Publishing\WordPressRenderer` converts `BlogContentPrompt`'s plain-text body into basic HTML paragraphs (WordPress's `content` field renders HTML). `WordPressMediaUploader` uploads a featured image to the site's media library (non-fatal on failure — the post still publishes without one). `WordPressPublisher` creates the post via `POST /wp-json/wp/v2/posts`, both registered ahead of `GenericRenderer`/`LogChannelPublisher` in `PublisherServiceProvider`. `SettingsController` gained `connectWordPress()`/`disconnectWordPress()` (manual site URL + username + Application Password form — no OAuth redirect needed, unlike the Meta flow) and a `wordpress_channel` prop; a new "WordPress" card in `Settings.vue` mirrors the existing Instagram *observation* card's form-based pattern.
+
+46 new PHP tests across image extraction, media fallback, and the three new WordPress services/controller actions. 1107 PHP tests (1104 passing, 3 skipped) + 78 Vitest tests. PHPStan level 8 — 0 errors. Pint clean. As with every other real-provider phase this session, there's no live WordPress site to verify the round-trip against — HTTP-mocked (Guzzle `MockHandler`) tests only.
+
+**Previous milestone:**
 
 **Visual direction refresh — bolder palette, gradients, illustration ✅ Complete**
 *Completed: 2026-07-11*

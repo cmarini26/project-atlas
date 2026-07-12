@@ -94,6 +94,112 @@ class SettingsControllerTest extends TestCase
             ->assertInertia(fn ($page) => $page->has('meta_channels', 0));
     }
 
+    public function test_index_includes_null_wordpress_channel_when_not_connected(): void
+    {
+        [$user] = $this->userWithCompany();
+
+        $this->actingAs($user)
+            ->get('/app/settings')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('wordpress_channel', null));
+    }
+
+    public function test_index_includes_connected_wordpress_channel(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+
+        Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'type' => 'blog', 'name' => 'blog.cbb-auctions.example',
+            'config' => ['site_url' => 'https://blog.cbb-auctions.example'], 'is_active' => true,
+        ]);
+        ChannelCredentials::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'channel_type' => 'blog', 'provider_type' => 'wordpress',
+            'credentials' => json_encode(['username' => 'atlas', 'app_password' => 'xxxx']), 'status' => 'active',
+        ]);
+
+        $this->actingAs($user)
+            ->get('/app/settings')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('wordpress_channel.name', 'blog.cbb-auctions.example')
+                ->where('wordpress_channel.site_url', 'https://blog.cbb-auctions.example')
+                ->where('wordpress_channel.status', 'active')
+            );
+    }
+
+    public function test_index_omits_revoked_wordpress_channel(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+
+        Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'type' => 'blog', 'name' => 'blog.cbb-auctions.example',
+            'config' => ['site_url' => 'https://blog.cbb-auctions.example'], 'is_active' => true,
+        ]);
+        ChannelCredentials::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'channel_type' => 'blog', 'provider_type' => 'wordpress',
+            'credentials' => json_encode(['username' => 'atlas', 'app_password' => 'xxxx']), 'status' => 'revoked',
+        ]);
+
+        $this->actingAs($user)
+            ->get('/app/settings')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('wordpress_channel', null));
+    }
+
+    public function test_connect_wordpress_creates_channel_and_credentials(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+
+        $this->actingAs($user)
+            ->post('/app/settings/wordpress/connect', [
+                'site_url' => 'https://blog.cbb-auctions.example/',
+                'username' => 'atlas',
+                'app_password' => 'xxxx xxxx xxxx xxxx',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('channels', [
+            'company_id' => $company->id,
+            'type' => 'blog',
+            'name' => 'blog.cbb-auctions.example',
+        ]);
+        $this->assertDatabaseHas('channel_credentials', [
+            'company_id' => $company->id,
+            'channel_type' => 'blog',
+            'provider_type' => 'wordpress',
+            'status' => 'active',
+        ]);
+    }
+
+    public function test_connect_wordpress_requires_valid_input(): void
+    {
+        [$user] = $this->userWithCompany();
+
+        $this->actingAs($user)
+            ->post('/app/settings/wordpress/connect', [])
+            ->assertSessionHasErrors(['site_url', 'username', 'app_password']);
+    }
+
+    public function test_disconnect_wordpress_revokes_credentials(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+
+        Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'type' => 'blog', 'name' => 'blog.cbb-auctions.example',
+            'config' => ['site_url' => 'https://blog.cbb-auctions.example'], 'is_active' => true,
+        ]);
+        $credentials = ChannelCredentials::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'channel_type' => 'blog', 'provider_type' => 'wordpress',
+            'credentials' => json_encode(['username' => 'atlas', 'app_password' => 'xxxx']), 'status' => 'active',
+        ]);
+
+        $this->actingAs($user)
+            ->post('/app/settings/wordpress/revoke')
+            ->assertRedirect();
+
+        $this->assertSame('revoked', $credentials->fresh()->status);
+    }
+
     public function test_update_saves_company_name(): void
     {
         [$user, $company] = $this->userWithCompany();

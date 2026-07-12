@@ -105,6 +105,10 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
     Route::get('/settings/meta/callback', [MetaOAuthController::class, 'callback'])->name('settings.meta.callback');
     Route::post('/settings/meta/revoke', [MetaOAuthController::class, 'revoke'])->name('settings.meta.revoke');
 
+    // WordPress publishing — Application Passwords (manual entry), no OAuth.
+    Route::post('/settings/wordpress/connect', [SettingsController::class, 'connectWordPress'])->name('settings.wordpress.connect');
+    Route::post('/settings/wordpress/revoke', [SettingsController::class, 'disconnectWordPress'])->name('settings.wordpress.revoke');
+
     // Marketing Presence
     Route::get('/settings/marketing-presence', [MarketingPresenceController::class, 'index'])->name('settings.marketing-presence');
     Route::post('/settings/marketing-presence', [MarketingPresenceController::class, 'store'])->name('settings.marketing-presence.store');

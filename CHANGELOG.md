@@ -6,6 +6,29 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Real image sourcing + WordPress publishing] — 2026-07-12
+
+Closes the real gap behind the Meta OAuth phase's `MalformedPayloadException` — `ContentAsset.media` was hardcoded to `null` everywhere content gets generated. There is no catalog-item ingestion pipeline in production (confirmed: nothing outside tests/seeders ever creates a `CatalogItem` row), so this is a pragmatic best-effort fix — real crawled images, not per-product photo matching — rather than a full catalog-photo pipeline. Also adds WordPress as a publishable channel, reusing the already-unused `'blog'` channel type.
+
+### Added
+
+- `app/Services/Observatory/Connectors/Website/WebPageCrawler.php` — extracts up to 5 image URLs per crawled page (`og:image` first, then content-area `<img>` tags, skipping logos/icons/data URIs). `WebPageData` gained an `images` field.
+- `app/Services/Analyst/Content/ContentGenerationAnalyst.php` — `resolveMediaFallback()` reads the most recent crawl `Observation` from `BusinessBrain::$recentObservations` and surfaces its first image as content media; `null` when nothing's been crawled.
+- `app/Services/Publishing/WordPressRenderer.php`, `WordPressMediaUploader.php`, `WordPressPublisher.php` — implement the existing `ChannelRenderer`/`ChannelPublisher` contracts for the `'blog'` channel type via WordPress's REST API (`/wp-json/wp/v2/posts`, `/wp-json/wp/v2/media`), authenticating with WordPress Application Passwords (HTTP Basic Auth) — no OAuth app registration needed. Registered ahead of `GenericRenderer`/`LogChannelPublisher` in `PublisherServiceProvider`.
+- `SettingsController::connectWordPress()`/`disconnectWordPress()` + routes `POST /app/settings/wordpress/connect`, `POST /app/settings/wordpress/revoke`; new `wordpress_channel` prop and "WordPress" card in `Settings.vue` (manual site URL + username + Application Password form, matching the existing Instagram *observation* card's pattern).
+- 46 new tests: `WebPageCrawlerTest` additions, `ContentGenerationAnalystMediaTest` (new), `WordPressRendererTest`, `WordPressMediaUploaderTest`, `WordPressPublisherTest`, `SettingsControllerTest` additions.
+
+### Changed
+
+- `app/Domain/Content/ValueObjects/ContentAssetData.php` — `$media`'s PHPDoc corrected from `array<string, mixed>|null` to `list<array<string, mixed>>|null`, matching how `MetaRenderer`/`GenericRenderer` actually index it (`media[0]['url']`); a type-accuracy fix only, not a behavior change.
+
+### Notes
+
+- Best-effort, not per-product: a blog post about "vintage comics" and one about "weekend hours" get the same site image if that's all that's been crawled. Real product-photo-per-campaign matching needs the catalog ingestion pipeline this change deliberately does not build.
+- No live WordPress site exists to verify the publish round-trip end-to-end — HTTP-mocked (Guzzle `MockHandler`) tests only, same disclosed limitation as every other real-provider phase this session.
+
+---
+
 ## [Visual direction refresh — bolder palette, gradients, illustration] — 2026-07-11
 
 Follow-up to user feedback that the product still read as plain after the earlier P0 visual-refresh pass. Agreed a direction (gradient hero, category-colored cards, inline SVG illustrations) via a mockup before implementing.

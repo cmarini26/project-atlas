@@ -5,7 +5,7 @@ namespace App\Domain\Content\ValueObjects;
 readonly class ContentAssetData
 {
     /**
-     * @param  array<string, mixed>|null  $media
+     * @param  list<array<string, mixed>>|null  $media
      * @param  array<string, mixed>|null  $metadata
      */
     public function __construct(
