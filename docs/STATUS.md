@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 964 tests (961 passing, 3 skipped where the local environment can't support it) + 53 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: UI Polish Phase 2 (`PageHeader.vue` + page descriptions), 4 new Vitest tests. |
+| Tests             | ✅ Strong | 967 tests (964 passing, 3 skipped where the local environment can't support it) + 64 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: UI Polish Phase 3 (first-time product tour), 3 new PHP tests + 11 new Vitest tests. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,21 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**UI Polish Phase 3 — First-time product tour ✅ Complete**
+*Completed: 2026-07-11*
+
+Third and final of three approved UI improvements. No tour/walkthrough/coach-mark concept existed anywhere in the codebase before this phase.
+
+**Persistence:** a nullable `users.product_tour_completed_at` timestamp (new migration), not `Company.settings` — `company_memberships` is a genuine many-to-many, so "has seen the tour" is a per-user fact, not a per-company one; storing it on the company would hide the tour from teammates or fail to re-show it to a user who is a member of two companies. New `App\Http\Controllers\App\ProductTourController::complete()` sets the timestamp; `POST /app/tour/complete` sits inside the existing `auth+company` `/app` route group. `HandleInertiaRequests` now shares `auth.user.has_completed_tour` (boolean, derived from the column) alongside the existing `id`/`name`/`email`.
+
+**Frontend:** `resources/js/composables/useProductTour.ts` follows `useToasts.ts`'s exact module-scoped `reactive()`/`readonly()` pattern — one shared tour state per browser tab, surviving Inertia navigations. `resources/js/lib/productTourSteps.ts` is a static 4-step config targeting the `data-tour="..."` attributes Phase 2 already added to `Dashboard.vue`. `resources/js/Components/Tour/ProductTourOverlay.vue` is modeled on `ConfirmDialog.vue`'s `Teleport to="body"` + backdrop pattern — a positioned tooltip card near the current step's target (`getBoundingClientRect()`, recalculated on a debounced resize/scroll listener), with Back/Next/Skip/Done controls. Mounted once in `AppLayout.vue`, which starts the tour automatically the first time a first-time user (`!has_completed_tour`) lands on the Dashboard, or on request via a new "Take the product tour" button on the Settings page (using a `pendingStart` flag checked on the next Dashboard mount, avoiding a post-navigation callback race).
+
+3 new PHP tests (`ProductTourControllerTest`: auth required, completion sets the timestamp, shared props flip from `false` to `true`) and 11 new Vitest tests (`useProductTour.spec.ts`, `ProductTourOverlay.spec.ts`) — the latter follows `ApproveActions.spec.ts`'s established `attachTo: document.body` + manual `unmount()` pattern for asserting on `Teleport`-rendered content. 967 PHP tests (964 passing, 3 skipped), 64 Vitest tests. PHPStan level 8 — 0 errors. Pint clean. Build and `vue-tsc --noEmit` green.
+
+This completes all three approved UI improvements from the original request (more color/imagery, page descriptions, first-time walkthrough).
+
+**Previous milestone:**
 
 **UI Polish Phase 2 — Page descriptions ✅ Complete**
 *Completed: 2026-07-11*

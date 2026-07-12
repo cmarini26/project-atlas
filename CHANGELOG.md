@@ -6,6 +6,32 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [UI Polish Phase 3 — First-time product tour] — 2026-07-11
+
+Third and final of three approved UI improvements. No tour/walkthrough concept existed anywhere in the codebase.
+
+### Added
+
+- `database/migrations/2026_07_11_000400_add_product_tour_completed_at_to_users_table.php` — nullable `users.product_tour_completed_at` timestamp. Not stored on `Company.settings`: `company_memberships` is many-to-many, so tour-seen state is inherently per-user, not per-company.
+- `app/Http/Controllers/App/ProductTourController.php` — `complete()` sets the timestamp on the authenticated user.
+- `routes/web.php` — `POST /app/tour/complete` inside the existing `auth+company` `/app` group.
+- `app/Http/Middleware/HandleInertiaRequests.php` — `auth.user.has_completed_tour` added to the shared props payload.
+- `resources/js/composables/useProductTour.ts` (new) — module-scoped tour state, copying `useToasts.ts`'s `reactive()`/`readonly()` pattern.
+- `resources/js/lib/productTourSteps.ts` (new) — static 4-step config targeting `Dashboard.vue`'s `data-tour="..."` anchors (added in Phase 2).
+- `resources/js/Components/Tour/ProductTourOverlay.vue` (new) — `Teleport`-based spotlight/tooltip overlay modeled on `ConfirmDialog.vue`'s pattern.
+- `resources/js/Pages/App/Settings.vue` — "Take the product tour" relaunch button.
+- `tests/Feature/App/ProductTourControllerTest.php` (new, 3 tests), `useProductTour.spec.ts` + `ProductTourOverlay.spec.ts` (new, 11 tests) — the overlay spec follows `ApproveActions.spec.ts`'s `attachTo: document.body` pattern for asserting on teleported content.
+
+### Changed
+
+- `app/Models/User.php` — `product_tour_completed_at` added to `$fillable` and cast to `datetime`.
+- `resources/js/types/index.ts` — `AuthUser` gained `has_completed_tour: boolean`.
+- `resources/js/Layouts/AppLayout.vue` — mounts `<ProductTourOverlay />`; starts the tour automatically for a first-time user on the Dashboard, or on a pending-relaunch request from Settings.
+
+This completes all three approved UI improvements (visual refresh, page descriptions, first-time walkthrough) from the original request.
+
+---
+
 ## [UI Polish Phase 2 — Page descriptions] — 2026-07-11
 
 Second of three approved UI improvements. No shared page-header component existed — every top-level page hand-rolled its own bare `<h1>` with no description of what the page was for.

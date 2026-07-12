@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Head, Link, useForm } from '@inertiajs/vue3'
+import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import PageHeader from '@/Components/UI/PageHeader.vue'
 import { Cog6ToothIcon } from '@heroicons/vue/24/outline'
+import { useProductTour } from '@/composables/useProductTour'
 
 // Persistent layout: the sidebar/toast shell survives Inertia visits.
 defineOptions({ layout: AppLayout })
@@ -85,6 +86,13 @@ function connectInstagram(): void {
   instagramForm.post('/app/settings/integrations/instagram', {
     onSuccess: () => instagramForm.reset(),
   })
+}
+
+const { requestTourStart } = useProductTour()
+
+function retakeTour(): void {
+  requestTourStart()
+  router.visit('/app')
 }
 </script>
 
@@ -256,6 +264,19 @@ function connectInstagram(): void {
         <p class="text-sm text-[var(--color-text-muted)]">No integrations yet.</p>
         <p class="text-xs text-[var(--color-text-muted)] mt-1">Connect your first source during onboarding or contact support.</p>
       </div>
+    </div>
+
+    <!-- Help -->
+    <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5 mt-6">
+      <h2 class="text-sm font-semibold text-[var(--color-text-primary)] mb-1">Help</h2>
+      <p class="text-xs text-[var(--color-text-muted)] mb-3">Not sure where to start? Retake the guided tour of your dashboard.</p>
+      <button
+        type="button"
+        class="py-1.5 px-3 text-xs font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)] transition-colors duration-[var(--duration-fast)]"
+        @click="retakeTour"
+      >
+        Take the product tour
+      </button>
     </div>
   </div>
 </template>

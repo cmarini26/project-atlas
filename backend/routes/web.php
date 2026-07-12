@@ -9,6 +9,7 @@ use App\Http\Controllers\App\DashboardController;
 use App\Http\Controllers\App\LearningController;
 use App\Http\Controllers\App\MarketingPresenceController;
 use App\Http\Controllers\App\OpportunityController;
+use App\Http\Controllers\App\ProductTourController;
 use App\Http\Controllers\App\PublishingController;
 use App\Http\Controllers\App\RecommendationController;
 use App\Http\Controllers\App\SettingsController;
@@ -98,4 +99,7 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
     Route::post('/settings/marketing-presence', [MarketingPresenceController::class, 'store'])->name('settings.marketing-presence.store');
     Route::patch('/settings/marketing-presence/{marketingChannel}', [MarketingPresenceController::class, 'update'])->name('settings.marketing-presence.update');
     Route::delete('/settings/marketing-presence/{marketingChannel}', [MarketingPresenceController::class, 'destroy'])->name('settings.marketing-presence.destroy');
+
+    // Product tour
+    Route::post('/tour/complete', [ProductTourController::class, 'complete'])->name('tour.complete');
 });

@@ -3,7 +3,9 @@ import { ref, computed, watch } from 'vue'
 import { usePage, Link, router } from '@inertiajs/vue3'
 import CompanySwitcher from '@/Components/App/CompanySwitcher.vue'
 import ToastStack from '@/Components/UI/ToastStack.vue'
+import ProductTourOverlay from '@/Components/Tour/ProductTourOverlay.vue'
 import { useToasts } from '@/composables/useToasts'
+import { useProductTour } from '@/composables/useProductTour'
 import type { SharedProps } from '@/types'
 
 const page = usePage<SharedProps>()
@@ -47,6 +49,20 @@ function isActive(href: string): boolean {
   }
   return currentPath.value.startsWith(href)
 }
+
+// The tour only has anchors on the Dashboard, so it's only started there —
+// either automatically for a first-time user, or on request from Settings'
+// "Take the product tour" relaunch link (the `pendingStart` flag avoids
+// depending on a post-navigation callback race).
+const { state: tourState, startTour } = useProductTour()
+watch(
+  () => [currentPath.value, user.value?.has_completed_tour, tourState.pendingStart],
+  () => {
+    if (currentPath.value !== '/app') return
+    if (tourState.pendingStart || user.value?.has_completed_tour === false) startTour()
+  },
+  { immediate: true },
+)
 
 function logout(): void {
   router.post('/logout')
@@ -173,5 +189,8 @@ function logout(): void {
 
     <!-- Dismissible toasts (flash + programmatic) -->
     <ToastStack />
+
+    <!-- First-time-user product tour (Dashboard-only) -->
+    <ProductTourOverlay />
   </div>
 </template>
