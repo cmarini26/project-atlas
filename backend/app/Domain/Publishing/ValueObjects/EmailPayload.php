@@ -12,6 +12,8 @@ readonly class EmailPayload
         public string $fromEmail,
         public string $body,
         public string $previewText,
+        public ?string $toEmail = null,
+        public ?string $toName = null,
     ) {}
 
     /**
@@ -31,6 +33,8 @@ readonly class EmailPayload
             fromEmail: (string) ($payload->data['from_email'] ?? ''),
             body: (string) ($payload->data['body'] ?? ''),
             previewText: (string) ($payload->data['preview_text'] ?? ''),
+            toEmail: isset($payload->data['to_email']) ? (string) $payload->data['to_email'] : null,
+            toName: isset($payload->data['to_name']) ? (string) $payload->data['to_name'] : null,
         );
     }
 }

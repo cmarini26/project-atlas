@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 1002 tests (999 passing, 3 skipped where the local environment can't support it) + 78 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Milestone 19 — Feedback Tooling, 23 new PHP tests + 9 new Vitest tests. |
+| Tests             | ✅ Strong | 1013 tests (1010 passing, 3 skipped where the local environment can't support it) + 78 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Milestone 16 groundwork — PostmarkEmailProvider, 11 new PHP tests. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,19 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**Milestone 16 groundwork — PostmarkEmailProvider ✅ Complete (Phase 2 of a 3-phase groundwork effort)**
+*Completed: 2026-07-11*
+
+Second of three phases prepping Version 0.2 Milestones 16-19. `App\Services\Publishing\Email\PostmarkEmailProvider` implements the existing `EmailProvider` contract (`send()`/`ping()`/`supports()`) — the codebase's registry-based publishing architecture (`EmailProviderRegistry`, encrypted per-company `ChannelCredentials`, `ExecutionResult`) needed no new abstractions, just a real implementation alongside the existing `LogEmailProvider`. Registered in `PublisherServiceProvider`, ahead of `LogEmailProvider` per that file's established priority-registration convention.
+
+**A real gap discovered while implementing this:** the email-publishing pipeline (`EmailPayload` → `EmailRenderer` → `EmailProvider::send()`) had no recipient concept anywhere — `LogEmailProvider` never needed one since it only logs a fake send. A real Postmark send requires a "To" address. Fixed with a small, additive extension: `Channel.config` (previously unused as structured data anywhere in the app — verified before adding a cast) gained an `array` cast, `EmailRenderer` now reads `to_email`/`to_name` from the channel's own config (not the content asset — the same asset can go out through more than one email channel with different recipients) into `PlatformPayload`, and `EmailPayload` gained two new nullable trailing constructor params. Fully backward compatible — no existing test assertions broke.
+
+**Scoped out, not built:** a Settings UI for entering a Postmark API token. `ChannelCredentials` has no UI anywhere in this app yet, and there's also no existing flow for a company to create an `email`-type `Channel` in the first place — building just the credential form would have been a partial, disconnected UI. Both are real, but separate, product decisions to make before this UI makes sense.
+
+11 new PHP tests (`PostmarkEmailProviderTest`: send success/failure/retry, ping success/failure, header verification; `EmailRendererTest` additions for the new recipient fields). 1013 PHP tests (1010 passing, 3 skipped). PHPStan level 8 — 0 errors. Pint clean. As with all of Milestones 16-18, this cannot be verified against a real Postmark account — only HTTP-mocked (Guzzle `MockHandler`, matching this codebase's established test convention for `AnthropicProvider`) unit tests exist.
+
+**Previous milestone:**
 
 **Milestone 19 — Early Customer Feedback Tooling ✅ Complete (Phase 1 of a 3-phase groundwork effort)**
 *Completed: 2026-07-11*

@@ -21,6 +21,7 @@ class Channel extends Model
     {
         return [
             'is_active' => 'boolean',
+            'config' => 'array',
         ];
     }
 }

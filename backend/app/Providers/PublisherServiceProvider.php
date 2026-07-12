@@ -6,6 +6,7 @@ use App\Services\Publishing\ChannelPublisherRegistry;
 use App\Services\Publishing\ChannelRendererRegistry;
 use App\Services\Publishing\Email\EmailProviderRegistry;
 use App\Services\Publishing\Email\LogEmailProvider;
+use App\Services\Publishing\Email\PostmarkEmailProvider;
 use App\Services\Publishing\EmailPublisher;
 use App\Services\Publishing\EmailRenderer;
 use App\Services\Publishing\GenericRenderer;
@@ -29,6 +30,11 @@ class PublisherServiceProvider extends ServiceProvider
         $rendererRegistry->register($this->app->make(GenericRenderer::class));
 
         $emailProviderRegistry = $this->app->make(EmailProviderRegistry::class);
+        // PostmarkEmailProvider is registered first — not load-bearing today
+        // since the two support() checks are mutually exclusive ('postmark'
+        // vs 'log'), but matches this file's established priority-order
+        // convention for registries where the first match wins.
+        $emailProviderRegistry->register($this->app->make(PostmarkEmailProvider::class));
         $emailProviderRegistry->register($this->app->make(LogEmailProvider::class));
 
         $publisherRegistry = $this->app->make(ChannelPublisherRegistry::class);

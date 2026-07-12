@@ -167,4 +167,25 @@ class EmailRendererTest extends TestCase
         $this->assertEquals('', $payload->data['from_email']);
         $this->assertEquals('', $payload->data['preview_text']);
     }
+
+    public function test_recipient_comes_from_the_channels_own_config_not_the_asset(): void
+    {
+        $this->channel->update(['config' => ['to_email' => 'collector@example.com', 'to_name' => 'Jamie Collector']]);
+        $asset = $this->makeAsset();
+
+        $payload = $this->renderer->render($asset, $this->channel->fresh());
+
+        $this->assertEquals('collector@example.com', $payload->data['to_email']);
+        $this->assertEquals('Jamie Collector', $payload->data['to_name']);
+    }
+
+    public function test_recipient_is_empty_when_the_channel_has_no_config(): void
+    {
+        $asset = $this->makeAsset();
+
+        $payload = $this->renderer->render($asset, $this->channel);
+
+        $this->assertEquals('', $payload->data['to_email']);
+        $this->assertEquals('', $payload->data['to_name']);
+    }
 }

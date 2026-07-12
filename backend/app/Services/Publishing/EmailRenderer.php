@@ -26,6 +26,9 @@ class EmailRenderer implements ChannelRenderer
             );
         }
 
+        /** @var array<string, mixed> $channelConfig */
+        $channelConfig = $channel->config ?? [];
+
         return new PlatformPayload(
             channelType: 'email',
             data: [
@@ -34,6 +37,12 @@ class EmailRenderer implements ChannelRenderer
                 'from_email' => (string) ($metadata['from_email'] ?? ''),
                 'body' => (string) ($asset->body ?? ''),
                 'preview_text' => (string) ($metadata['preview_text'] ?? ''),
+                // Recipient comes from the channel's own config (e.g. the
+                // company's configured notification/list address), not the
+                // content asset — the same asset can be delivered through
+                // more than one email channel with different recipients.
+                'to_email' => (string) ($channelConfig['to_email'] ?? ''),
+                'to_name' => (string) ($channelConfig['to_name'] ?? ''),
             ],
         );
     }

@@ -6,6 +6,25 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 16 groundwork — PostmarkEmailProvider] — 2026-07-11
+
+Second of three phases prepping Version 0.2 Milestones 16-19. Cannot be verified against a real Postmark account (none exists yet) — HTTP-mocked (Guzzle `MockHandler`) unit tests only, matching the codebase's established `AnthropicProvider` test convention.
+
+### Added
+
+- `app/Services/Publishing/Email/PostmarkEmailProvider.php` implementing the existing `EmailProvider` contract (`send()`, `ping()`, `supports()`). Registered in `PublisherServiceProvider`, ahead of `LogEmailProvider`. Retries once on HTTP 429 with a short backoff; non-retryable `PublishingException` on 4xx/Postmark error codes, retryable on 5xx/429-exhausted.
+- `tests/Feature/Publishing/Email/PostmarkEmailProviderTest.php` (11 tests).
+
+### Fixed
+
+- The email-publishing pipeline had no recipient concept anywhere — `LogEmailProvider` never needed one. `app/Models/Channel.php`'s `config` column (previously unused as structured data anywhere — verified before changing) gained an `array` cast; `EmailRenderer` now reads `to_email`/`to_name` from the channel's own config into `PlatformPayload`; `EmailPayload` gained two new nullable trailing constructor params (`toEmail`, `toName`) — fully backward compatible, no existing assertions broke.
+
+### Notes
+
+- Deliberately did not build a Settings UI for Postmark credentials: `ChannelCredentials` has no UI anywhere in this app yet, and there's no existing flow for a company to create an `email`-type `Channel` — a credential form alone would be disconnected from a working flow. Separate product decisions needed first.
+
+---
+
 ## [Milestone 19 — Early Customer Feedback Tooling] — 2026-07-11
 
 First of three phases prepping Version 0.2 Milestones 16-19. Milestones 16-18 (real email/social publishing, real analytics) need real Postmark/Meta accounts that don't exist yet; Milestone 19 needs no external credentials and ships complete.
