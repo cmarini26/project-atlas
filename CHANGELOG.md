@@ -6,6 +6,20 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Sidebar nav grouping] — 2026-07-11
+
+Picked up the last deferred item (3.1 — nav item grouping) from `Version-0.2-Polish.md`'s "Not Included" list, following a "keep going" on UI polish.
+
+### Changed
+
+- `resources/js/Layouts/AppLayout.vue` — the flat 8-item sidebar nav is now grouped into sections mirroring Atlas's Observe → Understand → Decide → Recommend → Prepare → Approve → Execute → Measure → Learn loop: Dashboard (standalone), Understand (Business Brain, Opportunities), Act (Recommendations, Campaigns, Publishing Queue), Measure (Analytics, Learning). Template/data reorganization only — `isActive()`, icons, and routes unchanged.
+
+### Notes
+
+- The other deferred item, full skeleton loading screens (11.1), was reconsidered and skipped: this app has no client-side polling outside the onboarding status page (which already has its own spinner/timeout state), so there's no in-page loading moment a skeleton would fill — the existing NProgress bar already covers page-transition feedback.
+
+---
+
 ## [Version 0.2 Polish sweep] — 2026-07-11
 
 Executed the remaining open items from `docs/plans/Version-0.2-Polish.md` (Product Validation Review punch list), after a follow-up "more professional, less plain" request. A verification pass confirmed Tier 1 and most of Tier 2 were already resolved by earlier sessions/this session's UI Polish phases; 12 Tier 2/3 items remained.

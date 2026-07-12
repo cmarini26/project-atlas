@@ -34,6 +34,17 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
+**Sidebar nav grouping ✅ Complete**
+*Completed: 2026-07-11*
+
+Picked up the last deferred item from `Version-0.2-Polish.md`'s "Not Included" list (3.1 — nav item grouping), after a follow-up "keep going" on UI polish. The other deferred item, full skeleton loading screens (11.1), was reconsidered and skipped: this is a classic full-page Inertia app with no client-side polling outside the onboarding status page (which already has its own spinner/timeout handling) — there's no in-page loading moment for a skeleton to fill, and the NProgress bar already covers page-transition feedback.
+
+**What changed:** `AppLayout.vue`'s flat 8-item sidebar list is now grouped into sections mirroring Atlas's own Observe → Understand → Decide → Recommend → Prepare → Approve → Execute → Measure → Learn loop: Dashboard stands alone; **Understand** (Business Brain, Opportunities); **Act** (Recommendations, Campaigns, Publishing Queue); **Measure** (Analytics, Learning). Each group gets a small uppercase label; ungrouped Dashboard renders without one. Purely a template/data reorganization — `isActive()`, icons, and routes are unchanged.
+
+No new tests added — this is a static-data template reorganization with no new logic, and testing the full `AppLayout.vue` would require mocking `usePage`, the router, and several child components for a change with negligible regression risk; the existing 67 Vitest tests, `vue-tsc --noEmit`, and `npm run build` all stayed green. 967 PHP tests, 67 Vitest tests. PHPStan level 8 — 0 errors. Pint clean.
+
+**Previous milestone:**
+
 **Version 0.2 Polish sweep ✅ Complete**
 *Completed: 2026-07-11*
 
