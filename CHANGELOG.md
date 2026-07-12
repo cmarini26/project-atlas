@@ -6,6 +6,26 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 15 — Customer Onboarding Improvements] — 2026-07-11
+
+A verification pass against `Version-0.2-Roadmap.md`'s Milestone 15 found most of its 10 listed deliverables already resolved by prior sessions, leaving 6 genuine gaps plus one real bug surfaced along the way. Email verification was scoped out entirely — no real mail provider is configured, so gating registration behind it would only be verifiable via a log file, not an actual inbox.
+
+### Fixed
+
+- `app/Models/Company.php` — `booted()`'s `creating` hook generated slugs via bare `Str::slug($company->name)` with no collision handling, despite `slug` having a DB-level unique constraint. Two customers signing up with the same business name would hit an uncaught 500. Added `uniqueSlugFor()`, appending `-2`, `-3`, ... on collision (checked against soft-deleted companies too, since the unique constraint still applies to trashed rows).
+
+### Added
+
+- `app/Http/Controllers/OnboardingController.php` — `retry()` action (`POST /onboarding/retry`) re-dispatches the existing `website_crawl` integration after a failure, without requiring the customer to re-enter a URL that was already correct.
+- `resources/js/Pages/Onboarding/Status.vue` — "Retry" button on the crawl-failed and AI-failed states, alongside the existing "Try a different URL."
+- `app/Notifications/FirstRecommendationReady.php`, `app/Listeners/SendWelcomeEmailOnFirstRecommendation.php` — emails the company's `owner` membership exactly once, the first time `RecommendationCreated` fires for that company. Registered on the previously-unlistened `RecommendationCreated` event in `AppServiceProvider`.
+- `resources/js/Pages/Onboarding/Index.vue` — a "Why do we need your website?" disclosure on the website-connection step.
+- `database/migrations/2026_07_11_000500_add_checklist_dismissed_at_to_users_table.php`, `app/Http/Controllers/App/OnboardingChecklistController.php`, `resources/js/Components/Dashboard/OnboardingChecklist.vue` — a dismissible "3 things to do first" card on the Dashboard, distinct from the existing product tour (tour = walkthrough of Dashboard sections; checklist = actionable next steps). Persisted per-user, matching the tour's `product_tour_completed_at` reasoning.
+- `docs/guides/Onboarding.md` (new) — internal guide: what the customer sees per step, how to manually retry/re-crawl/reset onboarding, and the tour-vs-checklist distinction.
+- 12 new PHP tests, 2 new Vitest tests.
+
+---
+
 ## [Sidebar nav grouping] — 2026-07-11
 
 Picked up the last deferred item (3.1 — nav item grouping) from `Version-0.2-Polish.md`'s "Not Included" list, following a "keep going" on UI polish.

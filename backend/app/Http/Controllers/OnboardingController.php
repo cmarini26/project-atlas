@@ -246,4 +246,45 @@ class OnboardingController extends Controller
 
         return Inertia::render('Onboarding/Status');
     }
+
+    /**
+     * Re-dispatch the existing website_crawl integration after a transient
+     * failure (site was briefly unreachable, AI provider hiccup) without
+     * making the user re-type the URL they already gave us.
+     */
+    public function retry(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+
+        $membership = CompanyMembership::with('company')->where('user_id', $user->id)->first();
+
+        if (! $membership) {
+            return redirect()->route('onboarding');
+        }
+
+        $company = $membership->company;
+        abort_unless($company instanceof Company, 404);
+
+        $integration = Integration::where('company_id', $company->id)
+            ->where('type', 'website_crawl')
+            ->first();
+
+        if (! $integration) {
+            return redirect()->route('onboarding');
+        }
+
+        $integration->update(['status' => 'active', 'last_error' => null]);
+
+        try {
+            SyncIntegration::dispatch($integration);
+        } catch (AiProviderOverloadedException $e) {
+            report($e);
+        } catch (Throwable $e) {
+            $integration->markAsError($e->getMessage());
+            report($e);
+        }
+
+        return redirect()->route('onboarding.status');
+    }
 }

@@ -8,6 +8,7 @@ use App\Http\Controllers\App\CompanySelectorController;
 use App\Http\Controllers\App\DashboardController;
 use App\Http\Controllers\App\LearningController;
 use App\Http\Controllers\App\MarketingPresenceController;
+use App\Http\Controllers\App\OnboardingChecklistController;
 use App\Http\Controllers\App\OpportunityController;
 use App\Http\Controllers\App\ProductTourController;
 use App\Http\Controllers\App\PublishingController;
@@ -48,6 +49,7 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/onboarding/company', [OnboardingController::class, 'createCompany'])->name('onboarding.company');
     // Throttled: each submit can queue a crawl + AI pipeline run (real spend).
     Route::post('/onboarding/integration', [OnboardingController::class, 'createIntegration'])->middleware('throttle:3,1')->name('onboarding.integration');
+    Route::post('/onboarding/retry', [OnboardingController::class, 'retry'])->middleware('throttle:3,1')->name('onboarding.retry');
     Route::post('/onboarding/marketing-presence', [OnboardingController::class, 'saveMarketingPresence'])->name('onboarding.marketing-presence');
     Route::get('/onboarding/status', [OnboardingController::class, 'status'])->name('onboarding.status');
     Route::get('/api/onboarding/status', [OnboardingStatusController::class, 'show'])->name('api.onboarding.status');
@@ -102,4 +104,7 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
 
     // Product tour
     Route::post('/tour/complete', [ProductTourController::class, 'complete'])->name('tour.complete');
+
+    // Post-onboarding checklist
+    Route::post('/checklist/dismiss', [OnboardingChecklistController::class, 'dismiss'])->name('checklist.dismiss');
 });

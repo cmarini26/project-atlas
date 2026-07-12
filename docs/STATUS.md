@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 967 tests (964 passing, 3 skipped where the local environment can't support it) + 67 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Version 0.2 Polish sweep, 3 new Vitest tests (`CampaignTrail.spec.ts`). |
+| Tests             | ✅ Strong | 979 tests (976 passing, 3 skipped where the local environment can't support it) + 69 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Milestone 15 onboarding improvements, 12 new PHP tests + 2 new Vitest tests. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,24 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**Milestone 15 — Customer Onboarding Improvements ✅ Complete**
+*Completed: 2026-07-11*
+
+A verification pass against `docs/plans/Version-0.2-Roadmap.md`'s Milestone 15 found most of the 10 originally-listed deliverables already resolved by prior sessions (timeout handling, error-state messaging, step-resume logic) — leaving 6 genuine gaps, plus one real bug the verification surfaced along the way. Email verification was scoped down: the infrastructure was skipped entirely (gating registration behind a confirmed email is a real product decision, and mail defaults to the `log` driver with no real provider configured — verification would only ever be readable in a log file, not a real inbox).
+
+**Bug found and fixed:** `Company::booted()`'s `creating` hook generated slugs via bare `Str::slug($company->name)` with no collision handling, but `slug` has a DB-level unique constraint — two different customers signing up with the same business name would hit an uncaught 500. Fixed with a `uniqueSlugFor()` helper that appends `-2`, `-3`, ... on collision, checked against soft-deleted companies too (the unique constraint still applies to trashed rows). This is what the roadmap called "company slug validation" — but since slug is never a user-facing input field in this onboarding flow (it's derived silently from the business name), the originally-envisioned live-debounced-validation UI doesn't apply; the actual fix needed was server-side robustness.
+
+**Shipped:**
+- **One-click retry** — `POST /onboarding/retry` (`OnboardingController::retry()`) re-dispatches the existing `website_crawl` integration after a crawl or AI-analysis failure, without making the customer re-type a URL that was already correct. Added to the Status page's failed/AI-failed states alongside "Try a different URL."
+- **Welcome email** — `App\Notifications\FirstRecommendationReady`, sent to the company's `owner` membership exactly once, the first time `RecommendationCreated` fires for that company (checked via "does any other recommendation exist for this company").
+- **Integration setup guidance** — a "Why do we need your website?" `<details>` disclosure on the onboarding website step, explaining the crawl is read-only and private.
+- **Post-onboarding checklist** — a new dismissible "3 things to do first" card on the Dashboard (`OnboardingChecklist.vue`), distinct from the existing product tour: the tour walks through Dashboard *sections*, the checklist points to actionable next steps (review the first recommendation, explore the Business Brain, review marketing presence). Persisted via a new `users.checklist_dismissed_at` column, following the same per-user (not per-company) reasoning as the tour's `product_tour_completed_at`.
+- **`docs/guides/Onboarding.md`** (new) — what the customer sees at each step, how to manually retry/re-crawl/reset onboarding for a test account, and the tour-vs-checklist distinction.
+
+12 new PHP tests (slug collision × 2, retry × 4, welcome email × 3, checklist × 3), 2 new Vitest tests (`OnboardingChecklist.spec.ts`). 979 PHP tests (976 passing, 3 skipped), 69 Vitest tests. PHPStan level 8 — 0 errors. Pint clean. Build and `vue-tsc --noEmit` green.
+
+**Previous milestone:**
 
 **Sidebar nav grouping ✅ Complete**
 *Completed: 2026-07-11*

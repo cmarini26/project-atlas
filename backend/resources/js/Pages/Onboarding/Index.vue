@@ -123,7 +123,14 @@ function submitMarketingPresence(): void {
     <!-- Step 2: Website URL -->
     <div v-else-if="step === 2">
       <h1 class="text-base font-semibold text-[var(--color-text-primary)] mb-1">Connect your website</h1>
-      <p class="text-sm text-[var(--color-text-muted)] mb-5">Atlas will crawl it to build your Business Brain.</p>
+      <p class="text-sm text-[var(--color-text-muted)] mb-2">Atlas will crawl it to build your Business Brain.</p>
+
+      <details class="mb-5 text-xs text-[var(--color-text-muted)]">
+        <summary class="cursor-pointer select-none hover:text-[var(--color-text-secondary)]">Why do we need your website?</summary>
+        <p class="mt-1.5 leading-relaxed">
+          Atlas reads your public pages once to learn the facts a marketer would: what you sell, who you sell it to, your tone of voice. Nothing is published or changed on your site — this is read-only, and only your Atlas team can see what it learns.
+        </p>
+      </details>
 
       <form class="space-y-4" @submit.prevent="submitIntegration">
         <div>

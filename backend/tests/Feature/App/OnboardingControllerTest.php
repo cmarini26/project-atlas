@@ -468,6 +468,60 @@ class OnboardingControllerTest extends TestCase
         $this->assertSame(2, MarketingChannel::withoutGlobalScopes()->where('company_id', $company->id)->count());
     }
 
+    // ── Retry ─────────────────────────────────────────────────────────────────
+
+    public function test_retry_redispatches_the_existing_integration_and_clears_error_state(): void
+    {
+        $user = User::factory()->create();
+        $company = Company::withoutGlobalScopes()->create(['name' => 'My Co', 'slug' => 'my-co']);
+        CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => 'owner']);
+        $integration = Integration::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'website_crawl',
+            'name' => 'Website',
+            'config' => ['url' => 'https://flaky.example.com'],
+            'status' => 'error',
+            'last_error' => 'Connection refused',
+        ]);
+
+        Bus::fake();
+
+        $this->actingAs($user)
+            ->post('/onboarding/retry')
+            ->assertRedirect(route('onboarding.status'));
+
+        $integration->refresh();
+        $this->assertSame('active', $integration->status);
+        $this->assertNull($integration->last_error);
+
+        Bus::assertDispatched(SyncIntegration::class, fn (SyncIntegration $job): bool => $job->integration->id === $integration->id);
+    }
+
+    public function test_retry_redirects_to_onboarding_with_no_integration(): void
+    {
+        $user = User::factory()->create();
+        $company = Company::withoutGlobalScopes()->create(['name' => 'My Co', 'slug' => 'my-co']);
+        CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => 'owner']);
+
+        $this->actingAs($user)
+            ->post('/onboarding/retry')
+            ->assertRedirect(route('onboarding'));
+    }
+
+    public function test_retry_redirects_to_onboarding_with_no_company(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->post('/onboarding/retry')
+            ->assertRedirect(route('onboarding'));
+    }
+
+    public function test_retry_requires_auth(): void
+    {
+        $this->post('/onboarding/retry')->assertRedirect('/login');
+    }
+
     // ── Status page ───────────────────────────────────────────────────────────
 
     public function test_status_page_renders_for_authenticated_user(): void

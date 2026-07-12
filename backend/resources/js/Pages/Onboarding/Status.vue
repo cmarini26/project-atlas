@@ -34,8 +34,15 @@ const status = ref<StatusData>({
 })
 
 const loading = ref(true)
+const retrying = ref(false)
 const startTime = Date.now()
 let intervalId: ReturnType<typeof setInterval> | null = null
+
+function retry(): void {
+  if (retrying.value) return
+  retrying.value = true
+  router.post('/onboarding/retry', {}, { onFinish: () => { retrying.value = false } })
+}
 
 const isTimedOut = computed(() => Date.now() - startTime > 5 * 60 * 1000)
 const isFailed = computed(() => status.value.integration_status === 'error')
@@ -103,13 +110,23 @@ onUnmounted(() => {
           </div>
         </div>
         <h1 class="text-base font-semibold text-[var(--color-text-primary)] mb-2">Atlas couldn't reach your website</h1>
-        <p class="text-sm text-[var(--color-text-muted)] mb-6">There was a problem fetching your site. Check that the URL is correct and accessible, then try again.</p>
-        <a
-          href="/onboarding"
-          class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] transition-colors duration-[var(--duration-fast)]"
-        >
-          Try a different URL
-        </a>
+        <p class="text-sm text-[var(--color-text-muted)] mb-6">This is often temporary — your site may have been briefly unreachable. You can retry the same URL, or try a different one if the problem persists.</p>
+        <div class="flex items-center justify-center gap-3">
+          <button
+            type="button"
+            :disabled="retrying"
+            class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+            @click="retry"
+          >
+            {{ retrying ? 'Retrying…' : 'Retry' }}
+          </button>
+          <a
+            href="/onboarding"
+            class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-raised)] transition-colors duration-[var(--duration-fast)]"
+          >
+            Try a different URL
+          </a>
+        </div>
       </div>
 
       <!-- AI analysis failed -->
@@ -123,9 +140,17 @@ onUnmounted(() => {
         <p class="text-sm text-[var(--color-text-muted)] mb-3">Your website was scanned successfully, but Atlas couldn't extract usable business facts from it. This can happen when the AI provider is misconfigured, or when the page doesn't contain enough readable text about your business.</p>
         <p class="text-xs text-[var(--color-text-muted)] mb-6">Check that <code class="font-mono bg-[var(--color-surface-raised)] px-1 rounded">ANTHROPIC_API_KEY</code> is set correctly in <code class="font-mono bg-[var(--color-surface-raised)] px-1 rounded">.env</code>, or try a page with more content about your business (like an About page).</p>
         <div class="flex items-center justify-center gap-3">
+          <button
+            type="button"
+            :disabled="retrying"
+            class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+            @click="retry"
+          >
+            {{ retrying ? 'Retrying…' : 'Retry' }}
+          </button>
           <a
             href="/onboarding"
-            class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] transition-colors duration-[var(--duration-fast)]"
+            class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-raised)] transition-colors duration-[var(--duration-fast)]"
           >
             Try a different URL
           </a>

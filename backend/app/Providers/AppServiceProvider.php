@@ -18,9 +18,11 @@ use App\Events\ObservationProcessed;
 use App\Events\ObservationRecorded;
 use App\Events\OpportunityDetected;
 use App\Events\RecommendationApproved;
+use App\Events\RecommendationCreated;
 use App\Listeners\DispatchCampaignPreparation;
 use App\Listeners\DispatchObservationProcessing;
 use App\Listeners\ScheduleMetricRetrieval;
+use App\Listeners\SendWelcomeEmailOnFirstRecommendation;
 use App\Listeners\TriggerCampaignPublishing;
 use App\Listeners\TriggerDecisionEvaluation;
 use App\Listeners\TriggerOpportunityDetection;
@@ -135,6 +137,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(DecisionCommitted::class, DispatchCampaignPreparation::class);
         Event::listen(CampaignAssetsReady::class, TriggerRecommendationCreation::class);
         Event::listen(RecommendationApproved::class, TriggerCampaignPublishing::class);
+        Event::listen(RecommendationCreated::class, SendWelcomeEmailOnFirstRecommendation::class);
         Event::listen(ExecutionCompleted::class, ScheduleMetricRetrieval::class);
 
         // Named limiter (not a bare `throttle:N,M` string) so this endpoint

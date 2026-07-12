@@ -37,9 +37,29 @@ class Company extends Model
     {
         static::creating(function (Company $company) {
             if (empty($company->slug)) {
-                $company->slug = Str::slug($company->name);
+                $company->slug = self::uniqueSlugFor($company->name);
             }
         });
+    }
+
+    /**
+     * Two companies with the same name (a common collision — "Acme Comics"
+     * twice, unrelated customers) would otherwise generate the same base
+     * slug and crash on the column's unique constraint. Appends -2, -3, ...
+     * until a free slug is found.
+     */
+    private static function uniqueSlugFor(string $name): string
+    {
+        $base = Str::slug($name);
+        $slug = $base;
+        $suffix = 2;
+
+        while (self::withoutGlobalScopes()->withTrashed()->where('slug', $slug)->exists()) {
+            $slug = "{$base}-{$suffix}";
+            $suffix++;
+        }
+
+        return $slug;
     }
 
     /** @return HasOne<DigitalTwin, $this> */

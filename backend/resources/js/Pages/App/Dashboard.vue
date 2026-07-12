@@ -1,16 +1,19 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3'
+import { Head, Link, usePage } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import SummaryCard from '@/Components/Dashboard/SummaryCard.vue'
 import HealthCard from '@/Components/Dashboard/HealthCard.vue'
 import RecommendationPrompt from '@/Components/Dashboard/RecommendationPrompt.vue'
+import OnboardingChecklist from '@/Components/Dashboard/OnboardingChecklist.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import PageHeader from '@/Components/UI/PageHeader.vue'
 import ChannelCapabilityBadge from '@/Components/UI/ChannelCapabilityBadge.vue'
 import { RectangleStackIcon, PaperAirplaneIcon, HomeIcon } from '@heroicons/vue/24/outline'
 import { channelLabel } from '@/lib/channelCapability'
-import type { Recommendation, Campaign } from '@/types'
+import type { Recommendation, Campaign, SharedProps } from '@/types'
+
+const page = usePage<SharedProps>()
 
 // Persistent layout: the sidebar/toast shell survives Inertia visits.
 defineOptions({ layout: AppLayout })
@@ -87,6 +90,8 @@ function formatDate(date: string | null): string {
       description="Your daily snapshot — see what needs a decision and how your brand twin is doing."
       :icon="HomeIcon"
     />
+
+    <OnboardingChecklist v-if="!page.props.auth.user?.has_dismissed_checklist" />
 
     <!-- Pending recommendation prompt -->
     <div v-if="pending_recommendation" data-tour="recommendation-prompt">
