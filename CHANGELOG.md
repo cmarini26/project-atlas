@@ -6,6 +6,28 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Visual direction refresh — bolder palette, gradients, illustration] — 2026-07-11
+
+Follow-up to user feedback that the product still read as plain after the earlier P0 visual-refresh pass. Agreed a direction (gradient hero, category-colored cards, inline SVG illustrations) via a mockup before implementing.
+
+### Added
+
+- `resources/css/app.css` — secondary accent tokens `--color-coral-500/600`, `--color-amber-500`, `--color-teal-500`, and gradient tokens `--gradient-accent`, `--gradient-hero`.
+- `Components/Dashboard/SummaryCard.vue` — new optional `icon`/`accent` props (colored top-border strip + tinted icon badge), wired into `Pages/App/Dashboard.vue`'s four summary cards (rose/pending, amber/opportunities, indigo/campaigns, teal/learnings).
+
+### Changed
+
+- `Components/Marketing/HeroSection.vue` — radial gradient background, two blurred gradient accent shapes, gradient headline text.
+- `Components/Marketing/MarketingButton.vue` — primary variant uses `--gradient-accent` + soft shadow instead of a flat fill.
+- `Components/Marketing/FinalCta.vue` — matching blurred gradient accent shape for depth on its dark section.
+- `Components/UI/EmptyState.vue` — default icon changed from a plain three-dot ellipsis to a sparkle motif; no prop/slot API change, applies automatically across all 10 existing usages.
+
+### Notes
+
+- Deliberately scoped to the highest-visibility surfaces (hero, primary CTA, dashboard, empty states) rather than a full mechanical sweep of all ~13 flat-accent buttons and marketing sections, to keep the change reviewable. No backend files touched.
+
+---
+
 ## [Milestone 17 groundwork — Meta OAuth social publishing] — 2026-07-11
 
 Fourth and final phase prepping Version 0.2 Milestones 16-19 — completes the groundwork effort. The first OAuth flow in this codebase (PKCE + state validation), with no prior pattern to build against. Cannot be verified end-to-end without a real registered Meta App — HTTP-mocked (Guzzle `MockHandler`) unit/feature tests only.

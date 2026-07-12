@@ -18,8 +18,17 @@ const quadrants = [
 </script>
 
 <template>
-  <section class="relative pt-32 pb-16 sm:pt-40 sm:pb-24 px-4 sm:px-8 overflow-hidden">
-    <div class="mx-auto max-w-[1280px] grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+  <section class="relative pt-32 pb-16 sm:pt-40 sm:pb-24 px-4 sm:px-8 overflow-hidden [background:var(--gradient-hero)]">
+    <div
+      class="pointer-events-none absolute -top-24 -right-16 size-72 rounded-full opacity-40 blur-3xl [background:linear-gradient(135deg,var(--color-accent-500),var(--color-coral-500))]"
+      aria-hidden="true"
+    />
+    <div
+      class="pointer-events-none absolute bottom-0 left-1/4 size-56 rounded-full opacity-25 blur-3xl [background:linear-gradient(135deg,var(--color-teal-500),var(--color-accent-500))]"
+      aria-hidden="true"
+    />
+
+    <div class="relative mx-auto max-w-[1280px] grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
       <div
         class="text-left transition-opacity duration-300"
         :class="hasEntered ? 'opacity-100' : 'opacity-0'"
@@ -29,7 +38,9 @@ const quadrants = [
         </p>
 
         <h1 class="text-display sm:text-[2.75rem] sm:leading-[1.15] text-[var(--color-text-primary)] mb-6 text-balance">
-          Marketing that arrives<br />before you think to ask for it.
+          Marketing that
+          <span class="bg-[image:linear-gradient(90deg,var(--color-accent-600),var(--color-coral-600))] bg-clip-text text-transparent">arrives</span><br />
+          before you think to ask for it.
         </h1>
 
         <p class="text-body-lg text-[var(--color-text-secondary)] max-w-xl mb-8">

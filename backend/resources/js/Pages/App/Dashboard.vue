@@ -9,7 +9,15 @@ import EmptyState from '@/Components/UI/EmptyState.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import PageHeader from '@/Components/UI/PageHeader.vue'
 import ChannelCapabilityBadge from '@/Components/UI/ChannelCapabilityBadge.vue'
-import { RectangleStackIcon, PaperAirplaneIcon, HomeIcon } from '@heroicons/vue/24/outline'
+import {
+  RectangleStackIcon,
+  PaperAirplaneIcon,
+  HomeIcon,
+  ClockIcon,
+  LightBulbIcon,
+  MegaphoneIcon,
+  ChartBarIcon,
+} from '@heroicons/vue/24/outline'
 import { channelLabel } from '@/lib/channelCapability'
 import type { Recommendation, Campaign, SharedProps } from '@/types'
 
@@ -104,21 +112,29 @@ function formatDate(date: string | null): string {
         label="Pending"
         :value="counts.pending_recommendations"
         href="/app/recommendations"
+        :icon="ClockIcon"
+        accent="rose"
       />
       <SummaryCard
         label="Opportunities"
         :value="counts.open_opportunities"
         href="/app/opportunities"
+        :icon="LightBulbIcon"
+        accent="amber"
       />
       <SummaryCard
         label="Campaigns"
         :value="counts.active_campaigns"
         href="/app/campaigns"
+        :icon="MegaphoneIcon"
+        accent="indigo"
       />
       <SummaryCard
         label="Learnings"
         :value="counts.unapplied_learnings"
         href="/app/learning"
+        :icon="ChartBarIcon"
+        accent="teal"
       />
     </div>
 

@@ -29,7 +29,7 @@ const variantClasses = computed(() => {
     case 'ghost':
       return 'bg-transparent text-[var(--color-text-muted)] hover:bg-[var(--color-surface-subtle)] hover:text-[var(--color-text-secondary)]'
     default:
-      return 'bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] active:bg-[var(--color-accent-700)]'
+      return 'bg-[image:var(--gradient-accent)] text-white shadow-[0_8px_20px_-6px_rgba(99,102,241,0.5)] hover:brightness-105 active:brightness-95'
   }
 })
 </script>

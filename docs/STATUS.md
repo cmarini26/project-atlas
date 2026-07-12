@@ -34,6 +34,19 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
+**Visual direction refresh — bolder palette, gradients, illustration ✅ Complete**
+*Completed: 2026-07-11*
+
+User feedback (twice) was that the product still read as plain despite the earlier P0 visual-refresh pass — that pass fixed spacing/consistency but kept a single flat indigo accent everywhere. Agreed a concrete direction with the user via a mockup (gradient hero, category-colored cards, inline SVG illustrations) before touching code.
+
+`resources/css/app.css` gained secondary accent tokens (`--color-coral-500/600`, `--color-amber-500`, `--color-teal-500`) plus two gradient tokens (`--gradient-accent`, `--gradient-hero`) — additive, no existing token renamed. `Components/Marketing/HeroSection.vue` now sits on a soft radial gradient with two blurred gradient "blobs" behind the content, and gradient text on its headline; `Components/Marketing/MarketingButton.vue`'s primary variant uses the gradient + a soft shadow instead of a flat fill; `Components/Marketing/FinalCta.vue` gained the same blob treatment for depth on its dark section. `Components/Dashboard/SummaryCard.vue` gained optional `icon`/`accent` props — a colored top-border strip and tinted icon badge per domain concept (rose/pending, amber/opportunities, indigo/campaigns, teal/learnings) — wired up in `Pages/App/Dashboard.vue`'s four summary cards. `Components/UI/EmptyState.vue`'s default icon (previously a plain three-dot ellipsis) is now a sparkle motif, applied automatically across all 10 existing usages (Dashboard, Learning, Brain, Publishing, Opportunities, Recommendations, Campaigns ×2, Analytics ×2) with no prop/slot API change — existing `EmptyState.spec.ts` assertions on the variant-tinted circle still pass unmodified.
+
+Deliberately scoped down from the mockup: did not touch the ~13 other flat-accent buttons across app pages (Settings, forms, etc.) or reskin all 13 marketing sections — kept this pass to the highest-visibility surfaces (hero, primary CTA, dashboard, empty states) rather than a full mechanical sweep, to keep the change reviewable. Further sections can pick up the same tokens incrementally.
+
+`npx vue-tsc --noEmit` clean (pre-existing `baseUrl` deprecation warning only, unrelated), 78 Vitest tests passing, `npm run build` succeeds. No backend files touched — Pint/PHPStan/PHPUnit untouched by this pass.
+
+**Previous milestone:**
+
 **Milestone 17 groundwork — Meta OAuth social publishing ✅ Complete (Phase 4 of 4 — groundwork effort finished)**
 *Completed: 2026-07-11*
 

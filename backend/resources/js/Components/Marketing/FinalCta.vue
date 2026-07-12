@@ -6,10 +6,14 @@ const { target, isVisible } = useScrollReveal()
 </script>
 
 <template>
-  <section class="py-20 sm:py-28 px-4 sm:px-8 bg-[var(--color-surface-overlay)]">
+  <section class="relative py-20 sm:py-28 px-4 sm:px-8 bg-[var(--color-surface-overlay)] overflow-hidden">
+    <div
+      class="pointer-events-none absolute -top-32 right-1/4 size-96 rounded-full opacity-20 blur-3xl [background:linear-gradient(135deg,var(--color-accent-500),var(--color-coral-500))]"
+      aria-hidden="true"
+    />
     <div
       ref="target"
-      class="mx-auto max-w-[720px] text-center transition-opacity duration-300 ease-[var(--ease-out)]"
+      class="relative mx-auto max-w-[720px] text-center transition-opacity duration-300 ease-[var(--ease-out)]"
       :class="isVisible ? 'opacity-100' : 'opacity-0'"
     >
       <h2 class="text-display sm:text-[2.25rem] text-[var(--color-text-inverse)] mb-6 text-balance">
