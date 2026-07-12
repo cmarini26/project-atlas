@@ -90,7 +90,7 @@ const cardStyle = computed(() => {
             </button>
             <button
               type="button"
-              class="py-1.5 px-3 text-xs font-medium rounded-lg bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] transition-colors duration-[var(--duration-fast)]"
+              class="py-1.5 px-3 text-xs font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] transition-colors duration-[var(--duration-fast)]"
               @click="nextStep"
             >
               {{ isLastStep ? 'Done' : 'Next' }}

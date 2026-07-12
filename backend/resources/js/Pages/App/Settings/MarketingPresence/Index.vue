@@ -166,7 +166,7 @@ function reactivate(channel: MarketingChannelData): void {
         <button
           type="submit"
           :disabled="addForm.processing"
-          class="shrink-0 py-2 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+          class="shrink-0 py-2 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
         >
           {{ addForm.processing ? 'Adding…' : 'Add channel' }}
         </button>

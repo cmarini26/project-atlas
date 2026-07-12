@@ -71,7 +71,7 @@ function onKeydown(event: KeyboardEvent): void {
             ref="confirmButton"
             type="button"
             :disabled="processing"
-            class="py-2 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+            class="py-2 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
             @click="emit('confirm')"
           >
             {{ confirmLabel }}

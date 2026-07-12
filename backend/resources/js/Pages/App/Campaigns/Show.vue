@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
+import CampaignTrail from '@/Components/Campaign/CampaignTrail.vue'
 import ChannelCapabilityBadge from '@/Components/UI/ChannelCapabilityBadge.vue'
 import { channelLabel } from '@/lib/channelCapability'
 import { ClockIcon } from '@heroicons/vue/24/outline'
@@ -79,6 +80,10 @@ function formatDate(date: string | null): string {
         <h1 class="text-xl font-semibold text-[var(--color-text-primary)]">{{ campaign.title }}</h1>
         <p class="text-sm text-[var(--color-text-muted)] mt-1">Started {{ formatDate(campaign.created_at) }}</p>
       </div>
+    </div>
+
+    <div v-if="campaign.status !== 'cancelled'" class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5 mb-6">
+      <CampaignTrail :status="campaign.status" />
     </div>
 
     <!-- KPI snapshot -->

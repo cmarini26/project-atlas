@@ -7,6 +7,7 @@ use App\Models\CatalogItem;
 use App\Models\Company;
 use App\Models\DigitalTwin;
 use App\Models\Fact;
+use App\Models\Integration;
 use App\Models\Knowledge;
 use App\Models\Observation;
 use App\Services\Brain\BusinessBrainService;
@@ -36,6 +37,7 @@ class BusinessBrainController extends Controller
                 'knowledge' => [],
                 'recent_observations' => [],
                 'catalog' => null,
+                'integration_count' => Integration::where('company_id', $company->id)->count(),
             ]);
         }
 
@@ -86,6 +88,7 @@ class BusinessBrainController extends Controller
                 'type' => $catalog->type,
                 'item_count' => CatalogItem::where('company_id', $company->id)->count(),
             ] : null,
+            'integration_count' => Integration::where('company_id', $company->id)->count(),
         ]);
     }
 }

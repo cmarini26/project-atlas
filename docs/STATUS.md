@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 967 tests (964 passing, 3 skipped where the local environment can't support it) + 64 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: UI Polish Phase 3 (first-time product tour), 3 new PHP tests + 11 new Vitest tests. |
+| Tests             | ✅ Strong | 967 tests (964 passing, 3 skipped where the local environment can't support it) + 67 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Version 0.2 Polish sweep, 3 new Vitest tests (`CampaignTrail.spec.ts`). |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,28 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**Version 0.2 Polish sweep ✅ Complete**
+*Completed: 2026-07-11*
+
+Executed [`docs/plans/Version-0.2-Polish.md`](plans/Version-0.2-Polish.md) — a 24-issue punch list from the Product Validation Review, requested after a follow-up "more professional, less plain" ask. A verification pass first confirmed all 4 Tier 1 (trust blockers) and 12 of 14 Tier 2 (clarity gap) items were already resolved by prior sessions and this session's earlier UI Polish phases — leaving 12 genuinely open items, all now shipped:
+
+- **T3-4** — Settings nav link now gets the same active-state highlight as every other nav item.
+- **T3-12** — "Publishing" renamed to "Publishing Queue" (nav label, page title, `<h1>`) — the page is a read-only queue view, not a publish action.
+- **T3-8** — Primary buttons across Auth, Onboarding, `ApproveActions`, `ContentEditor`, `ConfirmDialog`, Settings, Marketing Presence, and the product tour overlay moved from `accent-600`/`hover:accent-700` to `accent-500`/`hover:accent-600`, matching the design system's specified primary button color.
+- **T3-7** — Global `:focus-visible` ring (`app.css`) on every button/link/input/select/textarea — no per-component focus classes needed.
+- **T3-10** — Rejection textarea in `ApproveActions.vue` gained a proper `<label>` ("Help Atlas learn (optional)"), placeholder de-duplicated.
+- **T3-13** — Analytics' campaign-results empty state gained a "Review your first recommendation →" action link.
+- **T3-14** — Settings' integration sync button now uses `preserveScroll`/`preserveState`, so syncing no longer resets scroll position.
+- **T3-3** — Brain and Opportunities empty states show a "Connect your website →" CTA when `integration_count === 0` (new prop on `BusinessBrainController`/`OpportunityController`).
+- **T3-6** — `<main>` gets `aria-busy` during Inertia navigations, driven by `router.on('start'/'finish')`.
+- **T3-11** — Real `favicon.svg` (indigo "A" letterform) replacing the empty 0-byte `favicon.ico`; linked from `app.blade.php`.
+- **T3-1** — New `Components/Campaign/CampaignTrail.vue`: a 5-step lifecycle trail (Draft → Approved → Active → Published → Completed) on `Campaigns/Show.vue`, matching the app's actual `CampaignStatus` enum rather than the plan's originally-imagined Queued/Executing labels. Not rendered for `cancelled` campaigns — there's no record of which step a cancellation happened at, and the existing status Badge already communicates that state.
+- **T2-8** — Verified already satisfied: `app.ts`'s `createInertiaApp({ progress: { color: '#6366f1' } })` is Inertia's own built-in NProgress-based page-transition bar. Installing a second, standalone `nprogress` package would have been redundant — reverted that install once confirmed.
+
+3 new Vitest tests (`CampaignTrail.spec.ts`). 967 PHP tests (964 passing, 3 skipped), 67 Vitest tests. PHPStan level 8 — 0 errors. Pint clean. Build and `vue-tsc --noEmit` green.
+
+**Previous milestone:**
 
 **UI Polish Phase 3 — First-time product tour ✅ Complete**
 *Completed: 2026-07-11*

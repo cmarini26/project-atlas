@@ -113,7 +113,7 @@ function submitMarketingPresence(): void {
         <button
           type="submit"
           :disabled="companyForm.processing"
-          class="w-full py-2.5 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+          class="w-full py-2.5 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
         >
           {{ companyForm.processing ? 'Saving…' : 'Continue' }}
         </button>
@@ -147,7 +147,7 @@ function submitMarketingPresence(): void {
         <button
           type="submit"
           :disabled="integrationForm.processing"
-          class="w-full py-2.5 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+          class="w-full py-2.5 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
         >
           {{ integrationForm.processing ? 'Connecting…' : 'Connect website' }}
         </button>
@@ -184,7 +184,7 @@ function submitMarketingPresence(): void {
         <button
           type="submit"
           :disabled="marketingPresenceForm.processing"
-          class="w-full py-2.5 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+          class="w-full py-2.5 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
         >
           {{ marketingPresenceForm.processing ? 'Saving…' : 'Finish setup' }}
         </button>

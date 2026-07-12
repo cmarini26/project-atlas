@@ -6,6 +6,33 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Version 0.2 Polish sweep] — 2026-07-11
+
+Executed the remaining open items from `docs/plans/Version-0.2-Polish.md` (Product Validation Review punch list), after a follow-up "more professional, less plain" request. A verification pass confirmed Tier 1 and most of Tier 2 were already resolved by earlier sessions/this session's UI Polish phases; 12 Tier 2/3 items remained.
+
+### Added
+
+- `resources/js/Components/Campaign/CampaignTrail.vue` (new, T3-1) — a 5-step lifecycle trail (Draft → Approved → Active → Published → Completed) rendered on `Campaigns/Show.vue`; skipped for `cancelled` campaigns since there's no record of which step a cancellation occurred at.
+- `resources/js/Components/Campaign/CampaignTrail.spec.ts` (new, 3 tests).
+- `public/favicon.svg` (T3-11) — indigo "A" letterform, replacing an empty 0-byte `favicon.ico`; linked via `resources/views/app.blade.php`.
+- `resources/css/app.css` — global `button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible` ring (T3-7).
+- `app/Http/Controllers/App/BusinessBrainController.php`, `OpportunityController.php` — both now return `integration_count`, consumed by new CTAs on `Brain.vue`/`Opportunities.vue` empty states (T3-3): "Connect your website →" shown only when no integration exists.
+- `resources/js/Layouts/AppLayout.vue` — `aria-busy` on `<main>` during Inertia navigations, driven by `router.on('start'/'finish')` (T3-6).
+
+### Changed
+
+- `resources/js/Layouts/AppLayout.vue` — Settings nav link now gets the same active-state highlight as every other nav item (T3-4); "Publishing" renamed to "Publishing Queue" (T3-12, also updated in `Publishing.vue`'s title/header).
+- Primary buttons across Auth, Onboarding, `ApproveActions.vue`, `ContentEditor.vue`, `ConfirmDialog.vue`, `Settings.vue`, `MarketingPresence/Index.vue`, and `ProductTourOverlay.vue` moved from `bg-accent-600`/`hover:accent-700` to `bg-accent-500`/`hover:accent-600` (T3-8), matching the design system's specified primary button color.
+- `resources/js/Components/Recommendations/ApproveActions.vue` — rejection textarea gained a proper `<label>` ("Help Atlas learn (optional)"), de-duplicating the placeholder text (T3-10).
+- `resources/js/Pages/App/Analytics/Index.vue` — campaign-results empty state gained a "Review your first recommendation →" action link (T3-13).
+- `resources/js/Pages/App/Settings.vue` — integration sync now uses `preserveScroll`/`preserveState`, so syncing no longer resets scroll position (T3-14).
+
+### Notes
+
+- T2-8 (NProgress page-transition indicator) was verified already satisfied — `app.ts`'s `createInertiaApp({ progress: { color: '#6366f1' } })` is Inertia's own built-in progress bar. A standalone `nprogress` install was tried, found redundant, and reverted.
+
+---
+
 ## [UI Polish Phase 3 — First-time product tour] — 2026-07-11
 
 Third and final of three approved UI improvements. No tour/walkthrough concept existed anywhere in the codebase.

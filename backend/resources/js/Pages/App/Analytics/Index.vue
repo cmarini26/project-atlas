@@ -63,10 +63,13 @@ function pct(value: number | undefined): string {
       <EmptyState
         v-if="campaign_snapshots.length === 0"
         title="No campaign results yet"
-        description="Results appear here after campaigns complete."
+        description="Analytics will appear here once your first campaign runs."
         variant="info"
       >
         <template #icon><ChartBarIcon class="size-6" /></template>
+        <template #action>
+          <Link href="/app/recommendations" class="text-sm text-[var(--color-text-link)] hover:underline">Review your first recommendation →</Link>
+        </template>
       </EmptyState>
 
       <div v-else class="space-y-3">

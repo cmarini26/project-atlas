@@ -57,10 +57,10 @@ function formatDate(date: string | null): string {
 </script>
 
 <template>
-  <Head><title>Publishing — Atlas</title></Head>
+  <Head><title>Publishing Queue — Atlas</title></Head>
   <div class="max-w-3xl">
     <PageHeader
-      title="Publishing Activity"
+      title="Publishing Queue"
       description="Atlas doesn't publish to live external channels yet — every entry below is a simulated, internally logged send."
       :icon="PaperAirplaneIcon"
     />

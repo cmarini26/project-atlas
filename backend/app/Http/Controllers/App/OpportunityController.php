@@ -4,6 +4,7 @@ namespace App\Http\Controllers\App;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
+use App\Models\Integration;
 use App\Models\Opportunity;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -41,6 +42,7 @@ class OpportunityController extends Controller
 
         return Inertia::render('App/Opportunities', [
             'opportunities' => $opportunities,
+            'integration_count' => Integration::where('company_id', $company->id)->count(),
         ]);
     }
 }

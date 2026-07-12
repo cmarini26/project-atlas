@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3'
+import { Head, Link } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
@@ -15,6 +15,7 @@ defineProps<{
   facts: Fact[]
   knowledge: Knowledge[]
   recent_observations: BrainObservation[]
+  integration_count: number
 }>()
 
 const twinStatusLabels: Record<string, string> = {
@@ -77,6 +78,9 @@ function formatDate(date: string | null): string {
           description="Facts appear as Atlas learns about your business."
         >
           <template #icon><CpuChipIcon class="size-6" /></template>
+          <template v-if="integration_count === 0" #action>
+            <Link href="/app/settings" class="text-sm text-[var(--color-text-link)] hover:underline">Connect your website →</Link>
+          </template>
         </EmptyState>
 
         <div v-else class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl divide-y divide-[var(--color-border)]">

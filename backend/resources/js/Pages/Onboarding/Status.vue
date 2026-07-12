@@ -106,7 +106,7 @@ onUnmounted(() => {
         <p class="text-sm text-[var(--color-text-muted)] mb-6">There was a problem fetching your site. Check that the URL is correct and accessible, then try again.</p>
         <a
           href="/onboarding"
-          class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] transition-colors duration-[var(--duration-fast)]"
+          class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] transition-colors duration-[var(--duration-fast)]"
         >
           Try a different URL
         </a>
@@ -125,7 +125,7 @@ onUnmounted(() => {
         <div class="flex items-center justify-center gap-3">
           <a
             href="/onboarding"
-            class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] transition-colors duration-[var(--duration-fast)]"
+            class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] transition-colors duration-[var(--duration-fast)]"
           >
             Try a different URL
           </a>
@@ -168,7 +168,7 @@ onUnmounted(() => {
         <p class="text-xs text-[var(--color-text-muted)] font-mono bg-[var(--color-surface-raised)] rounded px-3 py-2 mb-6 text-left">php artisan queue:work --queue=high,ai,default,observations,publishing,analytics,maintenance</p>
         <a
           href="/app"
-          class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] transition-colors duration-[var(--duration-fast)]"
+          class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] transition-colors duration-[var(--duration-fast)]"
         >
           Go to dashboard
         </a>
@@ -191,7 +191,7 @@ onUnmounted(() => {
         <div class="flex items-center justify-center gap-3">
           <a
             href="/app"
-            class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] transition-colors duration-[var(--duration-fast)]"
+            class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] transition-colors duration-[var(--duration-fast)]"
           >
             Go to dashboard
           </a>
@@ -215,7 +215,7 @@ onUnmounted(() => {
         <p class="text-sm text-[var(--color-text-muted)] mb-6">Atlas is doing a thorough analysis. You can leave this page — your first recommendation will be waiting on the dashboard when it's ready.</p>
         <a
           href="/app"
-          class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] transition-colors duration-[var(--duration-fast)]"
+          class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] transition-colors duration-[var(--duration-fast)]"
         >
           Go to dashboard
         </a>

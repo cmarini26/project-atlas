@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3'
+import { Head, Link } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import ScoreBar from '@/Components/UI/ScoreBar.vue'
@@ -13,6 +13,7 @@ defineOptions({ layout: AppLayout })
 
 defineProps<{
   opportunities: Opportunity[]
+  integration_count: number
 }>()
 
 const typeLabels: Record<string, string> = {
@@ -76,6 +77,9 @@ const urgencyClass: Record<string, string> = {
       variant="info"
     >
       <template #icon><MagnifyingGlassIcon class="size-6" /></template>
+      <template v-if="integration_count === 0" #action>
+        <Link href="/app/settings" class="text-sm text-[var(--color-text-link)] hover:underline">Connect your website →</Link>
+      </template>
     </EmptyState>
 
     <div v-else class="space-y-3">

@@ -93,7 +93,7 @@ function reject(): void {
       <button
         type="button"
         :disabled="approveForm.processing || rejectForm.processing"
-        class="flex-1 py-2.5 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+        class="flex-1 py-2.5 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
         @click="requestApproval"
       >
         {{ approveForm.processing ? 'Approving…' : 'Approve' }}
@@ -125,11 +125,13 @@ function reject(): void {
     </p>
 
     <div v-if="showRejectNote" class="space-y-2">
+      <label for="reject-note" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest">Help Atlas learn (optional)</label>
       <textarea
+        id="reject-note"
         v-model="rejectNote"
         rows="2"
         class="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] resize-none focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)]"
-        placeholder="Optional: tell Atlas why (helps it learn)"
+        placeholder="Tell Atlas why (helps it learn)"
       />
       <p v-if="rejectError" class="text-sm text-rose-600" role="alert">{{ rejectError }}</p>
       <button
