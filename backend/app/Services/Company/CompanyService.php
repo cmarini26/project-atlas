@@ -23,6 +23,7 @@ class CompanyService
             $company = Company::create([
                 'name' => $data['name'],
                 'industry' => $data['industry'] ?? null,
+                'description' => $data['description'] ?? null,
                 'website_url' => $data['website_url'] ?? null,
                 'brand' => $data['brand'] ?? null,
                 'settings' => $data['settings'] ?? null,

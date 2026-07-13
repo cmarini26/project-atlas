@@ -1,10 +1,9 @@
 /**
  * The 12 declarable MarketingChannelType values and their display labels —
- * shared between the onboarding "Where do your customers find you?" step
- * and the Settings Marketing Presence page, so both surfaces present the
- * same channel list without duplicating the label set. Mirrors
- * OnboardingController::CHANNEL_LABELS (backend/app/Http/Controllers/OnboardingController.php)
- * on the PHP side.
+ * used by the Settings Marketing Presence page. Mirrors
+ * MarketingChannelType::label() (backend/app/Enums/MarketingChannelType.php)
+ * on the PHP side. The redesigned onboarding wizard's Marketing Assets step
+ * uses its own curated subset — see lib/onboardingAssets.ts.
  */
 
 export interface MarketingChannelTypeOption {

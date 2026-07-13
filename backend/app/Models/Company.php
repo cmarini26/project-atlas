@@ -20,6 +20,7 @@ class Company extends Model
         'name',
         'slug',
         'industry',
+        'description',
         'website_url',
         'brand',
         'settings',
@@ -78,6 +79,12 @@ class Company extends Model
     public function instagramAccount(): HasOne
     {
         return $this->hasOne(InstagramAccount::class);
+    }
+
+    /** @return HasOne<OnboardingProfile, $this> */
+    public function onboardingProfile(): HasOne
+    {
+        return $this->hasOne(OnboardingProfile::class);
     }
 
     /** @return HasMany<CompanyMembership, $this> */

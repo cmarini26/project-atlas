@@ -6,6 +6,40 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 15 Phase 1 — Business Discovery Onboarding] — 2026-07-13
+
+Implements the new onboarding UI and its persistence only, per this phase's explicit scope. Does not implement Business Discovery, dispatch any connector jobs, or touch the Observation pipeline, Business Brain, Marketing Health, Opportunity Engine, or Decision Engine.
+
+### Added
+
+- 7-step onboarding wizard (`resources/js/Pages/Onboarding/Index.vue`, fully rewritten): Welcome → Company → Business Goals → Marketing Assets → Asset Details → Marketing Preferences → Discovery Placeholder. Responsive, uses the existing design system/component library, has a progress indicator and Back/Continue navigation, and persists at each step so refreshing mid-wizard resumes at the correct step.
+- `companies.description` column (migration `2026_07_14_000100_add_description_to_companies_table.php`) and `onboarding_profiles` table (migration `2026_07_14_000200_create_onboarding_profiles_table.php`) + `App\Models\OnboardingProfile` — one row per company, storing business goals and marketing preferences (frequency, owner, seasonality, primary CTA). Both verified against real local PostgreSQL (migrate/rollback/migrate cycle + `psql` schema inspection).
+- Five new backed enums: `BusinessGoal`, `MarketingFrequency`, `MarketingOwner`, `PrimaryCallToAction`, `WebsitePlatform`.
+- `App\Domain\Onboarding\AssetDetailRequirements` — determines which declared asset types require details before onboarding can advance past Step 5.
+- `App\Services\Onboarding\OnboardingProfileService` and `App\Services\Onboarding\OnboardingAssetService` — the latter reuses `App\Services\MarketingPresence\MarketingPresenceService::declare()`/`update()` (Milestone 11) to persist declared marketing assets as `MarketingChannel` rows, storing asset-specific fields in that model's previously-unused `metadata` json column and existing `handle_or_url` column. No new tables were needed for asset declaration.
+- `MarketingChannelType::label()` — centralizes display names previously duplicated between `OnboardingController` and a frontend lookup table.
+- 37 new PHP tests (`OnboardingControllerTest` rewritten, `OnboardingProfileServiceTest`, `OnboardingAssetServiceTest`, `AssetDetailRequirementsTest`) and 19 new Vitest tests (`Onboarding/Index.spec.ts`).
+
+### Changed
+
+- `OnboardingController` fully rewritten around one POST action per step; `index()` infers which step to resume at from what's already persisted (membership → profile → declared channels → asset-detail completeness → preferences → completion).
+- `App\Services\Company\CompanyService::create()` now accepts an optional `description`.
+- `routes/web.php` — replaced the old onboarding route block with the new per-step POST routes.
+- `tests/e2e/onboarding-to-recommendation.spec.ts` — rewritten to walk the new 7-step wizard; stops at the Discovery placeholder screen rather than waiting for a recommendation, since Phase 1 never dispatches real discovery.
+
+### Removed
+
+- Old crawl-triggering onboarding routes/tests: `onboarding.integration`, `onboarding.retry`, `onboarding.marketing-presence`, and the rate-limiting test that guarded the old website-submit endpoint (removed, not skipped — the endpoint no longer exists in this phase).
+- Dead `retry()` reference in `resources/js/Pages/Onboarding/Status.vue` (posted to the now-removed retry route; those Status states are unreachable in this phase since no `Integration` is ever created).
+
+### Notes
+
+- Verified end-to-end that this phase never touches the Observation pipeline: a dedicated test asserts `Bus::assertNotDispatched(SyncIntegration::class)` and zero rows across `observations`/`facts`/`opportunities`/`marketing_health_scores` after a full wizard run.
+- Phase 2 (real Discovery orchestration, connector dispatch) is out of scope for this session and remains future work per `docs/plans/Milestone-15-Business-Discovery-Onboarding-Plan.md`.
+- 1206 PHP tests (1203 passing, 3 skipped) + 98 Vitest tests; PHPStan level 8 — 0 errors; Pint clean.
+
+---
+
 ## [Milestone 15 — Business Discovery Onboarding (design only)] — 2026-07-13
 
 Design-only session, no code. Redesigns onboarding around teaching Atlas about a business (company info, goals, declared assets) before any discovery begins, replacing today's website-first, single-connector flow.

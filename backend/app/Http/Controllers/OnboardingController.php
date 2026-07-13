@@ -2,53 +2,56 @@
 
 namespace App\Http\Controllers;
 
-use App\AI\Exceptions\AiProviderOverloadedException;
+use App\Domain\Onboarding\AssetDetailRequirements;
+use App\Enums\BusinessGoal;
 use App\Enums\MarketingChannelType;
-use App\Jobs\SyncIntegration;
-use App\Models\Channel;
+use App\Enums\MarketingFrequency;
+use App\Enums\MarketingOwner;
+use App\Enums\PrimaryCallToAction;
 use App\Models\Company;
 use App\Models\CompanyMembership;
-use App\Models\Integration;
 use App\Models\MarketingChannel;
 use App\Models\User;
 use App\Services\Company\CompanyService;
-use App\Services\MarketingPresence\MarketingPresenceService;
-use App\Services\Observatory\IntegrationService;
+use App\Services\Onboarding\OnboardingAssetService;
+use App\Services\Onboarding\OnboardingProfileService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
-use Throwable;
 
+/**
+ * Milestone 15 Phase 1 — Business Discovery Onboarding (UI + data
+ * collection only). Replaces the old website-first, single-integration
+ * wizard: seven steps — Welcome, Company, Business Goals, Marketing
+ * Assets, Asset Details, Marketing Preferences, Discovery Placeholder —
+ * none of which dispatch a connector, touch the Observation pipeline, or
+ * modify Business Brain / Marketing Health / the Opportunity or Decision
+ * Engine. See docs/specs/Business-Discovery-Onboarding.md.
+ */
 class OnboardingController extends Controller
 {
     /**
-     * Human-readable display names for the onboarding marketing-presence
-     * step's checklist — one per MarketingChannelType. Kept here rather than
-     * on the enum since these are onboarding-copy concerns, not a domain fact.
+     * The subset of MarketingChannelType offered as a Marketing Assets
+     * card in this wizard — deliberately narrower than the full enum
+     * (excludes TikTok, Other), matching the exact card list specified for
+     * this phase.
      *
-     * @var array<string, string>
+     * @var list<string>
      */
-    private const CHANNEL_LABELS = [
-        'website' => 'Website',
-        'email' => 'Email Newsletter',
-        'instagram' => 'Instagram',
-        'facebook' => 'Facebook',
-        'linkedin' => 'LinkedIn',
-        'x' => 'X',
-        'youtube' => 'YouTube',
-        'tiktok' => 'TikTok',
-        'google_business_profile' => 'Google Business Profile',
-        'events' => 'Events',
-        'print' => 'Print',
-        'other' => 'Other',
+    private const ASSET_CARD_TYPES = [
+        'website', 'google_business_profile', 'instagram', 'facebook',
+        'linkedin', 'x', 'youtube', 'email', 'events', 'print',
     ];
 
     public function __construct(
         private readonly CompanyService $companyService,
-        private readonly IntegrationService $integrationService,
-        private readonly MarketingPresenceService $marketingPresenceService,
+        private readonly OnboardingProfileService $onboardingProfileService,
+        private readonly OnboardingAssetService $onboardingAssetService,
     ) {}
 
     public function index(Request $request): Response|RedirectResponse
@@ -59,176 +62,187 @@ class OnboardingController extends Controller
         $membership = CompanyMembership::with('company')->where('user_id', $user->id)->first();
 
         if (! $membership) {
-            return Inertia::render('Onboarding/Index', ['initial_step' => 1]);
+            return Inertia::render('Onboarding/Index', ['initial_step' => 1, 'enabled_assets' => []]);
         }
 
         $company = $membership->company;
         abort_unless($company instanceof Company, 404);
 
-        // Company exists but no integration yet — collect website URL
-        if (! Integration::where('company_id', $company->id)->exists()) {
-            return Inertia::render('Onboarding/Index', ['initial_step' => 2]);
+        $profile = $this->onboardingProfileService->for($company);
+
+        if ($profile === null || empty($profile->business_goals)) {
+            return Inertia::render('Onboarding/Index', ['initial_step' => 3, 'enabled_assets' => []]);
         }
 
-        // Website connected but marketing presence not declared yet — the
-        // final onboarding step, so it's captured before the status page's
-        // "Atlas is now learning" experience begins.
-        if (! MarketingChannel::where('company_id', $company->id)->exists()) {
-            return Inertia::render('Onboarding/Index', ['initial_step' => 3]);
+        $channels = MarketingChannel::where('company_id', $company->id)->get();
+
+        if ($channels->isEmpty()) {
+            return Inertia::render('Onboarding/Index', ['initial_step' => 4, 'enabled_assets' => []]);
         }
 
-        // Both submitted — wait for analysis to complete
+        $enabledAssets = $this->serializeAssets($channels);
+
+        $needsDetails = $channels->contains(function (MarketingChannel $c): bool {
+            /** @var array<string, mixed> $metadata */
+            $metadata = $c->metadata ?? [];
+
+            return ! AssetDetailRequirements::isSatisfied($c->type->value, $c->handle_or_url, $metadata);
+        });
+
+        if ($needsDetails) {
+            return Inertia::render('Onboarding/Index', ['initial_step' => 5, 'enabled_assets' => $enabledAssets]);
+        }
+
+        if ($profile->marketing_frequency === null) {
+            return Inertia::render('Onboarding/Index', ['initial_step' => 6, 'enabled_assets' => $enabledAssets]);
+        }
+
+        if (! $profile->isComplete()) {
+            return Inertia::render('Onboarding/Index', ['initial_step' => 7, 'enabled_assets' => $enabledAssets]);
+        }
+
         return redirect()->route('onboarding.status');
     }
 
-    public function createCompany(Request $request): RedirectResponse
+    public function saveCompany(Request $request): RedirectResponse
     {
         $user = $request->user();
         abort_unless($user instanceof User, 401);
+
+        // A membership already existing means this step is already done —
+        // never create a second company for the same user on a resubmit
+        // (double-click, back-button).
+        if (CompanyMembership::where('user_id', $user->id)->exists()) {
+            return redirect()->route('onboarding');
+        }
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'industry' => ['nullable', 'string', 'max:255'],
+            'industry' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $company = $this->companyService->create(
-            $user,
-            [
-                'name' => $validated['name'],
-                'industry' => $validated['industry'] ?? null,
-            ]
-        );
-
-        $request->session()->put('onboarding_company_id', $company->id);
+        $this->companyService->create($user, $validated);
 
         return redirect()->route('onboarding');
     }
 
-    public function createIntegration(Request $request): RedirectResponse
+    public function saveGoals(Request $request): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user instanceof User, 401);
-
-        $validated = $request->validate([
-            'website_url' => ['required', 'url', 'max:500'],
-        ]);
-
-        $companyId = $request->session()->get('onboarding_company_id');
-        $membership = CompanyMembership::with('company')
-            ->where('user_id', $user->id)
-            ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
-            ->first();
-
-        if (! $membership) {
+        if (($company = $this->findCompany($request)) === null) {
             return redirect()->route('onboarding');
         }
 
-        $company = $membership->company;
-        abort_unless($company instanceof Company, 404);
+        $validated = $request->validate([
+            'goals' => ['required', 'array', 'min:1'],
+            'goals.*' => [Rule::enum(BusinessGoal::class)],
+        ]);
 
-        $company->update(['website_url' => $validated['website_url']]);
+        $this->onboardingProfileService->saveGoals($company, $validated['goals']);
 
-        // Reuse the company's website integration on resubmits ("try a
-        // different URL", double-clicks) instead of creating a new row each
-        // time. Combined with SyncIntegration's ShouldBeUnique (keyed on the
-        // integration id), this caps queued crawls + AI pipeline runs at one
-        // per company — repeat submits cannot stack AI spend.
-        $integration = Integration::where('company_id', $company->id)
-            ->where('type', 'website_crawl')
-            ->first();
-
-        if ($integration !== null) {
-            $integration->update([
-                'config' => ['url' => $validated['website_url']],
-                'status' => 'active',
-                'last_error' => null,
-            ]);
-        } else {
-            $integration = $this->integrationService->create(
-                $company,
-                'website_crawl',
-                ['url' => $validated['website_url']]
-            );
-        }
-
-        // Seed a default blog channel so DecisionEngine has at least one
-        // active channel to commit a Decision against. Users can add real
-        // connected channels (email, social) through Settings later.
-        if (! Channel::where('company_id', $company->id)->exists()) {
-            Channel::create([
-                'company_id' => $company->id,
-                'type' => 'blog',
-                'name' => 'Blog',
-                'is_active' => true,
-            ]);
-        }
-
-        // Queue the first sync — never run it inline. The crawl plus the AI
-        // pipeline (facts → opportunity → rationale → campaign → content) can
-        // take minutes with a real provider; running it in the request caused
-        // 502s behind PHP-FPM/Herd. The status page polls progress while the
-        // worker processes it. The try/catch only matters for environments
-        // still using QUEUE_CONNECTION=sync, where dispatch() runs inline.
-        try {
-            SyncIntegration::dispatch($integration);
-        } catch (AiProviderOverloadedException $e) {
-            // The crawl succeeded — only the AI analysis is waiting on the
-            // provider. The observation is left in 'retrying' and the status
-            // endpoint re-dispatches it, so don't mark the integration error.
-            report($e);
-        } catch (Throwable $e) {
-            $integration->markAsError($e->getMessage());
-            report($e);
-        }
-
-        $request->session()->forget('onboarding_company_id');
-
-        // Not straight to the status page — the marketing-presence step
-        // still needs to run first. index() re-evaluates and shows step 3.
         return redirect()->route('onboarding');
     }
 
-    /**
-     * Final onboarding step: declare which marketing channels the business
-     * already uses today. Creates one unlinked, unconnected MarketingChannel
-     * per selection via MarketingPresenceService::declare() — no Channel
-     * record, no integration, no API connection. Runs before the redirect to
-     * the status page, so Atlas knows the company's declared marketing
-     * presence before the Business Brain pipeline's asynchronous learning
-     * step meaningfully begins.
-     */
-    public function saveMarketingPresence(Request $request): RedirectResponse
+    public function saveAssets(Request $request): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user instanceof User, 401);
-
-        $membership = CompanyMembership::with('company')->where('user_id', $user->id)->first();
-
-        if (! $membership) {
+        if (($company = $this->findCompany($request)) === null) {
             return redirect()->route('onboarding');
         }
 
-        $company = $membership->company;
-        abort_unless($company instanceof Company, 404);
-
         $validated = $request->validate([
-            'channels' => ['present', 'array'],
-            'channels.*' => [Rule::in(MarketingChannelType::values())],
+            'enabled' => ['required', 'array', 'min:1'],
+            'enabled.*' => [Rule::in(self::ASSET_CARD_TYPES)],
+            'primary' => ['sometimes', 'array', 'max:3'],
+            'primary.*' => [Rule::in(self::ASSET_CARD_TYPES)],
         ]);
 
-        foreach ($validated['channels'] as $type) {
-            // Idempotent against back-button resubmits and double-clicks —
-            // declare() itself happily allows duplicates, but a repeat
-            // submission of this same step shouldn't create them.
-            if (MarketingChannel::where('company_id', $company->id)->where('type', $type)->exists()) {
+        $enabled = $validated['enabled'];
+        $primary = $validated['primary'] ?? [];
+
+        $invalidPrimary = array_diff($primary, $enabled);
+
+        if ($invalidPrimary !== []) {
+            throw ValidationException::withMessages([
+                'primary' => 'You can only mark an enabled asset as primary.',
+            ]);
+        }
+
+        $this->onboardingAssetService->syncEnabledAssets($company, $enabled, $primary);
+
+        return redirect()->route('onboarding');
+    }
+
+    public function saveAssetDetails(Request $request): RedirectResponse
+    {
+        if (($company = $this->findCompany($request)) === null) {
+            return redirect()->route('onboarding');
+        }
+
+        $channels = MarketingChannel::where('company_id', $company->id)->get();
+
+        $validated = $request->validate([
+            'assets' => ['required', 'array'],
+        ]);
+
+        $assets = $validated['assets'];
+        $errors = [];
+
+        foreach ($channels as $channel) {
+            $type = $channel->type->value;
+
+            if (! in_array($type, AssetDetailRequirements::REQUIRES_DETAILS, true)) {
                 continue;
             }
 
-            $this->marketingPresenceService->declare($company, [
-                'type' => $type,
-                'display_name' => self::CHANNEL_LABELS[$type] ?? ucfirst((string) $type),
-            ]);
+            $rules = $type === 'website'
+                ? ['url' => ['required', 'url', 'max:500'], 'platform' => ['required', 'string']]
+                : [($type === 'google_business_profile' ? 'business_name_or_url' : 'url') => ['required', 'string', 'max:500']];
+
+            $validator = Validator::make($assets[$type] ?? [], $rules);
+
+            if ($validator->fails()) {
+                foreach ($validator->errors()->messages() as $field => $messages) {
+                    $errors["assets.{$type}.{$field}"] = $messages;
+                }
+            }
         }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        $this->onboardingAssetService->saveAssetDetails($company, $assets);
+
+        return redirect()->route('onboarding');
+    }
+
+    public function savePreferences(Request $request): RedirectResponse
+    {
+        if (($company = $this->findCompany($request)) === null) {
+            return redirect()->route('onboarding');
+        }
+
+        $validated = $request->validate([
+            'marketing_frequency' => ['required', Rule::enum(MarketingFrequency::class)],
+            'marketing_owner' => ['required', Rule::enum(MarketingOwner::class)],
+            'is_seasonal' => ['required', 'boolean'],
+            'seasonal_months' => ['required_if:is_seasonal,true', 'array'],
+            'seasonal_months.*' => ['integer', 'between:1,12'],
+            'primary_cta' => ['required', Rule::enum(PrimaryCallToAction::class)],
+        ]);
+
+        $this->onboardingProfileService->savePreferences($company, $validated);
+
+        return redirect()->route('onboarding');
+    }
+
+    public function finish(Request $request): RedirectResponse
+    {
+        if (($company = $this->findCompany($request)) === null) {
+            return redirect()->route('onboarding');
+        }
+
+        $this->onboardingProfileService->markCompleted($company);
 
         return redirect()->route('onboarding.status');
     }
@@ -247,44 +261,40 @@ class OnboardingController extends Controller
         return Inertia::render('Onboarding/Status');
     }
 
-    /**
-     * Re-dispatch the existing website_crawl integration after a transient
-     * failure (site was briefly unreachable, AI provider hiccup) without
-     * making the user re-type the URL they already gave us.
-     */
-    public function retry(Request $request): RedirectResponse
+    private function findCompany(Request $request): ?Company
     {
         $user = $request->user();
         abort_unless($user instanceof User, 401);
 
         $membership = CompanyMembership::with('company')->where('user_id', $user->id)->first();
 
-        if (! $membership) {
-            return redirect()->route('onboarding');
+        if ($membership === null) {
+            return null;
         }
 
         $company = $membership->company;
         abort_unless($company instanceof Company, 404);
 
-        $integration = Integration::where('company_id', $company->id)
-            ->where('type', 'website_crawl')
-            ->first();
+        return $company;
+    }
 
-        if (! $integration) {
-            return redirect()->route('onboarding');
-        }
+    /**
+     * @param  Collection<int, MarketingChannel>  $channels
+     * @return list<array<string, mixed>>
+     */
+    private function serializeAssets(Collection $channels): array
+    {
+        return array_values($channels->map(function (MarketingChannel $c): array {
+            /** @var array<string, mixed> $metadata */
+            $metadata = $c->metadata ?? [];
 
-        $integration->update(['status' => 'active', 'last_error' => null]);
-
-        try {
-            SyncIntegration::dispatch($integration);
-        } catch (AiProviderOverloadedException $e) {
-            report($e);
-        } catch (Throwable $e) {
-            $integration->markAsError($e->getMessage());
-            report($e);
-        }
-
-        return redirect()->route('onboarding.status');
+            return [
+                'type' => $c->type->value,
+                'label' => MarketingChannelType::from($c->type->value)->label(),
+                'importance' => $c->importance->value,
+                'handle_or_url' => $c->handle_or_url,
+                'metadata' => $metadata,
+            ];
+        })->all());
     }
 }

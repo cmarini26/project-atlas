@@ -40,4 +40,27 @@ enum MarketingChannelType: string
             default => false,
         };
     }
+
+    /**
+     * Human-readable display label — the single source of truth both the
+     * onboarding wizard and the Settings Marketing Presence page use, so
+     * neither maintains its own copy of this list.
+     */
+    public function label(): string
+    {
+        return match ($this) {
+            self::Website => 'Website',
+            self::Email => 'Email Newsletter',
+            self::Instagram => 'Instagram',
+            self::Facebook => 'Facebook',
+            self::LinkedIn => 'LinkedIn',
+            self::X => 'X',
+            self::YouTube => 'YouTube',
+            self::TikTok => 'TikTok',
+            self::GoogleBusinessProfile => 'Google Business Profile',
+            self::Events => 'Events',
+            self::Print => 'Print',
+            self::Other => 'Other',
+        };
+    }
 }

@@ -2,11 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
-use App\Models\Company;
-use App\Models\CompanyMembership;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Bus;
 use Tests\TestCase;
 
 class RateLimitingTest extends TestCase
@@ -47,24 +43,10 @@ class RateLimitingTest extends TestCase
         $this->post('/forgot-password', ['email' => 'nobody@example.com'])->assertStatus(429);
     }
 
-    public function test_onboarding_website_submit_is_rate_limited(): void
-    {
-        // Each submit can queue a crawl + a 5-call AI pipeline run — real
-        // spend — so the endpoint is capped at 3 requests per minute.
-        Bus::fake();
-
-        $user = User::factory()->create();
-        $company = Company::withoutGlobalScopes()->create(['name' => 'My Co', 'slug' => 'my-co']);
-        CompanyMembership::create(['company_id' => $company->id, 'user_id' => $user->id, 'role' => 'owner']);
-
-        for ($i = 0; $i < 3; $i++) {
-            $this->actingAs($user)
-                ->post('/onboarding/integration', ['website_url' => 'https://example.com'])
-                ->assertRedirect();
-        }
-
-        $this->actingAs($user)
-            ->post('/onboarding/integration', ['website_url' => 'https://example.com'])
-            ->assertStatus(429);
-    }
+    // The old website-submit throttle test was removed along with the route
+    // it covered: Milestone 15 Phase 1's redesigned onboarding never queues a
+    // crawl or any connector from onboarding itself (see
+    // docs/specs/Business-Discovery-Onboarding.md) — no onboarding endpoint
+    // carries the "real spend" risk that throttle existed to prevent.
+    // Discovery (a future phase) is where that concern reappears.
 }

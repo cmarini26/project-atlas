@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 1183 tests (1180 passing, 3 skipped where the local environment can't support it) + 85 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Milestone 13 Phase 1 — Marketing Health MVP, 49 new PHP tests. |
+| Tests             | ✅ Strong | 1206 tests (1203 passing, 3 skipped where the local environment can't support it) + 98 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Milestone 15 Phase 1 — Business Discovery Onboarding, 37 new PHP tests + 19 new Vitest tests. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,21 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**Milestone 15 Phase 1 — Business Discovery Onboarding ✅ Complete**
+*Completed: 2026-07-13*
+
+Implements only the new onboarding experience and its persistence, per this phase's explicit scope: no Business Discovery, no connector jobs dispatched, and the Observation pipeline, Business Brain, Marketing Health, Opportunity Engine, and Decision Engine are all untouched. Replaces the old website-first single-connector wizard with the 7-step flow from [Business-Discovery-Onboarding.md](specs/Business-Discovery-Onboarding.md): Welcome → Company → Business Goals → Marketing Assets → Asset Details → Marketing Preferences → Discovery Placeholder. The Finish button persists onboarding data and navigates to the existing placeholder/status screen — it does not start discovery.
+
+Persistence reuses existing architecture rather than inventing new storage: declared marketing assets (Step 4/5) are `MarketingChannel` rows via the existing `MarketingPresenceService::declare()`/`update()` (Milestone 11), storing asset-specific details (URL, platform, provider, description) in that model's previously-unused `metadata` json column and existing `handle_or_url` column. Only two small additions were needed system-wide: `companies.description` (new nullable text column) and a new `onboarding_profiles` table (one row per company) holding business goals and marketing preferences (frequency, owner, seasonality, primary CTA) — five new backed enums (`BusinessGoal`, `MarketingFrequency`, `MarketingOwner`, `PrimaryCallToAction`, `WebsitePlatform`) back its fields. `MarketingChannelType` gained a `label()` method, centralizing display names previously duplicated between the old controller and a frontend lookup table.
+
+`OnboardingController` was fully rewritten around one per-step POST action each (`saveCompany`/`saveGoals`/`saveAssets`/`saveAssetDetails`/`savePreferences`/`finish`), with `index()` inferring which step to resume at from what's already persisted — so refreshing or returning mid-wizard resumes correctly rather than restarting. All old crawl-triggering routes (`onboarding.integration`, `onboarding.retry`, the old rate-limited website-submit endpoint) were removed entirely, since Phase 1 never creates an `Integration`. A dead `retry()` reference in `Onboarding/Status.vue` (posting to the now-removed retry route) was also cleaned up.
+
+Verified with an explicit end-to-end test asserting `Bus::assertNotDispatched(SyncIntegration::class)` and zero rows across `observations`/`facts`/`opportunities`/`marketing_health_scores` after a full wizard run — direct proof the DO-NOT-touch boundaries were respected, not just an assumption. 37 new PHP tests (controller + two new onboarding services + an asset-detail-requirements value helper) and 19 new Vitest tests (one per wizard step, including the 3-primary-asset limit and seasonal month picker) were added. Both new migrations were verified against real local PostgreSQL (up/rollback/up cycle plus direct `psql` schema inspection), not just sqlite.
+
+Phase 2 (Discovery — real orchestration, connector dispatch) is intentionally out of scope for this session and remains future work per [Milestone-15-Business-Discovery-Onboarding-Plan.md](plans/Milestone-15-Business-Discovery-Onboarding-Plan.md).
+
+**Previous milestone:**
 
 **Milestone 15 — Business Discovery Onboarding 📐 Designed (not implemented)**
 *Completed: 2026-07-13*

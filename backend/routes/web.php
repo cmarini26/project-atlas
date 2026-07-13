@@ -47,13 +47,20 @@ Route::middleware('guest')->group(function (): void {
 Route::middleware('auth')->post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // ── Onboarding ────────────────────────────────────────────────────────────────
+// Milestone 15 Phase 1 — Business Discovery Onboarding (UI + data collection
+// only; see docs/specs/Business-Discovery-Onboarding.md). Seven steps: Welcome
+// (client-side only, no route), Company, Business Goals, Marketing Assets,
+// Asset Details, Marketing Preferences, Discovery Placeholder. None of these
+// dispatch a connector or touch the Observation pipeline — that's Discovery,
+// a future phase.
 Route::middleware('auth')->group(function (): void {
     Route::get('/onboarding', [OnboardingController::class, 'index'])->name('onboarding');
-    Route::post('/onboarding/company', [OnboardingController::class, 'createCompany'])->name('onboarding.company');
-    // Throttled: each submit can queue a crawl + AI pipeline run (real spend).
-    Route::post('/onboarding/integration', [OnboardingController::class, 'createIntegration'])->middleware('throttle:3,1')->name('onboarding.integration');
-    Route::post('/onboarding/retry', [OnboardingController::class, 'retry'])->middleware('throttle:3,1')->name('onboarding.retry');
-    Route::post('/onboarding/marketing-presence', [OnboardingController::class, 'saveMarketingPresence'])->name('onboarding.marketing-presence');
+    Route::post('/onboarding/company', [OnboardingController::class, 'saveCompany'])->name('onboarding.company');
+    Route::post('/onboarding/goals', [OnboardingController::class, 'saveGoals'])->name('onboarding.goals');
+    Route::post('/onboarding/assets', [OnboardingController::class, 'saveAssets'])->name('onboarding.assets');
+    Route::post('/onboarding/asset-details', [OnboardingController::class, 'saveAssetDetails'])->name('onboarding.asset-details');
+    Route::post('/onboarding/preferences', [OnboardingController::class, 'savePreferences'])->name('onboarding.preferences');
+    Route::post('/onboarding/finish', [OnboardingController::class, 'finish'])->name('onboarding.finish');
     Route::get('/onboarding/status', [OnboardingController::class, 'status'])->name('onboarding.status');
     Route::get('/api/onboarding/status', [OnboardingStatusController::class, 'show'])->name('api.onboarding.status');
 });
