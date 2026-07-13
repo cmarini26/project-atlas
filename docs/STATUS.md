@@ -34,6 +34,23 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
+**Milestone 14 — Google Business Intelligence 📐 Designed (not implemented)**
+*Completed: 2026-07-13*
+
+Design-only session — no code was written. Deliverables: [Google-Business-Intelligence.md](specs/Google-Business-Intelligence.md) (domain spec) and [Milestone-14-Google-Business-Plan.md](plans/Milestone-14-Google-Business-Plan.md) (5-phase implementation plan).
+
+Designs Google Business Profile as Atlas's second real-world Marketing Source, reusing the exact `Connector`/`ObservationAnalyst`/`AnalystRegistry` architecture Instagram Observation (Milestone 12) already established — `GoogleBusinessConnector`/`GoogleBusinessAnalyst` mirror `InstagramConnector`/`InstagramAnalyst` structurally, down to the two-Observation-source-type split (`google_business` for the low-churn profile/hours/categories/photos snapshot, `google_business_reviews` for the high-churn review list) mirroring Instagram Phase 2's `'social'`/`'social_content'` split for the identical reason: incompatible payload shapes, different natural refresh cadences. Beta connection scope matches Instagram Phase 1's own precedent exactly — a manually-obtained, manually-pasted access token, no in-app OAuth (a real OAuth flow would mirror the existing `MetaOAuthService` PKCE pattern, but that's future-phase work, not this milestone).
+
+`GoogleBusinessAnalyst` is deterministic (implements `ObservationAnalyst`, not the AI-calling `Analyst` marker interface) — review star ratings and counts are structured data to aggregate, not text to interpret; review *sentiment/theme* analysis would need an AI call and is explicitly out of scope, the same category as Marketing Health's own deferred "AI-generated narrative" idea. One new Fact-shape distinction worth noting: `google_business.has_qanda_access` is *absent* when never checked and `false` when checked-and-unavailable — a real-world honesty concession, since Google restricted public Q&A API access for most developers around 2021–2023 and the design refuses to assume access exists.
+
+Marketing Health contribution has two parts: a **zero-code-change** contribution to the already-shipped `PresenceCoverageScorer` (a linked Google Business Profile `MarketingChannel` is just another channel that scorer already reads generically — concrete proof of the source-agnostic discipline `docs/specs/Marketing-Health.md` §7 designed for, not a hypothetical), and a **proposed** eighth dimension, `ReputationScorer` (dimension key `reputation`), scored from rating average/count/trend/owner-reply-rate — proposed, not implemented, sequenced as an optional Phase 5 in the plan.
+
+Two new company-level Opportunity types fit the existing Campaign-generation pipeline without inventing a new Recommendation shape: `review_milestone` (crossing a meaningful rating/review-count threshold — feature it as social proof) and `reputation_risk` (a declining rating trend — mirrors `UrgencyDetector`'s time-sensitive framing, but for reputation instead of inventory; explicitly not a recommendation to reply to reviews). A `profile_incompleteness` opportunity type was considered and deliberately rejected — it doesn't fit the pipeline's "always produces marketing content" shape, and belongs in Marketing Health evidence instead.
+
+The plan flags real risks honestly: Google Business Profile API access is genuinely harder to obtain than Instagram's (Cloud project setup, possible manual approval), Q&A access may not exist at all, the two new Opportunity types require real content-generation prompt work that's easy to under-scope, and reviewer PII is a new data category this codebase hasn't stored before, worth a deliberate retention decision rather than an implicit default.
+
+**Previous milestone:**
+
 **Milestone 13 Phase 1 — Marketing Health MVP ✅ Complete**
 *Completed: 2026-07-13*
 

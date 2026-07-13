@@ -6,6 +6,24 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 14 — Google Business Intelligence (design only)] — 2026-07-13
+
+Design-only session, no code. Designs Google Business Profile as Atlas's second real-world Marketing Source, reusing Instagram Observation's (Milestone 12) `Connector`/`ObservationAnalyst`/`AnalystRegistry` architecture exactly.
+
+### Added
+
+- `docs/specs/Google-Business-Intelligence.md` — domain model, observable data (profile, hours, categories, reviews, ratings, photos, Q&A), Observation→Fact→Knowledge pipeline, Marketing Health contribution (existing `PresenceCoverageScorer` + proposed new `ReputationScorer` dimension), two new Opportunity types (`review_milestone`, `reputation_risk`), explicit out-of-scope boundaries, sequence diagrams, migration strategy.
+- `docs/plans/Milestone-14-Google-Business-Plan.md` — 5-phase implementation plan (connector/observation capture, analyst/fact derivation, Marketing Presence linkage, new opportunity types, proposed eighth Marketing Health dimension), risks, acceptance criteria.
+
+### Notes
+
+- Beta connection scope mirrors Instagram Phase 1 exactly: manually-obtained access token, no in-app OAuth (distinct from the Meta OAuth publishing subsystem — this is observation-only, using the `Integration`/`Observation` model, not `Channel`/`ChannelCredentials`).
+- `GoogleBusinessAnalyst` is deterministic, not AI-calling — review star ratings/counts are aggregated, review text is captured but never sentiment-analyzed in this design.
+- Real risks flagged rather than hidden: Google Business Profile API access is harder to obtain than Instagram's, Q&A API access may not exist at all for most developers, new `campaign_type` values imply real (easy-to-underscope) content-generation prompt work, and reviewer PII is a new data category needing a deliberate retention decision.
+- No code written. Implementation is a future session's work, sequenced by the plan document.
+
+---
+
 ## [Milestone 13 Phase 1 — Marketing Health MVP] — 2026-07-13
 
 Implements the deterministic scoring subsystem designed in `docs/specs/Marketing-Health.md`, MVP scope only: no Opportunity/Decision Engine influence, no trend history, no AI scoring, no historical charts, no notifications.
