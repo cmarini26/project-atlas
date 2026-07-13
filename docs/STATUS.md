@@ -34,6 +34,21 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
+**Milestone 15 — Business Discovery Onboarding 📐 Designed (not implemented)**
+*Completed: 2026-07-13*
+
+Design-only session — no code was written. Deliverables: [Business-Discovery-Onboarding.md](specs/Business-Discovery-Onboarding.md) (domain spec) and [Milestone-15-Business-Discovery-Onboarding-Plan.md](plans/Milestone-15-Business-Discovery-Onboarding-Plan.md) (4-phase implementation plan).
+
+Redesigns onboarding from today's website-first, single-connector flow (company name → website URL, which immediately queues a crawl → a generic marketing-presence checklist → wait) into six steps — Company Information, Business Goals, Marketing Assets, Asset Details, Atlas Discovery, Recommendations — that separate *declaring* a business's marketing footprint (fast, no credentials, no waiting) from *discovering* what's true about it (a new, resilient, multi-connector orchestration stage that runs only after all onboarding input is collected). Grounded in a full trace of the current implementation (`OnboardingController`, `OnboardingStatusController`'s single-`Integration`-scoped polling, the `IntegrationSyncStarted → ObservationRecorded → ProcessObservation → ObservationProcessed → DetectOpportunities` event chain, `MarketingPresenceService`), not assumption.
+
+**A real gap found while tracing the code, not invented for this spec:** `MarketingPresenceService::link()` only accepts a `Channel` (a publishing destination) to mark a declared `MarketingChannel` connected — but Instagram Observation (Milestone 12) and Google Business Intelligence (Milestone 14) both connect via an `Integration` (an observation source), never a `Channel`. Under today's code, a declared Instagram asset can never become `is_connected: true` through observation alone. Fixed in the design with a new `marketing_channels.integration_id` column and a parallel `linkIntegration()` method — a small, precise addition, not a broad refactor.
+
+**The most concrete new design decision:** which declared assets can actually auto-discover during onboarding with zero credentials collected. Website can (unchanged — needs only a URL). Google Business Profile *can*, via a new addendum to Milestone 14's design: a second connector (`GoogleBusinessPublicConnector`) using Google's public, API-key-only Places API — distinct from Milestone 14's OAuth-gated Business Profile API, and exactly why onboarding only ever asks for "a URL or business name," never a token. Instagram, Facebook, and LinkedIn cannot (all three require a real access token none of these APIs expose publicly) — they're declared and left `is_connected: false`, waiting for the user to connect for real later from Settings, unchanged from how Instagram connection already works today. This asymmetry is the literal reason objective 7 ("pending connectors should not block onboarding completion") is a real, load-bearing requirement rather than a hypothetical edge case.
+
+New `DiscoveryRun`/`DiscoveryConnectorAttempt` tables track orchestration as a pure observability layer riding alongside the existing, completely unchanged Observe→Understand→Decide event chain — never gating it, the same non-invasive relationship `MarketingHealthService::recompute()` already has to that same pipeline. The four-stage progress UI (Discover → Analyze → Understand → Recommend) is computed from precise, declarative conditions over current state (spec §4.4), recomputed fresh on every relevant event rather than incrementally mutated, specifically to avoid stage-tracking drift as future connectors are added.
+
+**Previous milestone:**
+
 **Milestone 14 — Google Business Intelligence 📐 Designed (not implemented)**
 *Completed: 2026-07-13*
 

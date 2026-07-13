@@ -6,6 +6,24 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 15 — Business Discovery Onboarding (design only)] — 2026-07-13
+
+Design-only session, no code. Redesigns onboarding around teaching Atlas about a business (company info, goals, declared assets) before any discovery begins, replacing today's website-first, single-connector flow.
+
+### Added
+
+- `docs/specs/Business-Discovery-Onboarding.md` — six-step UX flow (Company Information, Business Goals, Marketing Assets, Asset Details, Atlas Discovery, Recommendations), domain changes, event flow, discovery orchestration design, error handling/retry behavior, migration strategy.
+- `docs/plans/Milestone-15-Business-Discovery-Onboarding-Plan.md` — 4-phase implementation plan (domain changes + Business Goals, a new Google Places-based public connector, discovery orchestration, wizard UI redesign), risks, acceptance criteria.
+
+### Notes
+
+- Found a real gap while tracing the current code: `MarketingPresenceService::link()` only accepts a `Channel`, but Instagram/Google Business connect via an `Integration` — meaning a declared Instagram asset can never become connected through observation alone today. Spec adds `marketing_channels.integration_id` + `linkIntegration()` to close it.
+- Adds a necessary addendum to Milestone 14: a second, no-OAuth `GoogleBusinessPublicConnector` (Google Places API) so Google Business Profile can auto-discover from just a URL/name during onboarding, matching what onboarding actually collects — Instagram/Facebook/LinkedIn cannot auto-discover (no public no-auth API) and remain "declared, connect later."
+- New `DiscoveryRun`/`DiscoveryConnectorAttempt` tables are a pure observability/orchestration layer — never gate the existing, unchanged Observe→Understand→Decide event chain, mirroring `MarketingHealthService`'s existing non-invasive relationship to that same pipeline.
+- No code written. Implementation is a future session's work, sequenced by the plan document.
+
+---
+
 ## [Milestone 14 — Google Business Intelligence (design only)] — 2026-07-13
 
 Design-only session, no code. Designs Google Business Profile as Atlas's second real-world Marketing Source, reusing Instagram Observation's (Milestone 12) `Connector`/`ObservationAnalyst`/`AnalystRegistry` architecture exactly.
