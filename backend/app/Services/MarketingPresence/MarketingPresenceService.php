@@ -173,6 +173,38 @@ class MarketingPresenceService
     }
 
     /**
+     * Link a declared channel to a real Integration — the observation-source
+     * counterpart to link()'s Channel-based (publishing-destination) linkage.
+     * Instagram/Google Business connect via an Integration, never a Channel;
+     * without this, a declared MarketingChannel for either could never
+     * become is_connected: true through observation alone. See
+     * docs/specs/Business-Discovery-Onboarding.md §3.1.
+     *
+     * @throws ChannelBelongsToDifferentCompanyException
+     */
+    public function linkIntegration(MarketingChannel $channel, Integration $integration): MarketingChannel
+    {
+        if ($integration->company_id !== $channel->company_id) {
+            throw new ChannelBelongsToDifferentCompanyException(sprintf(
+                'Integration %s belongs to company %s, but MarketingChannel %s belongs to company %s.',
+                $integration->id,
+                $integration->company_id,
+                $channel->id,
+                $channel->company_id,
+            ));
+        }
+
+        $channel->update([
+            'integration_id' => $integration->id,
+            'is_connected' => true,
+        ]);
+
+        MarketingPresenceUpdated::dispatch($channel->refresh());
+
+        return $channel;
+    }
+
+    /**
      * Sensible onboarding defaults per channel type, so a bare declare()
      * (or a future onboarding multi-select) isn't followed by empty forms.
      * Always overridable by explicit caller-supplied attributes.

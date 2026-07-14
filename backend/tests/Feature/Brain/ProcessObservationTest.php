@@ -212,8 +212,14 @@ class ProcessObservationTest extends TestCase
         $this->assertEquals('failed', $this->observation->status);
     }
 
-    public function test_failed_ai_analysis_surfaces_as_ai_failed_in_onboarding_status(): void
+    public function test_failed_ai_analysis_leaves_the_observation_failed_with_no_facts(): void
     {
+        // Milestone 15 Phase 2 renamed/rescoped the onboarding status
+        // endpoint to a DiscoveryRun-aggregated payload (no per-Observation
+        // ai_failed/crawl_succeeded flags) — see
+        // tests/Feature/Api/OnboardingStatusControllerTest.php and
+        // tests/Feature/Discovery/BusinessDiscoveryServiceTest.php. This test
+        // now asserts ProcessObservation's own behavior directly.
         $this->fake->queueResponse('{"facts": []}');
 
         try {
@@ -227,26 +233,9 @@ class ProcessObservationTest extends TestCase
             // expected
         }
 
-        $user = User::create([
-            'name' => 'Owner',
-            'email' => 'owner@cbbauctions.com',
-            'password' => 'secret-password',
-        ]);
-
-        CompanyMembership::create([
-            'user_id' => $user->id,
-            'company_id' => $this->company->id,
-            'role' => 'owner',
-        ]);
-
-        $response = $this->actingAs($user)->getJson('/api/onboarding/status');
-
-        $response->assertOk()
-            ->assertJson([
-                'crawl_succeeded' => true,
-                'ai_failed' => true,
-                'fact_count' => 0,
-            ]);
+        $this->observation->refresh();
+        $this->assertEquals('failed', $this->observation->status);
+        $this->assertDatabaseCount('facts', 0);
     }
 
     public function test_dispatches_opportunity_detection_after_processing(): void
@@ -310,8 +299,11 @@ class ProcessObservationTest extends TestCase
         $this->assertDatabaseCount('facts', 0);
     }
 
-    public function test_overloaded_provider_surfaces_as_ai_retrying_in_onboarding_status(): void
+    public function test_overloaded_provider_marks_the_observation_retrying_not_failed(): void
     {
+        // See the comment on test_failed_ai_analysis_leaves_the_observation_failed_with_no_facts()
+        // — the onboarding status endpoint's ai_retrying/ai_failed flags were
+        // replaced by Milestone 15 Phase 2's DiscoveryRun-aggregated payload.
         $this->fake->queueException(
             new AiProviderOverloadedException('Anthropic API is overloaded')
         );
@@ -327,18 +319,9 @@ class ProcessObservationTest extends TestCase
             // expected
         }
 
-        $response = $this->actingAs($this->makeOwner())->getJson('/api/onboarding/status');
-
-        // Freshly marked 'retrying' (< 30 s ago) — reported as waiting, no
-        // re-dispatch yet, and not confused with failed or stalled states.
-        $response->assertOk()
-            ->assertJson([
-                'crawl_succeeded' => true,
-                'ai_retrying' => true,
-                'ai_failed' => false,
-                'pipeline_stalled' => false,
-                'fact_count' => 0,
-            ]);
+        $this->observation->refresh();
+        $this->assertEquals('retrying', $this->observation->status);
+        $this->assertDatabaseCount('facts', 0);
     }
 
     public function test_status_endpoint_redispatches_stale_retrying_observation(): void
@@ -351,19 +334,13 @@ class ProcessObservationTest extends TestCase
 
         $this->fake->queueFixture('website-facts');
 
-        $response = $this->actingAs($this->makeOwner())->getJson('/api/onboarding/status');
+        $this->actingAs($this->makeOwner())->getJson('/api/onboarding/status')->assertOk();
 
         // The sync-queue re-dispatch ran inline: facts extracted, observation
         // processed, and this same poll already reflects the recovery.
-        $response->assertOk()
-            ->assertJson([
-                'ai_retrying' => false,
-                'ai_failed' => false,
-                'fact_count' => 4,
-            ]);
-
         $this->observation->refresh();
         $this->assertEquals('processed', $this->observation->status);
+        $this->assertDatabaseCount('facts', 4);
     }
 
     private function makeOwner(): User

@@ -2,18 +2,36 @@
 
 namespace App\Services\Observatory\Connectors\Website;
 
+use App\Enums\MarketingChannelType;
 use App\Models\Integration;
+use App\Models\MarketingChannel;
 use App\Services\Observatory\Connectors\ConnectorResult;
-use App\Services\Observatory\Connectors\Contracts\Connector;
+use App\Services\Observatory\Connectors\Contracts\AutoDiscoverableConnector;
 use Illuminate\Support\Collection;
 
-class WebsiteConnector implements Connector
+class WebsiteConnector implements AutoDiscoverableConnector
 {
     public function __construct(private readonly WebPageCrawler $crawler) {}
 
     public function supports(Integration $integration): bool
     {
         return $integration->type === 'website_crawl';
+    }
+
+    public function marketingChannelType(): MarketingChannelType
+    {
+        return MarketingChannelType::Website;
+    }
+
+    public function connectorType(): string
+    {
+        return 'website_crawl';
+    }
+
+    /** @return array<string, mixed> */
+    public function buildIntegrationConfig(MarketingChannel $channel): array
+    {
+        return ['url' => $channel->handle_or_url];
     }
 
     /**

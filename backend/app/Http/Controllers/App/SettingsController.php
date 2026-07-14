@@ -10,6 +10,8 @@ use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\InstagramAccount;
 use App\Models\Integration;
+use App\Models\MarketingChannel;
+use App\Services\MarketingPresence\MarketingPresenceService;
 use App\Services\Observatory\IntegrationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,7 +21,10 @@ use Throwable;
 
 class SettingsController extends Controller
 {
-    public function __construct(private readonly IntegrationService $integrationService) {}
+    public function __construct(
+        private readonly IntegrationService $integrationService,
+        private readonly MarketingPresenceService $marketingPresence,
+    ) {}
 
     public function index(Request $request): Response
     {
@@ -165,6 +170,19 @@ class SettingsController extends Controller
                 'instagram',
                 ['access_token' => $validated['access_token']],
             );
+        }
+
+        // Close the gap docs/specs/Business-Discovery-Onboarding.md §3.1
+        // identifies: a declared Instagram MarketingChannel from onboarding
+        // has no path to is_connected: true until the user connects for
+        // real here — link it now so Business Discovery can find and resync
+        // it as "already connected" on any future run.
+        $declaredChannel = MarketingChannel::where('company_id', $company->id)
+            ->where('type', 'instagram')
+            ->first();
+
+        if ($declaredChannel !== null) {
+            $this->marketingPresence->linkIntegration($declaredChannel, $integration);
         }
 
         try {

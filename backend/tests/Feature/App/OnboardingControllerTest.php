@@ -13,10 +13,12 @@ use Illuminate\Support\Facades\Bus;
 use Tests\TestCase;
 
 /**
- * Milestone 15 Phase 1 — Business Discovery Onboarding (UI + data
- * collection only). Covers the redesigned seven-step wizard: Welcome
- * (client-side, no route), Company, Business Goals, Marketing Assets,
- * Asset Details, Marketing Preferences, Discovery Placeholder.
+ * Business Discovery Onboarding — covers the seven-step wizard: Welcome
+ * (client-side, no route), Company, Business Goals, Marketing Assets, Asset
+ * Details, Marketing Preferences, Discovery Placeholder. Steps 1–6 are pure
+ * data collection; finish() starts real Business Discovery orchestration
+ * (Milestone 15 Phase 2) — see tests/Feature/Discovery/BusinessDiscoveryServiceTest.php
+ * for the orchestration/pipeline behavior itself.
  */
 class OnboardingControllerTest extends TestCase
 {
@@ -452,22 +454,44 @@ class OnboardingControllerTest extends TestCase
         $this->assertNotNull($profile->completed_at);
     }
 
-    public function test_finish_does_not_dispatch_any_connector_job(): void
+    public function test_finish_starts_discovery_for_auto_discoverable_assets_only(): void
     {
+        // Milestone 15 Phase 2 — finish() now starts Business Discovery.
+        // Bus::fake() intercepts the dispatched job before it runs, so no
+        // real HTTP crawl happens; this only proves the orchestration
+        // wiring (which asset gets a job dispatched), not the pipeline
+        // itself (covered by BusinessDiscoveryServiceTest).
         [$user, $company] = $this->userWithCompany();
         OnboardingProfile::create(['company_id' => $company->id, 'business_goals' => ['increase_sales']]);
+        MarketingChannel::create([
+            'company_id' => $company->id, 'type' => 'website', 'display_name' => 'Website',
+            'handle_or_url' => 'https://acme.example.com', 'importance' => 'secondary', 'objective' => ['seo'],
+        ]);
+        MarketingChannel::create([
+            'company_id' => $company->id, 'type' => 'facebook', 'display_name' => 'Facebook',
+            'importance' => 'secondary', 'objective' => ['awareness'],
+        ]);
 
         Bus::fake();
 
         $this->actingAs($user)->post('/onboarding/finish');
 
-        Bus::assertNotDispatched(SyncIntegration::class);
+        // Website can auto-discover from just a URL — a connector job is dispatched.
+        Bus::assertDispatched(SyncIntegration::class);
+        $this->assertDatabaseCount('discovery_connector_attempts', 1);
+
+        // Facebook has no auto-discoverable connector — declared only, no attempt.
+        $this->assertDatabaseHas('marketing_channels', [
+            'company_id' => $company->id, 'type' => 'facebook', 'is_connected' => false,
+        ]);
+
+        // The job was only dispatched (faked), never actually run.
         $this->assertDatabaseCount('observations', 0);
     }
 
     // ── Full progression ──────────────────────────────────────────────────────
 
-    public function test_full_onboarding_progression_never_dispatches_a_connector(): void
+    public function test_full_onboarding_progression_starts_discovery_only_at_finish(): void
     {
         $user = User::factory()->create();
 
@@ -495,6 +519,10 @@ class OnboardingControllerTest extends TestCase
             ->get('/onboarding')
             ->assertInertia(fn ($page) => $page->where('initial_step', 7));
 
+        // Steps 1–6 are pure data collection — no connector runs until finish().
+        Bus::assertNotDispatched(SyncIntegration::class);
+        $this->assertDatabaseCount('discovery_runs', 0);
+
         $this->actingAs($user)
             ->post('/onboarding/finish')
             ->assertRedirect(route('onboarding.status'));
@@ -502,10 +530,17 @@ class OnboardingControllerTest extends TestCase
         $this->assertSame(2, MarketingChannel::where('company_id', $company->id)->count());
         $this->assertNotNull(OnboardingProfile::where('company_id', $company->id)->first()->completed_at);
 
-        // The entire wizard, start to finish, never touches the Observation
-        // pipeline, Business Brain, Marketing Health, or the Opportunity /
-        // Decision Engine — Discovery is a future phase.
-        Bus::assertNotDispatched(SyncIntegration::class);
+        // finish() starts Discovery: Website can auto-discover from just a
+        // URL, so exactly one connector job is dispatched for it. Instagram
+        // has no auto-discoverable connector and isn't already connected, so
+        // it gets no attempt row — declared only, pending connection later.
+        Bus::assertDispatched(SyncIntegration::class);
+        $this->assertDatabaseCount('discovery_connector_attempts', 1);
+        $this->assertDatabaseHas('discovery_connector_attempts', ['connector_type' => 'website_crawl']);
+
+        // Bus::fake() intercepts the dispatched job — it never actually runs,
+        // so the Observation pipeline, Business Brain, Marketing Health, and
+        // the Opportunity/Decision Engine are untouched by this test.
         $this->assertDatabaseCount('observations', 0);
         $this->assertDatabaseCount('facts', 0);
         $this->assertDatabaseCount('opportunities', 0);

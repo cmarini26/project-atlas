@@ -7,6 +7,7 @@ use App\Enums\MarketingChannelStatus;
 use App\Events\MarketingPresenceUpdated;
 use App\Models\Channel;
 use App\Models\Company;
+use App\Models\Integration;
 use App\Models\MarketingChannel;
 use App\Services\MarketingPresence\Exceptions\ChannelBelongsToDifferentCompanyException;
 use App\Services\MarketingPresence\MarketingPresenceService;
@@ -298,6 +299,58 @@ class MarketingPresenceServiceTest extends TestCase
         $this->expectException(ChannelBelongsToDifferentCompanyException::class);
 
         $this->service->link($channel, $globalChannel);
+    }
+
+    // ── linkIntegration() ────────────────────────────────────────────────────
+
+    public function test_link_integration_sets_integration_id_and_is_connected(): void
+    {
+        $channel = $this->service->declare($this->company, ['type' => 'instagram', 'display_name' => 'Instagram']);
+        $integration = Integration::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id, 'type' => 'instagram', 'name' => 'Instagram',
+            'config' => ['access_token' => 'token'], 'status' => 'active',
+        ]);
+
+        $linked = $this->service->linkIntegration($channel, $integration);
+
+        $this->assertSame($integration->id, $linked->integration_id);
+        $this->assertTrue($linked->is_connected);
+    }
+
+    public function test_link_integration_throws_when_integration_belongs_to_a_different_company(): void
+    {
+        $channel = $this->service->declare($this->company, ['type' => 'instagram', 'display_name' => 'Instagram']);
+        $otherCompany = Company::withoutGlobalScopes()->create(['name' => 'Other', 'slug' => 'other']);
+        $integration = Integration::withoutGlobalScopes()->create([
+            'company_id' => $otherCompany->id, 'type' => 'instagram', 'name' => 'Instagram',
+            'config' => ['access_token' => 'token'], 'status' => 'active',
+        ]);
+
+        $this->expectException(ChannelBelongsToDifferentCompanyException::class);
+
+        $this->service->linkIntegration($channel, $integration);
+    }
+
+    public function test_scope_connected_matches_both_channel_and_integration_linkage(): void
+    {
+        $viaChannel = $this->service->declare($this->company, ['type' => 'email', 'display_name' => 'Newsletter']);
+        $realChannel = Channel::withoutGlobalScopes()->create(['company_id' => $this->company->id, 'type' => 'email', 'name' => 'Email', 'is_active' => true]);
+        $this->service->link($viaChannel, $realChannel);
+
+        $viaIntegration = $this->service->declare($this->company, ['type' => 'instagram', 'display_name' => 'Instagram']);
+        $integration = Integration::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id, 'type' => 'instagram', 'name' => 'Instagram',
+            'config' => ['access_token' => 'token'], 'status' => 'active',
+        ]);
+        $this->service->linkIntegration($viaIntegration, $integration);
+
+        $unconnected = $this->service->declare($this->company, ['type' => 'facebook', 'display_name' => 'Facebook']);
+
+        $connectedIds = MarketingChannel::where('company_id', $this->company->id)->connected()->pluck('id')->all();
+
+        $this->assertContains($viaChannel->id, $connectedIds);
+        $this->assertContains($viaIntegration->id, $connectedIds);
+        $this->assertNotContains($unconnected->id, $connectedIds);
     }
 
     // ── wouldDuplicate() ─────────────────────────────────────────────────────

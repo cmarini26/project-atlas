@@ -13,6 +13,7 @@ use App\Models\CompanyMembership;
 use App\Models\MarketingChannel;
 use App\Models\User;
 use App\Services\Company\CompanyService;
+use App\Services\Discovery\BusinessDiscoveryService;
 use App\Services\Onboarding\OnboardingAssetService;
 use App\Services\Onboarding\OnboardingProfileService;
 use Illuminate\Http\RedirectResponse;
@@ -25,13 +26,12 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Milestone 15 Phase 1 — Business Discovery Onboarding (UI + data
- * collection only). Replaces the old website-first, single-integration
- * wizard: seven steps — Welcome, Company, Business Goals, Marketing
- * Assets, Asset Details, Marketing Preferences, Discovery Placeholder —
- * none of which dispatch a connector, touch the Observation pipeline, or
- * modify Business Brain / Marketing Health / the Opportunity or Decision
- * Engine. See docs/specs/Business-Discovery-Onboarding.md.
+ * Business Discovery Onboarding — seven steps: Welcome, Company, Business
+ * Goals, Marketing Assets, Asset Details, Marketing Preferences, Discovery
+ * Placeholder. Steps 1–6 are pure data collection — no connector runs, no
+ * Observation is recorded, until finish() explicitly starts Discovery
+ * (Milestone 15 Phase 2 — App\Services\Discovery\BusinessDiscoveryService).
+ * See docs/specs/Business-Discovery-Onboarding.md.
  */
 class OnboardingController extends Controller
 {
@@ -52,6 +52,7 @@ class OnboardingController extends Controller
         private readonly CompanyService $companyService,
         private readonly OnboardingProfileService $onboardingProfileService,
         private readonly OnboardingAssetService $onboardingAssetService,
+        private readonly BusinessDiscoveryService $discovery,
     ) {}
 
     public function index(Request $request): Response|RedirectResponse
@@ -243,6 +244,12 @@ class OnboardingController extends Controller
         }
 
         $this->onboardingProfileService->markCompleted($company);
+
+        // Milestone 15 Phase 2 — the "Start Discovery" moment: orchestrates
+        // the existing connector/observation pipeline for every declared
+        // asset that can currently be observed. See
+        // App\Services\Discovery\BusinessDiscoveryService.
+        $this->discovery->start($company);
 
         return redirect()->route('onboarding.status');
     }

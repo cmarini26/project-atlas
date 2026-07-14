@@ -13,6 +13,9 @@ use App\Events\DecisionCommitted;
 use App\Events\ExecutionCompleted;
 use App\Events\FactExtracted;
 use App\Events\FeedbackSubmitted;
+use App\Events\IntegrationSyncCompleted;
+use App\Events\IntegrationSyncFailed;
+use App\Events\IntegrationSyncStarted;
 use App\Events\KnowledgeSynthesized;
 use App\Events\MarketingPresenceUpdated;
 use App\Events\ObservationProcessed;
@@ -29,6 +32,7 @@ use App\Listeners\TriggerCampaignPublishing;
 use App\Listeners\TriggerDecisionEvaluation;
 use App\Listeners\TriggerOpportunityDetection;
 use App\Listeners\TriggerRecommendationCreation;
+use App\Listeners\UpdateDiscoveryConnectorAttempt;
 use App\Models\Catalog;
 use App\Models\CatalogItem;
 use App\Models\Company;
@@ -142,6 +146,13 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(RecommendationCreated::class, SendWelcomeEmailOnFirstRecommendation::class);
         Event::listen(ExecutionCompleted::class, ScheduleMetricRetrieval::class);
         Event::listen(FeedbackSubmitted::class, SendFeedbackNotification::class);
+
+        // Business Discovery orchestration (Milestone 15 Phase 2) — bookkeeping
+        // only, reacting to the existing Integration sync lifecycle. Never
+        // gates or mutates the pipeline above.
+        Event::listen(IntegrationSyncStarted::class, [UpdateDiscoveryConnectorAttempt::class, 'onStarted']);
+        Event::listen(IntegrationSyncCompleted::class, [UpdateDiscoveryConnectorAttempt::class, 'onCompleted']);
+        Event::listen(IntegrationSyncFailed::class, [UpdateDiscoveryConnectorAttempt::class, 'onFailed']);
 
         // Named limiter (not a bare `throttle:N,M` string) so this endpoint
         // gets its own isolated bucket and a place to log rejections — bare

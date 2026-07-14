@@ -35,6 +35,7 @@ class MarketingChannel extends Model
     protected $fillable = [
         'company_id',
         'channel_id',
+        'integration_id',
         'type',
         'display_name',
         'handle_or_url',
@@ -72,6 +73,12 @@ class MarketingChannel extends Model
         return $this->belongsTo(Channel::class);
     }
 
+    /** @return BelongsTo<Integration, $this> */
+    public function integration(): BelongsTo
+    {
+        return $this->belongsTo(Integration::class);
+    }
+
     /** @param Builder<MarketingChannel> $query */
     public function scopeActive(Builder $query): void
     {
@@ -84,10 +91,17 @@ class MarketingChannel extends Model
         $query->where('importance', MarketingChannelImportance::Primary);
     }
 
-    /** @param Builder<MarketingChannel> $query */
+    /**
+     * Connected via either linkage path: a real publishing Channel (link())
+     * or an observation-source Integration (linkIntegration()) — see
+     * docs/specs/Business-Discovery-Onboarding.md §3.1.
+     *
+     * @param  Builder<MarketingChannel>  $query
+     */
     public function scopeConnected(Builder $query): void
     {
-        $query->whereNotNull('channel_id')->where('is_connected', true);
+        $query->where('is_connected', true)
+            ->where(fn (Builder $q) => $q->whereNotNull('channel_id')->orWhereNotNull('integration_id'));
     }
 
     /**

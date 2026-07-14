@@ -6,6 +6,41 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 15 Phase 2 — Business Discovery Orchestration] — 2026-07-14
+
+Replaces the Phase 1 "Start Discovery" placeholder with real, source-agnostic orchestration of the existing connector/observation pipeline. Discovery orchestrates that pipeline; it does not replace, duplicate, or redesign it — no changes to Business Brain, Marketing Health, the Opportunity Engine, the Decision Engine, or the Connector architecture itself.
+
+### Added
+
+- `App\Services\Observatory\Connectors\Contracts\AutoDiscoverableConnector` — an optional interface a `Connector` implements to declare which `MarketingChannelType` it can auto-discover with zero credentials and how to build an `Integration` config for it. Implemented by `WebsiteConnector`. `ConnectorRegistry::autoDiscoverableFor()` answers "what can be observed?" generically — no Discovery code references any specific platform.
+- `App\Services\Discovery\DiscoveryPlanner` — decides, per declared `MarketingChannel`, whether to reuse an already-connected `Integration` or create one via an auto-discoverable connector; returns null (skip, no attempt) otherwise.
+- `App\Services\Discovery\BusinessDiscoveryService` — `start()` creates a `DiscoveryRun` and dispatches `SyncIntegration` for every observable asset (wrapped in try/catch — one failure never aborts the run); `refreshStage()` recomputes `DiscoveryRun.stage` from scratch from persisted state on every call, never incrementally; `progressFor()` is the read model backing the progress UI.
+- `discovery_runs` / `discovery_connector_attempts` tables + `App\Models\DiscoveryRun`/`DiscoveryConnectorAttempt` — `DiscoveryStage` enum (`discovering`/`analyzing`/`understanding`/`recommending`/`completed`/`completed_with_errors`) and `DiscoveryAttemptStatus` enum (`pending`/`running`/`succeeded`/`failed`/`skipped_no_credentials`), tracking orchestration as a pure observability layer alongside the unchanged pipeline.
+- `marketing_channels.integration_id` (new nullable FK to `integrations`) + `MarketingPresenceService::linkIntegration()` — closes the gap identified in the Phase 1/design docs: a declared asset can now become `is_connected: true` via an `Integration` (observation source), mirroring `link()`'s existing `Channel` (publishing destination) path. `MarketingChannel::scopeConnected()` now matches either linkage.
+- `App\Events\IntegrationSyncFailed` (dispatched from `SyncIntegration::failed()`) + `App\Listeners\UpdateDiscoveryConnectorAttempt` — keeps each `DiscoveryConnectorAttempt`'s status current across the sync lifecycle (started → running, completed → succeeded, failed → failed with the error message).
+- Rewritten `resources/js/Pages/Onboarding/Status.vue` — four-stage progress UI (Discover → Analyze → Understand → Recommend), per-asset connector status underneath Discover, and a completion summary (succeeded assets, facts created, opportunities found, recommendations generated — all real persisted counts) with a manual link to the first recommendation.
+- 16 new PHP tests (`BusinessDiscoveryServiceTest`, `DiscoveryPlannerTest`) + 3 new `MarketingPresenceServiceTest` cases + 4 new Vitest tests.
+
+### Changed
+
+- `OnboardingController::finish()` now calls `BusinessDiscoveryService::start()` after marking onboarding complete — the actual "Start Discovery" moment.
+- `SettingsController::connectInstagram()` now links a declared Instagram `MarketingChannel` (if one exists) to the newly-connected `Integration` via `linkIntegration()`.
+- `App\Http\Controllers\Api\OnboardingStatusController` fully rewritten: aggregates across a company's whole `DiscoveryRun` instead of "the latest Integration" (the old scope).
+- `tests/Feature/App/OnboardingControllerTest.php`'s two Phase-1 tests that asserted `finish()` never dispatches a connector were updated: it now legitimately dispatches one for every auto-discoverable asset (proven via `Bus::fake()`, no real HTTP).
+- `tests/Feature/Api/OnboardingStatusControllerTest.php` and three assertions in `tests/Feature/Brain/ProcessObservationTest.php` rewritten/simplified for the new DiscoveryRun-aggregated payload shape (the old `ai_failed`/`ai_retrying`/`pipeline_stalled`/`crawl_succeeded` flags no longer exist).
+
+### Fixed
+
+- Adding a foreign key to an existing table via `Schema::table()` forces SQLite to rebuild the table from its Doctrine-introspected column list, which silently drops the raw `CHECK` constraints Laravel's `enum()` columns rely on — this broke an existing `marketing_channels` enum-rejection test the moment `integration_id`'s FK was added. Fixed by skipping the FK on SQLite only (test environment); Postgres (local dev, staging, production) gets the real, enforced FK, verified via `psql`.
+
+### Notes
+
+- Idempotent: rerunning Discovery for a company whose Website `Integration` already exists resyncs that same `Integration` rather than creating a second one — no duplicate `MarketingChannel` or `Integration` rows across any number of runs, verified explicitly.
+- No new asset type (Instagram, Facebook, LinkedIn, Google Business Profile) got a real auto-discovery connector in this phase — that remains future work (e.g. a public Google Business lookup), addable without any change to the Discovery orchestration layer itself, by design.
+- 1222 PHP tests (1219 passing, 3 skipped) + 102 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Both new/modified migrations verified against real local PostgreSQL (up/rollback/up).
+
+---
+
 ## [Milestone 15 Phase 1 — Business Discovery Onboarding] — 2026-07-13
 
 Implements the new onboarding UI and its persistence only, per this phase's explicit scope. Does not implement Business Discovery, dispatch any connector jobs, or touch the Observation pipeline, Business Brain, Marketing Health, Opportunity Engine, or Decision Engine.

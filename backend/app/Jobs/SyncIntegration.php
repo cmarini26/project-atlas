@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\AI\Exceptions\AiProviderOverloadedException;
 use App\Events\IntegrationSyncCompleted;
+use App\Events\IntegrationSyncFailed;
 use App\Events\IntegrationSyncStarted;
 use App\Models\Integration;
 use App\Services\Observatory\Connectors\ConnectorRegistry;
@@ -66,5 +67,7 @@ class SyncIntegration implements ShouldBeUnique, ShouldQueue
         }
 
         $this->integration->markAsError($exception->getMessage());
+
+        IntegrationSyncFailed::dispatch($this->integration, $exception->getMessage());
     }
 }
