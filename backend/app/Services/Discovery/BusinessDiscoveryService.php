@@ -67,6 +67,73 @@ class BusinessDiscoveryService
         return $run;
     }
 
+    /**
+     * Retry only the appropriate failed/pending work on an existing
+     * DiscoveryRun — never a whole new run, and never touching attempts
+     * that already succeeded. Also picks up any declared asset that has
+     * since become observable (e.g. Instagram connected for real from
+     * Settings after this run's original attempt never ran at all), since
+     * that's exactly the same "what can currently be observed?" question
+     * start() already asks, just scoped to one existing run instead of a
+     * fresh one. Safe to call repeatedly, and never duplicates an
+     * Integration, MarketingChannel, or Observation.
+     */
+    public function retry(DiscoveryRun $run): DiscoveryRun
+    {
+        $company = Company::withoutGlobalScopes()->find($run->company_id);
+
+        if ($company === null) {
+            return $this->refreshStage($run);
+        }
+
+        $existingAttempts = DiscoveryConnectorAttempt::where('discovery_run_id', $run->id)
+            ->get()
+            ->keyBy('marketing_channel_id');
+
+        $channels = MarketingChannel::where('company_id', $company->id)
+            ->where('status', MarketingChannelStatus::Active)
+            ->get();
+
+        foreach ($channels as $channel) {
+            $existing = $existingAttempts->get($channel->id);
+
+            if ($existing !== null && $existing->status === DiscoveryAttemptStatus::Succeeded) {
+                // Preserve successful connector results — never re-touch them.
+                continue;
+            }
+
+            if ($existing !== null) {
+                $this->retryAttempt($existing);
+
+                continue;
+            }
+
+            // No attempt existed in this run at all (e.g. the type had no
+            // auto-discoverable connector and wasn't yet connected) — give
+            // it its first try now, exactly as start() would for a fresh run.
+            $this->attempt($run, $company, $channel);
+        }
+
+        return $this->refreshStage($run);
+    }
+
+    private function retryAttempt(DiscoveryConnectorAttempt $attempt): void
+    {
+        $integration = Integration::withoutGlobalScopes()->find($attempt->integration_id);
+
+        if ($integration === null) {
+            return;
+        }
+
+        // Same resilience guarantee as attempt(): one connector failing
+        // again on retry must never block any other asset's retry.
+        try {
+            SyncIntegration::dispatch($integration);
+        } catch (Throwable) {
+            // Swallowed deliberately — see comment above.
+        }
+    }
+
     private function attempt(DiscoveryRun $run, Company $company, MarketingChannel $channel): void
     {
         $plan = $this->planner->planFor($channel);
@@ -181,6 +248,32 @@ class BusinessDiscoveryService
             return DiscoveryStage::Understanding;
         }
 
+        // Reached Recommend: Atlas understands the business but hasn't
+        // produced a Recommendation yet. If every attempt has finished and
+        // no Opportunity resulted either, this is a legitimate, final
+        // "learned your business, nothing to act on yet" outcome — not an
+        // indefinite spinner. The 90 s grace period against the last
+        // processed Observation mirrors the pre-Phase-2 no_opportunities
+        // heuristic exactly, avoiding a race with any still-in-flight async
+        // downstream step.
+        if ($allTerminal) {
+            $opportunityExists = Opportunity::withoutGlobalScopes()
+                ->where('company_id', $run->company_id)
+                ->where('created_at', '>=', $run->started_at)
+                ->exists();
+
+            if (! $opportunityExists) {
+                $lastProcessedAt = Observation::withoutGlobalScopes()
+                    ->whereIn('integration_id', $integrationIds)
+                    ->where('status', 'processed')
+                    ->max('processed_at');
+
+                if ($lastProcessedAt !== null && Carbon::parse($lastProcessedAt)->lt(now()->subSeconds(90))) {
+                    return DiscoveryStage::CompletedNoOpportunities;
+                }
+            }
+        }
+
         return DiscoveryStage::Recommending;
     }
 
@@ -205,6 +298,7 @@ class BusinessDiscoveryService
      *     recommendations_generated: int,
      *     recommendation_count: int,
      *     first_recommendation_id: string|null,
+     *     retry_available: bool,
      * }|null
      */
     public function progressFor(Company $company): ?array
@@ -256,6 +350,13 @@ class BusinessDiscoveryService
             ->oldest()
             ->first();
 
+        // Retry is offered whenever there's plausible unfinished business:
+        // a connector that actually failed, or a terminal state reached
+        // without every declared asset having been given a fair shot yet
+        // (e.g. one was just corrected in Settings/Asset Details).
+        $retryAvailable = $attempts->contains(fn (DiscoveryConnectorAttempt $a): bool => $a->status === DiscoveryAttemptStatus::Failed)
+            || in_array($run->stage, [DiscoveryStage::CompletedWithErrors, DiscoveryStage::CompletedNoOpportunities], true);
+
         return [
             'stage' => $run->stage->value,
             'started_at' => Carbon::parse($run->started_at)->toIso8601String(),
@@ -269,6 +370,7 @@ class BusinessDiscoveryService
                 ->where('status', 'pending')
                 ->count(),
             'first_recommendation_id' => $pendingRecommendation?->id,
+            'retry_available' => $retryAvailable,
         ];
     }
 }

@@ -14,10 +14,11 @@ use Illuminate\Http\Request;
 use Throwable;
 
 /**
- * Polled by the Discovery progress screen (Milestone 15 Phase 2). Aggregates
- * across a company's whole DiscoveryRun — every declared asset Discovery
- * attempted, not just "the one Integration" the pre-Phase-2 version of this
- * endpoint was scoped to.
+ * Polled by the Discovery progress screen. Aggregates across a company's
+ * whole DiscoveryRun — every declared asset Discovery attempted, not "the
+ * one Integration" a pre-Milestone-15 version of this endpoint was scoped
+ * to. There is only one onboarding execution path (BusinessDiscoveryService)
+ * this endpoint reports on; it has no separate legacy status logic.
  */
 class OnboardingStatusController extends Controller
 {
@@ -59,6 +60,7 @@ class OnboardingStatusController extends Controller
             'recommendations_generated' => 0,
             'recommendation_count' => 0,
             'first_recommendation_id' => null,
+            'retry_available' => false,
         ];
     }
 

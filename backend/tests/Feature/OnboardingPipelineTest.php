@@ -237,7 +237,8 @@ class OnboardingPipelineTest extends TestCase
     {
         // The AI finds facts but no opportunity candidates — a legitimate
         // outcome, not a failure. The observation stays processed, nothing
-        // downstream runs, and the status endpoint surfaces no_opportunities.
+        // downstream runs — a DiscoveryRun reaches DiscoveryStage::CompletedNoOpportunities
+        // for this same scenario (see BusinessDiscoveryServiceTest).
         $this->fake
             ->queueFixture('website-facts')
             ->queueResponse('{"opportunities": []}');

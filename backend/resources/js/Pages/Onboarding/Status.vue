@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { Head } from '@inertiajs/vue3'
+import { router, Head } from '@inertiajs/vue3'
 import AuthLayout from '@/Layouts/AuthLayout.vue'
 
 interface ConnectorStatus {
@@ -11,7 +11,7 @@ interface ConnectorStatus {
 }
 
 interface DiscoveryProgress {
-  stage: 'discovering' | 'analyzing' | 'understanding' | 'recommending' | 'completed' | 'completed_with_errors' | null
+  stage: 'discovering' | 'analyzing' | 'understanding' | 'recommending' | 'completed' | 'completed_with_errors' | 'completed_no_opportunities' | null
   started_at: string | null
   completed_at: string | null
   connectors: ConnectorStatus[]
@@ -20,6 +20,7 @@ interface DiscoveryProgress {
   recommendations_generated: number
   recommendation_count: number
   first_recommendation_id: string | null
+  retry_available: boolean
 }
 
 const STAGES = ['discovering', 'analyzing', 'understanding', 'recommending'] as const
@@ -29,6 +30,8 @@ const STAGE_LABELS: Record<(typeof STAGES)[number], string> = {
   understanding: 'Understand',
   recommending: 'Recommend',
 }
+
+const TERMINAL_STAGES = ['completed', 'completed_with_errors', 'completed_no_opportunities']
 
 const progress = ref<DiscoveryProgress>({
   stage: null,
@@ -40,27 +43,31 @@ const progress = ref<DiscoveryProgress>({
   recommendations_generated: 0,
   recommendation_count: 0,
   first_recommendation_id: null,
+  retry_available: false,
 })
 
 const loading = ref(true)
+const retrying = ref(false)
 const startTime = Date.now()
 let intervalId: ReturnType<typeof setInterval> | null = null
 
 const isTimedOut = computed(() => Date.now() - startTime > 5 * 60 * 1000)
 const isCompletedWithErrors = computed(() => progress.value.stage === 'completed_with_errors')
+const isNoOpportunities = computed(() => progress.value.stage === 'completed_no_opportunities')
 const isCompleted = computed(() => progress.value.stage === 'completed')
 
-/** Index of the current stage among the four coarse stages — 4 once completed. */
+/** Index of the current stage among the four coarse stages — 4 once terminal. */
 const currentStageIndex = computed((): number => {
   const stage = progress.value.stage
-  if (stage === 'completed' || stage === 'completed_with_errors') return STAGES.length
+  if (stage !== null && TERMINAL_STAGES.includes(stage)) return STAGES.length
   const index = STAGES.indexOf(stage as (typeof STAGES)[number])
   return index === -1 ? 0 : index
 })
 
 function stageState(index: number): 'done' | 'active' | 'pending' {
+  const isTerminal = progress.value.stage !== null && TERMINAL_STAGES.includes(progress.value.stage)
   if (index < currentStageIndex.value) return 'done'
-  if (index === currentStageIndex.value && !isCompleted.value && !isCompletedWithErrors.value) return 'active'
+  if (index === currentStageIndex.value && !isTerminal) return 'active'
   if (index === currentStageIndex.value) return 'done'
   return 'pending'
 }
@@ -87,9 +94,28 @@ const recommendationHref = computed(() =>
   progress.value.first_recommendation_id ? `/app/recommendations/${progress.value.first_recommendation_id}` : '/app',
 )
 
+function ensurePolling(): void {
+  if (intervalId === null) {
+    intervalId = setInterval(() => { void fetchStatus() }, 5000)
+  }
+}
+
+function retryDiscovery(): void {
+  retrying.value = true
+  router.post('/onboarding/discovery/retry', {}, {
+    onSuccess: () => {
+      retrying.value = false
+      ensurePolling()
+      void fetchStatus()
+    },
+    onError: () => { retrying.value = false },
+  })
+}
+
 async function fetchStatus(): Promise<void> {
   if (Date.now() - startTime > 10 * 60 * 1000) {
     if (intervalId) clearInterval(intervalId)
+    intervalId = null
     return
   }
 
@@ -101,11 +127,21 @@ async function fetchStatus(): Promise<void> {
       progress.value = await response.json() as DiscoveryProgress
       loading.value = false
 
-      // Both are terminal states — stop polling, let the user read the
-      // outcome (and, on success, choose when to move on) rather than
-      // yanking them away the instant a recommendation exists.
-      if (progress.value.stage === 'completed' || progress.value.stage === 'completed_with_errors') {
+      // A pending recommendation exists — take the user straight to it
+      // rather than leaving them reading a summary screen.
+      if (progress.value.recommendation_count > 0 && progress.value.first_recommendation_id) {
         if (intervalId) clearInterval(intervalId)
+        intervalId = null
+        router.visit(recommendationHref.value)
+        return
+      }
+
+      // Terminal, no recommendation to redirect to — stop polling and show
+      // the truthful outcome (completed_with_errors / no_opportunities).
+      // Never leaves the user on an indefinite progress page.
+      if (progress.value.stage !== null && TERMINAL_STAGES.includes(progress.value.stage)) {
+        if (intervalId) clearInterval(intervalId)
+        intervalId = null
       }
     }
   } catch {
@@ -115,7 +151,7 @@ async function fetchStatus(): Promise<void> {
 
 onMounted(() => {
   void fetchStatus()
-  intervalId = setInterval(() => { void fetchStatus() }, 5000)
+  ensurePolling()
 })
 
 onUnmounted(() => {
@@ -143,12 +179,48 @@ onUnmounted(() => {
           </div>
         </div>
         <div class="flex items-center justify-center gap-3">
-          <a href="/onboarding" class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] transition-colors duration-[var(--duration-fast)]">Review asset details</a>
+          <a href="/onboarding" class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-raised)] transition-colors duration-[var(--duration-fast)]">Review asset details</a>
+          <button
+            v-if="progress.retry_available"
+            type="button"
+            :disabled="retrying"
+            class="py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+            @click="retryDiscovery"
+          >
+            {{ retrying ? 'Retrying…' : 'Try again' }}
+          </button>
           <a href="/app" class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-raised)] transition-colors duration-[var(--duration-fast)]">Go to dashboard</a>
         </div>
       </div>
 
-      <!-- Discovery completed — the completion summary -->
+      <!-- Atlas learned the business, but the scan legitimately found nothing to act on -->
+      <div v-else-if="isNoOpportunities">
+        <div class="mb-5 flex items-center justify-center">
+          <div class="size-12 rounded-full bg-[var(--color-accent-50)] flex items-center justify-center">
+            <svg class="size-6 text-[var(--color-accent-600)]" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" /></svg>
+          </div>
+        </div>
+        <h1 class="text-base font-semibold text-[var(--color-text-primary)] mb-2">Atlas learned your business — no campaign opportunity yet</h1>
+        <p class="text-sm text-[var(--color-text-muted)] mb-3">Atlas gathered {{ progress.facts_created }} fact{{ progress.facts_created === 1 ? '' : 's' }} about your business, but didn't find a strong enough opportunity from this scan.</p>
+        <p class="text-xs text-[var(--color-text-muted)] mb-6">Atlas keeps learning — a recommendation will appear on your dashboard as soon as it finds a strong opportunity.</p>
+        <div class="flex items-center justify-center gap-3">
+          <a href="/app" class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] transition-colors duration-[var(--duration-fast)]">Go to dashboard</a>
+          <a href="/app/brain" class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-raised)] transition-colors duration-[var(--duration-fast)]">See what Atlas learned</a>
+          <button
+            v-if="progress.retry_available"
+            type="button"
+            :disabled="retrying"
+            class="py-2.5 px-6 text-sm font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-raised)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+            @click="retryDiscovery"
+          >
+            {{ retrying ? 'Retrying…' : 'Try again' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Discovery completed with a recommendation — fetchStatus() redirects
+           there automatically; this only renders for the brief moment before
+           that navigation completes. -->
       <div v-else-if="isCompleted">
         <div class="mb-5 flex items-center justify-center">
           <div class="size-12 rounded-full bg-[var(--color-accent-50)] flex items-center justify-center">
@@ -217,7 +289,18 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <a href="/app" class="mt-6 inline-block text-sm text-[var(--color-text-link)] hover:underline">Skip to dashboard</a>
+        <div class="mt-6 flex items-center justify-center gap-4">
+          <button
+            v-if="progress.retry_available"
+            type="button"
+            :disabled="retrying"
+            class="text-sm text-[var(--color-text-link)] hover:underline disabled:opacity-60"
+            @click="retryDiscovery"
+          >
+            {{ retrying ? 'Retrying…' : 'Retry failed assets' }}
+          </button>
+          <a href="/app" class="text-sm text-[var(--color-text-link)] hover:underline">Skip to dashboard</a>
+        </div>
       </template>
     </div>
   </AuthLayout>

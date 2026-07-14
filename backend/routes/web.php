@@ -47,12 +47,14 @@ Route::middleware('guest')->group(function (): void {
 Route::middleware('auth')->post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // ── Onboarding ────────────────────────────────────────────────────────────────
-// Milestone 15 Phase 1 — Business Discovery Onboarding (UI + data collection
-// only; see docs/specs/Business-Discovery-Onboarding.md). Seven steps: Welcome
-// (client-side only, no route), Company, Business Goals, Marketing Assets,
-// Asset Details, Marketing Preferences, Discovery Placeholder. None of these
-// dispatch a connector or touch the Observation pipeline — that's Discovery,
-// a future phase.
+// Business Discovery Onboarding (see docs/specs/Business-Discovery-Onboarding.md).
+// Seven wizard steps — Welcome (client-side only, no route), Company, Business
+// Goals, Marketing Assets, Asset Details, Marketing Preferences, Discovery
+// Placeholder — are pure data collection; finish() is the single point that
+// starts real Discovery orchestration (App\Services\Discovery\BusinessDiscoveryService),
+// and onboarding.discovery.retry is the single recovery path for a stuck or
+// partially-failed run. This is the only onboarding execution path — there is
+// no separate legacy website-only orchestrator.
 Route::middleware('auth')->group(function (): void {
     Route::get('/onboarding', [OnboardingController::class, 'index'])->name('onboarding');
     Route::post('/onboarding/company', [OnboardingController::class, 'saveCompany'])->name('onboarding.company');
@@ -61,6 +63,7 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/onboarding/asset-details', [OnboardingController::class, 'saveAssetDetails'])->name('onboarding.asset-details');
     Route::post('/onboarding/preferences', [OnboardingController::class, 'savePreferences'])->name('onboarding.preferences');
     Route::post('/onboarding/finish', [OnboardingController::class, 'finish'])->name('onboarding.finish');
+    Route::post('/onboarding/discovery/retry', [OnboardingController::class, 'retryDiscovery'])->name('onboarding.discovery.retry');
     Route::get('/onboarding/status', [OnboardingController::class, 'status'])->name('onboarding.status');
     Route::get('/api/onboarding/status', [OnboardingStatusController::class, 'show'])->name('api.onboarding.status');
 });

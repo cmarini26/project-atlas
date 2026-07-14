@@ -13,7 +13,7 @@ return new class() extends Migration
             $table->char('company_id', 26)->index();
             $table->enum('stage', [
                 'discovering', 'analyzing', 'understanding', 'recommending',
-                'completed', 'completed_with_errors',
+                'completed', 'completed_with_errors', 'completed_no_opportunities',
             ])->default('discovering');
             $table->timestamp('started_at');
             $table->timestamp('completed_at')->nullable();

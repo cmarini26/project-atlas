@@ -5,11 +5,15 @@ namespace Tests\Feature\App;
 use App\Jobs\SyncIntegration;
 use App\Models\Company;
 use App\Models\CompanyMembership;
+use App\Models\DiscoveryConnectorAttempt;
+use App\Models\DiscoveryRun;
 use App\Models\MarketingChannel;
 use App\Models\OnboardingProfile;
 use App\Models\User;
+use App\Services\Discovery\BusinessDiscoveryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Mockery;
 use Tests\TestCase;
 
 /**
@@ -487,6 +491,94 @@ class OnboardingControllerTest extends TestCase
 
         // The job was only dispatched (faked), never actually run.
         $this->assertDatabaseCount('observations', 0);
+    }
+
+    public function test_finish_invokes_business_discovery_service_as_the_single_orchestrator(): void
+    {
+        // Milestone 15 Phase 3 — proves finish() calls the source-agnostic
+        // orchestrator directly, not some parallel/legacy dispatch path.
+        [$user, $company] = $this->userWithCompany();
+        OnboardingProfile::create(['company_id' => $company->id, 'business_goals' => ['increase_sales']]);
+
+        $this->mock(BusinessDiscoveryService::class, function ($mock) use ($company) {
+            $mock->shouldReceive('start')
+                ->once()
+                ->with(Mockery::on(fn (Company $c): bool => $c->id === $company->id))
+                ->andReturn(new DiscoveryRun(['company_id' => $company->id, 'stage' => 'discovering', 'started_at' => now()]));
+        });
+
+        $this->actingAs($user)
+            ->post('/onboarding/finish')
+            ->assertRedirect(route('onboarding.status'));
+    }
+
+    // ── Step: Retry ────────────────────────────────────────────────────────────
+
+    public function test_retry_discovery_invokes_the_orchestrators_retry_method_on_the_latest_run(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $run = DiscoveryRun::create(['company_id' => $company->id, 'stage' => 'completed_with_errors', 'started_at' => now()]);
+
+        $this->mock(BusinessDiscoveryService::class, function ($mock) use ($company, $run) {
+            $mock->shouldReceive('latestRunFor')
+                ->once()
+                ->with(Mockery::on(fn (Company $c): bool => $c->id === $company->id))
+                ->andReturn($run);
+
+            $mock->shouldReceive('retry')
+                ->once()
+                ->with(Mockery::on(fn (DiscoveryRun $r): bool => $r->id === $run->id))
+                ->andReturn($run);
+        });
+
+        $this->actingAs($user)
+            ->post('/onboarding/discovery/retry')
+            ->assertRedirect(route('onboarding.status'));
+    }
+
+    public function test_retry_discovery_is_a_no_op_when_discovery_was_never_started(): void
+    {
+        [$user] = $this->userWithCompany();
+
+        $this->actingAs($user)
+            ->post('/onboarding/discovery/retry')
+            ->assertRedirect(route('onboarding.status'));
+
+        $this->assertDatabaseCount('discovery_runs', 0);
+    }
+
+    public function test_retry_discovery_redirects_unauthenticated(): void
+    {
+        $this->post('/onboarding/discovery/retry')->assertRedirect('/login');
+    }
+
+    public function test_retry_discovery_never_duplicates_attempts_end_to_end(): void
+    {
+        // Real (unmocked) orchestrator, through the controller/route layer —
+        // proves the HTTP wiring reuses the same run, not a fresh one.
+        [$user, $company] = $this->userWithCompany();
+        $run = app(BusinessDiscoveryService::class)->start($company);
+        $this->assertSame(0, DiscoveryConnectorAttempt::where('discovery_run_id', $run->id)->count());
+
+        $this->actingAs($user)
+            ->post('/onboarding/discovery/retry')
+            ->assertRedirect(route('onboarding.status'));
+
+        $this->assertSame(1, DiscoveryRun::where('company_id', $company->id)->count(), 'Retry must reuse the existing DiscoveryRun.');
+    }
+
+    // ── Legacy cutover ───────────────────────────────────────────────────────
+
+    public function test_legacy_website_only_onboarding_routes_no_longer_exist(): void
+    {
+        $user = User::factory()->create();
+
+        // These pre-Milestone-15 routes dispatched a connector directly from
+        // onboarding, bypassing Business Discovery entirely. They must no
+        // longer resolve to anything — Discovery is the only execution path.
+        $this->actingAs($user)->post('/onboarding/integration', ['url' => 'https://acme.example.com'])->assertNotFound();
+        $this->actingAs($user)->post('/onboarding/retry')->assertNotFound();
+        $this->actingAs($user)->post('/onboarding/marketing-presence')->assertNotFound();
     }
 
     // ── Full progression ──────────────────────────────────────────────────────

@@ -21,8 +21,20 @@ enum DiscoveryStage: string
     case Completed = 'completed';
     case CompletedWithErrors = 'completed_with_errors';
 
+    /**
+     * Every attempted connector finished, Atlas understood the business,
+     * but no Opportunity/Recommendation ever resulted — a legitimate,
+     * final outcome (Milestone 15 Phase 3), not an indefinite "Recommend"
+     * spinner. Distinct from CompletedWithErrors: here, discovery itself
+     * worked; there was just nothing to act on yet.
+     */
+    case CompletedNoOpportunities = 'completed_no_opportunities';
+
     public function isTerminal(): bool
     {
-        return $this === self::Completed || $this === self::CompletedWithErrors;
+        return match ($this) {
+            self::Completed, self::CompletedWithErrors, self::CompletedNoOpportunities => true,
+            default => false,
+        };
     }
 }

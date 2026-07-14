@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 1222 tests (1219 passing, 3 skipped where the local environment can't support it) + 102 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Milestone 15 Phase 2 — Business Discovery Orchestration, 16 new PHP tests + 4 new Vitest tests. |
+| Tests             | ✅ Strong | 1238 tests (1235 passing, 3 skipped where the local environment can't support it) + 104 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Milestone 15 Phase 3 — Business Discovery Cutover and Recovery, 16 new PHP tests + 2 new/4 rewritten Vitest tests. |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,23 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**Milestone 15 Phase 3 — Business Discovery Cutover and Recovery ✅ Complete**
+*Completed: 2026-07-14* — see [Milestone-15-Phase-3-Review.md](reviews/Milestone-15-Phase-3-Review.md)
+
+Makes Business Discovery the single supported onboarding execution path and closes the two real gaps Phase 2 left open: no recovery from a partial failure, and an indefinite "Recommend" spinner when a scan legitimately finds nothing to act on. Confirmed (not assumed) there was no second onboarding orchestrator to remove — a full grep of every `SyncIntegration::dispatch()` call site found exactly one onboarding path (`BusinessDiscoveryService`) plus the unrelated, correctly-untouched recurring/manual sync call sites (`SettingsController`, `SyncDueIntegrations`).
+
+**Retry/recovery, the core new capability:** `BusinessDiscoveryService::retry(DiscoveryRun $run)` reuses the *same* run — never a new one — and only re-attempts what didn't succeed: already-succeeded connector attempts are never re-touched (verified at the object-identity level), failed/pending attempts are re-dispatched against their *existing* Integration (no duplicate Integration, MarketingChannel, or attempt row), and a declared asset that had no attempt at all yet (e.g. Instagram connected via Settings after the run originally failed) gets its first try. `OnboardingController::retryDiscovery()` (`POST /onboarding/discovery/retry`) is the one and only recovery entry point, and `progressFor()` now reports `retry_available` so the UI only offers it when there's real unfinished work.
+
+**Closed a real indefinite-spinner gap:** a company whose only asset legitimately produced no campaign opportunity used to sit at `DiscoveryStage::Recommending` forever — no terminal condition existed for "everything that could run has finished, Atlas understood the business, but nothing came of it." Added `DiscoveryStage::CompletedNoOpportunities`, detected with the same 90-second grace-period heuristic the pre-Phase-2 status endpoint used for its old `no_opportunities` flag, now expressed as a first-class stage instead of a separate boolean.
+
+**Completion behavior now matches the approved spec exactly:** `Status.vue` auto-redirects to the first pending Recommendation the moment one exists (replacing Phase 2's manual "click to view" summary), and shows one of two honest terminal states when none exists (`completed_with_errors` or `completed_no_opportunities`) — never leaving the user on an indefinite progress page.
+
+**Legacy cleanup:** stale comments describing Discovery as "a future phase" (routes/web.php), the removed `ai_failed` onboarding-status field (`FactExtractionFailedException`, `OnboardingPipelineTest`) were corrected; a dedicated test now proves the pre-Milestone-15 routes (`onboarding.integration`, `onboarding.retry`, `onboarding.marketing-presence`) actually 404 rather than trusting Phase 1's removal was never quietly reverted.
+
+16 new PHP tests (7 `BusinessDiscoveryServiceTest` additions covering retry/recovery/no-opportunities/tenant-isolation, 4 `OnboardingControllerTest` additions covering the source-agnostic invocation and legacy-route removal, 2 `OnboardingStatusControllerTest` additions, plus stage/idempotency coverage) and 6 Vitest tests for the rewritten `Status.vue`. One new migration (`discovery_runs.stage` CHECK constraint extension) verified against real local PostgreSQL (up/rollback/up).
+
+**Previous milestone:**
 
 **Milestone 15 Phase 2 — Business Discovery Orchestration ✅ Complete**
 *Completed: 2026-07-14*

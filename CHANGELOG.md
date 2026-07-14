@@ -6,6 +6,39 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Milestone 15 Phase 3 — Business Discovery Cutover and Recovery] — 2026-07-14
+
+Makes Business Discovery the single supported onboarding execution path, adds retry/recovery for a partial or stuck run, and closes an indefinite-spinner gap in the stage model. See [Milestone-15-Phase-3-Review.md](docs/reviews/Milestone-15-Phase-3-Review.md).
+
+### Added
+
+- `App\Enums\DiscoveryStage::CompletedNoOpportunities` — every attempted connector finished, Atlas understood the business, but no Opportunity/Recommendation ever resulted. Detected in `BusinessDiscoveryService::computeStage()` with the same 90 s grace period the pre-Phase-2 status endpoint used for its `no_opportunities` flag.
+- `BusinessDiscoveryService::retry(DiscoveryRun $run)` + private `retryAttempt()` — reuses the same `DiscoveryRun`, re-dispatches only failed/pending attempts against their existing `Integration` (never a new one), preserves already-succeeded attempts untouched, and picks up any declared asset that became observable after the original run (e.g. Instagram connected via Settings).
+- `OnboardingController::retryDiscovery()` + `POST /onboarding/discovery/retry` — the single recovery entry point.
+- `retry_available` field on `BusinessDiscoveryService::progressFor()`'s payload.
+- Migration `2026_07_16_000100_add_completed_no_opportunities_stage_to_discovery_runs.php` (Postgres CHECK constraint extension, mirroring `add_retrying_status_to_observations.php`'s precedent); base `create_discovery_runs_table` migration updated in place for fresh/sqlite databases.
+- 16 new PHP tests (`BusinessDiscoveryServiceTest` retry/no-opportunities/tenant-isolation coverage, `OnboardingControllerTest` source-agnostic-invocation and legacy-route-removal coverage, `OnboardingStatusControllerTest` `retry_available`/recommendation-payload coverage) and 6 Vitest tests for `Status.vue`.
+
+### Changed
+
+- `Status.vue` — auto-redirects to a pending Recommendation via `router.visit()` instead of requiring a manual click; new `completed_no_opportunities` branch; "Try again" button shown wherever `retry_available` is true.
+- `OnboardingStatusController` — empty payload includes `retry_available: false`; docblock updated to note this is the only onboarding status endpoint (no separate legacy logic).
+- `routes/web.php` — stale onboarding block comment ("Discovery, a future phase") corrected; new `onboarding.discovery.retry` route added.
+
+### Fixed (legacy cleanup)
+
+- `App\Services\Analyst\Exceptions\FactExtractionFailedException`'s docblock referenced the removed `ai_failed` onboarding-status field — corrected.
+- `OnboardingPipelineTest`'s no-opportunities-scenario comment referenced the same removed field — corrected to point at `DiscoveryStage::CompletedNoOpportunities`.
+
+### Notes
+
+- Audited every `SyncIntegration::dispatch()` call site in the codebase: exactly one onboarding path (`BusinessDiscoveryService`) plus the correctly-untouched recurring/manual sync paths (`SettingsController::syncIntegration()`/`connectInstagram()`, `Console\Commands\SyncDueIntegrations`) — there was no second onboarding orchestrator to remove.
+- `test_legacy_website_only_onboarding_routes_no_longer_exist` proves the pre-Milestone-15 routes (`onboarding.integration`, `onboarding.retry`, `onboarding.marketing-presence`) actually 404, rather than trusting Phase 1's removal was never reverted.
+- No changes to Business Brain, Marketing Health, the Opportunity/Decision Engine, the Connector architecture, publishing, OAuth, or Google Business — all explicitly out of scope for this phase.
+- 1238 PHP tests (1235 passing, 3 skipped) + 104 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. New migration verified against real local PostgreSQL (up/rollback/up).
+
+---
+
 ## [Milestone 15 Phase 2 — Business Discovery Orchestration] — 2026-07-14
 
 Replaces the Phase 1 "Start Discovery" placeholder with real, source-agnostic orchestration of the existing connector/observation pipeline. Discovery orchestrates that pipeline; it does not replace, duplicate, or redesign it — no changes to Business Brain, Marketing Health, the Opportunity Engine, the Decision Engine, or the Connector architecture itself.

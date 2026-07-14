@@ -11,6 +11,7 @@ use App\Models\DiscoveryRun;
 use App\Models\Integration;
 use App\Models\MarketingChannel;
 use App\Models\Observation;
+use App\Models\Recommendation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -48,6 +49,7 @@ class OnboardingStatusControllerTest extends TestCase
                 'recommendations_generated' => 0,
                 'recommendation_count' => 0,
                 'first_recommendation_id' => null,
+                'retry_available' => false,
             ]);
     }
 
@@ -139,6 +141,55 @@ class OnboardingStatusControllerTest extends TestCase
         // testing environment (no fixture queued), it moves out of the
         // exact 'retrying'-since-2-minutes-ago state it started in.
         $this->assertNotEquals($observation->updated_at, $observation->fresh()->updated_at);
+    }
+
+    public function test_reports_retry_available_when_an_attempt_has_failed(): void
+    {
+        [$user, $company] = $this->makeCompanyWithMembership();
+        $run = DiscoveryRun::create(['company_id' => $company->id, 'stage' => DiscoveryStage::CompletedWithErrors, 'started_at' => now(), 'completed_at' => now()]);
+        $channel = MarketingChannel::factory()->for($company)->create(['type' => 'website']);
+
+        DiscoveryConnectorAttempt::create([
+            'discovery_run_id' => $run->id, 'company_id' => $company->id,
+            'marketing_channel_id' => $channel->id, 'connector_type' => 'website_crawl',
+            'status' => DiscoveryAttemptStatus::Failed, 'attempt_count' => 3,
+            'error_message' => 'Connection refused',
+        ]);
+
+        $this->actingAs($user)
+            ->getJson('/api/onboarding/status')
+            ->assertOk()
+            ->assertJson(['retry_available' => true]);
+    }
+
+    public function test_reports_recommendation_count_and_first_id_when_a_recommendation_exists(): void
+    {
+        [$user, $company] = $this->makeCompanyWithMembership();
+        $run = DiscoveryRun::create(['company_id' => $company->id, 'stage' => DiscoveryStage::Discovering, 'started_at' => now()]);
+        $channel = MarketingChannel::factory()->for($company)->create(['type' => 'website']);
+
+        // computeStage() derives 'completed' from real state — anySucceeded
+        // plus a pending Recommendation — never from a stale stage field.
+        DiscoveryConnectorAttempt::create([
+            'discovery_run_id' => $run->id, 'company_id' => $company->id,
+            'marketing_channel_id' => $channel->id, 'connector_type' => 'website_crawl',
+            'status' => DiscoveryAttemptStatus::Succeeded, 'attempt_count' => 1,
+        ]);
+
+        $recommendation = Recommendation::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_type' => 'social_post',
+            'status' => 'pending',
+        ]);
+
+        $this->actingAs($user)
+            ->getJson('/api/onboarding/status')
+            ->assertOk()
+            ->assertJson([
+                'stage' => 'completed',
+                'recommendation_count' => 1,
+                'first_recommendation_id' => $recommendation->id,
+            ]);
     }
 
     /** @return array{0: User, 1: Company} */

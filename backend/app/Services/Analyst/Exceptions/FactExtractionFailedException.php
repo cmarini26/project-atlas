@@ -10,6 +10,7 @@ use RuntimeException;
  * facts list for a page that had analyzable content.
  *
  * ProcessObservation treats this like any other failure: the observation is
- * marked "failed", which the onboarding status endpoint surfaces as ai_failed.
+ * marked "failed" — surfaced in the Discovery progress screen as that
+ * asset's connector attempt staying failed, not as a whole-run failure.
  */
 class FactExtractionFailedException extends RuntimeException {}

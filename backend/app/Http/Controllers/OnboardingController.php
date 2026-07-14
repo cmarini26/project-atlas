@@ -254,6 +254,30 @@ class OnboardingController extends Controller
         return redirect()->route('onboarding.status');
     }
 
+    /**
+     * Milestone 15 Phase 3 — retry the most recent DiscoveryRun. Reuses
+     * that same run (never a whole new one) and only retries its
+     * failed/pending work or assets that have since become observable
+     * (e.g. Instagram connected for real after the original run) — every
+     * already-succeeded connector attempt is left untouched. This is the
+     * one and only recovery path for a stuck or partially-failed run;
+     * there is no separate legacy retry mechanism.
+     */
+    public function retryDiscovery(Request $request): RedirectResponse
+    {
+        if (($company = $this->findCompany($request)) === null) {
+            return redirect()->route('onboarding');
+        }
+
+        $run = $this->discovery->latestRunFor($company);
+
+        if ($run !== null) {
+            $this->discovery->retry($run);
+        }
+
+        return redirect()->route('onboarding.status');
+    }
+
     public function status(Request $request): Response|RedirectResponse
     {
         $user = $request->user();

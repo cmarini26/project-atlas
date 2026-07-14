@@ -312,6 +312,279 @@ class BusinessDiscoveryServiceTest extends TestCase
         }
     }
 
+    public function test_unsupported_assets_do_not_block_completion_alongside_a_successful_one(): void
+    {
+        $this->bindRegistry($this->fakeAutoDiscoverableConnector(MarketingChannelType::Website, 'website_crawl'));
+        $this->queueFullPipelineFixtures();
+
+        MarketingChannel::factory()->for($this->company)->create([
+            'type' => MarketingChannelType::Website,
+            'handle_or_url' => 'https://acme.example.com',
+        ]);
+        MarketingChannel::factory()->for($this->company)->create(['type' => MarketingChannelType::Facebook]);
+        MarketingChannel::factory()->for($this->company)->create(['type' => MarketingChannelType::LinkedIn]);
+
+        $run = app(BusinessDiscoveryService::class)->start($this->company);
+
+        $this->assertSame(DiscoveryStage::Completed, $run->fresh()->stage);
+        $this->assertNotNull(
+            Recommendation::withoutGlobalScopes()->where('company_id', $this->company->id)->where('status', 'pending')->first(),
+        );
+
+        $progress = app(BusinessDiscoveryService::class)->progressFor($this->company);
+        $statusesByType = collect($progress['connectors'])->pluck('status', 'type');
+        $this->assertSame('succeeded', $statusesByType['website']);
+        $this->assertSame('not_attempted', $statusesByType['facebook']);
+        $this->assertSame('not_attempted', $statusesByType['linkedin']);
+    }
+
+    // ── Retry / recovery ─────────────────────────────────────────────────────
+
+    public function test_retry_reuses_the_same_run_and_only_retries_the_failed_attempt(): void
+    {
+        // First pass: website fails.
+        MarketingChannel::factory()->for($this->company)->create([
+            'type' => MarketingChannelType::Website,
+            'handle_or_url' => 'https://unreachable.example.com',
+        ]);
+
+        $failingConnector = $this->fakeAutoDiscoverableConnector(MarketingChannelType::Website, 'website_crawl', shouldFail: true);
+        $this->bindRegistry($failingConnector);
+
+        $run = app(BusinessDiscoveryService::class)->start($this->company);
+        $this->assertSame(DiscoveryStage::CompletedWithErrors, $run->fresh()->stage);
+        $this->assertSame(1, DiscoveryConnectorAttempt::where('discovery_run_id', $run->id)->count());
+
+        // The site is fixed — swap in a connector that now succeeds for the
+        // exact same connector type, and retry the SAME run.
+        $this->queueFullPipelineFixtures();
+        $this->bindRegistry($this->fakeAutoDiscoverableConnector(MarketingChannelType::Website, 'website_crawl'));
+
+        $retried = app(BusinessDiscoveryService::class)->retry($run->fresh());
+
+        $this->assertSame($run->id, $retried->id, 'Retry must reuse the existing DiscoveryRun, never create a new one.');
+        $this->assertSame(1, DiscoveryConnectorAttempt::where('discovery_run_id', $run->id)->count(), 'Retry must reuse the existing attempt row, never duplicate it.');
+        $this->assertSame(DiscoveryStage::Completed, $retried->stage);
+        $this->assertSame(1, DiscoveryRun::where('company_id', $this->company->id)->count(), 'No new DiscoveryRun was created by retry().');
+    }
+
+    public function test_retry_never_duplicates_integrations_or_observations(): void
+    {
+        MarketingChannel::factory()->for($this->company)->create([
+            'type' => MarketingChannelType::Website,
+            'handle_or_url' => 'https://unreachable.example.com',
+        ]);
+
+        $this->bindRegistry($this->fakeAutoDiscoverableConnector(MarketingChannelType::Website, 'website_crawl', shouldFail: true));
+        $run = app(BusinessDiscoveryService::class)->start($this->company);
+
+        $integrationCountBefore = Integration::withoutGlobalScopes()->where('company_id', $this->company->id)->count();
+        $this->assertSame(1, $integrationCountBefore);
+
+        $this->queueFullPipelineFixtures();
+        $this->bindRegistry($this->fakeAutoDiscoverableConnector(MarketingChannelType::Website, 'website_crawl'));
+        app(BusinessDiscoveryService::class)->retry($run->fresh());
+
+        $this->assertSame(
+            $integrationCountBefore,
+            Integration::withoutGlobalScopes()->where('company_id', $this->company->id)->count(),
+            'Retry must never create a second Integration for the same asset.',
+        );
+        $this->assertSame(1, Observation::withoutGlobalScopes()->where('company_id', $this->company->id)->count());
+        $this->assertSame(1, MarketingChannel::where('company_id', $this->company->id)->count());
+    }
+
+    public function test_retry_preserves_a_successful_attempt_while_retrying_a_failed_one(): void
+    {
+        MarketingChannel::factory()->for($this->company)->create([
+            'type' => MarketingChannelType::Website,
+            'handle_or_url' => 'https://acme.example.com',
+        ]);
+        MarketingChannel::factory()->for($this->company)->create([
+            'type' => MarketingChannelType::GoogleBusinessProfile,
+            'handle_or_url' => 'Acme Comics',
+        ]);
+
+        $this->queueFullPipelineFixtures();
+        $this->bindRegistry(
+            $this->fakeAutoDiscoverableConnector(MarketingChannelType::Website, 'website_crawl'),
+            $this->fakeAutoDiscoverableConnector(MarketingChannelType::GoogleBusinessProfile, 'api', shouldFail: true),
+        );
+
+        $run = app(BusinessDiscoveryService::class)->start($this->company);
+        $websiteAttempt = DiscoveryConnectorAttempt::where('discovery_run_id', $run->id)->where('connector_type', 'website_crawl')->first();
+        $this->assertSame(DiscoveryAttemptStatus::Succeeded, $websiteAttempt->status);
+        $succeededAt = $websiteAttempt->completed_at;
+
+        // Retry — Google Business now succeeds too (its own full pipeline
+        // run needs its own queued AI responses), but the website attempt
+        // must never be re-touched or re-run.
+        $this->queueFullPipelineFixtures();
+        $this->bindRegistry(
+            $this->fakeAutoDiscoverableConnector(MarketingChannelType::Website, 'website_crawl'),
+            $this->fakeAutoDiscoverableConnector(MarketingChannelType::GoogleBusinessProfile, 'api'),
+        );
+        app(BusinessDiscoveryService::class)->retry($run->fresh());
+
+        $websiteAttemptCountAfterFirstRun = $websiteAttempt->attempt_count;
+        $websiteAttempt->refresh();
+        $this->assertSame(DiscoveryAttemptStatus::Succeeded, $websiteAttempt->status);
+        $this->assertSame($websiteAttemptCountAfterFirstRun, $websiteAttempt->attempt_count, 'A preserved successful attempt must never be re-dispatched.');
+        $this->assertEquals($succeededAt, $websiteAttempt->completed_at);
+
+        $googleAttempt = DiscoveryConnectorAttempt::where('discovery_run_id', $run->id)->where('connector_type', 'api')->first();
+        $this->assertSame(DiscoveryAttemptStatus::Succeeded, $googleAttempt->status);
+        $this->assertSame(2, DiscoveryConnectorAttempt::where('discovery_run_id', $run->id)->count(), 'No duplicate attempt rows from retry.');
+    }
+
+    public function test_retry_picks_up_an_asset_that_only_became_connected_after_the_original_run(): void
+    {
+        MarketingChannel::factory()->for($this->company)->create(['type' => MarketingChannelType::Instagram]);
+
+        $this->bindRegistry(); // Instagram not yet connected — no connector at all
+        $run = app(BusinessDiscoveryService::class)->start($this->company);
+        $this->assertSame(0, DiscoveryConnectorAttempt::where('discovery_run_id', $run->id)->count());
+        $this->assertSame(DiscoveryStage::CompletedWithErrors, $run->fresh()->stage);
+
+        // The user connects Instagram for real from Settings in between.
+        $integration = Integration::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id, 'type' => 'instagram', 'name' => 'Instagram',
+            'config' => ['access_token' => 'token'], 'status' => 'active',
+        ]);
+        MarketingChannel::where('company_id', $this->company->id)->where('type', 'instagram')->first()
+            ->update(['integration_id' => $integration->id, 'is_connected' => true]);
+
+        $this->ai->queueFixture('website-facts')->queueResponse('{"opportunities": []}');
+        $this->bindRegistry($this->reuseCapableConnector('instagram'));
+
+        $retried = app(BusinessDiscoveryService::class)->retry($run->fresh());
+
+        $this->assertSame(1, DiscoveryConnectorAttempt::where('discovery_run_id', $run->id)->count());
+        $this->assertSame(
+            DiscoveryAttemptStatus::Succeeded,
+            DiscoveryConnectorAttempt::where('discovery_run_id', $run->id)->first()->status,
+        );
+        $this->assertNotSame(DiscoveryStage::CompletedWithErrors, $retried->stage);
+    }
+
+    // ── No-opportunities terminal state ──────────────────────────────────────
+
+    public function test_reaches_completed_no_opportunities_when_nothing_to_act_on(): void
+    {
+        $run = DiscoveryRun::create(['company_id' => $this->company->id, 'stage' => DiscoveryStage::Discovering, 'started_at' => now()->subMinutes(3)]);
+        $channel = MarketingChannel::factory()->for($this->company)->create(['type' => MarketingChannelType::Website]);
+        $integration = Integration::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id, 'type' => 'website_crawl', 'name' => 'Website',
+            'config' => ['url' => 'https://acme.example.com'], 'status' => 'active',
+        ]);
+        $observation = Observation::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id, 'integration_id' => $integration->id,
+            'source_type' => 'crawl', 'source_identifier' => 'https://acme.example.com',
+            'raw_payload' => '{}', 'status' => 'processed', 'observed_at' => now()->subMinutes(3),
+            'processed_at' => now()->subMinutes(2),
+        ]);
+
+        DiscoveryConnectorAttempt::create([
+            'discovery_run_id' => $run->id, 'company_id' => $this->company->id,
+            'marketing_channel_id' => $channel->id, 'integration_id' => $integration->id,
+            'connector_type' => 'website_crawl', 'status' => DiscoveryAttemptStatus::Succeeded,
+            'attempt_count' => 1, 'observation_id' => $observation->id, 'completed_at' => now()->subMinutes(2),
+        ]);
+
+        DigitalTwin::withoutGlobalScopes()->where('company_id', $this->company->id)->update(['status' => 'active']);
+        Knowledge::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id, 'type' => 'context', 'subject' => 'business',
+            'body' => 'Acme sells things.', 'confidence' => 0.8, 'is_active' => true,
+            'generated_at' => now()->subMinutes(2),
+        ]);
+
+        // No Opportunity, no Recommendation — facts_created still reported.
+        Fact::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id, 'observation_id' => $observation->id,
+            'key' => 'business.name', 'value' => 'Acme', 'data_type' => 'string',
+            'confidence' => 90, 'is_current' => true, 'valid_from' => now()->subMinutes(2),
+        ]);
+
+        $refreshed = app(BusinessDiscoveryService::class)->refreshStage($run);
+
+        $this->assertSame(DiscoveryStage::CompletedNoOpportunities, $refreshed->stage);
+        $this->assertNotNull($refreshed->completed_at);
+
+        $progress = app(BusinessDiscoveryService::class)->progressFor($this->company);
+        $this->assertSame('completed_no_opportunities', $progress['stage']);
+        $this->assertSame(1, $progress['facts_created']);
+        $this->assertSame(0, $progress['recommendation_count']);
+        $this->assertTrue($progress['retry_available']);
+    }
+
+    public function test_stays_recommending_within_the_grace_period_after_processing(): void
+    {
+        // Same shape as the no-opportunities test, but processed just now —
+        // must not prematurely declare "no opportunities" while an async
+        // downstream step could still be in flight.
+        $run = DiscoveryRun::create(['company_id' => $this->company->id, 'stage' => DiscoveryStage::Discovering, 'started_at' => now()]);
+        $channel = MarketingChannel::factory()->for($this->company)->create(['type' => MarketingChannelType::Website]);
+        $integration = Integration::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id, 'type' => 'website_crawl', 'name' => 'Website',
+            'config' => ['url' => 'https://acme.example.com'], 'status' => 'active',
+        ]);
+        $observation = Observation::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id, 'integration_id' => $integration->id,
+            'source_type' => 'crawl', 'source_identifier' => 'https://acme.example.com',
+            'raw_payload' => '{}', 'status' => 'processed', 'observed_at' => now(), 'processed_at' => now(),
+        ]);
+
+        DiscoveryConnectorAttempt::create([
+            'discovery_run_id' => $run->id, 'company_id' => $this->company->id,
+            'marketing_channel_id' => $channel->id, 'integration_id' => $integration->id,
+            'connector_type' => 'website_crawl', 'status' => DiscoveryAttemptStatus::Succeeded,
+            'attempt_count' => 1, 'observation_id' => $observation->id, 'completed_at' => now(),
+        ]);
+
+        DigitalTwin::withoutGlobalScopes()->where('company_id', $this->company->id)->update(['status' => 'active']);
+        Knowledge::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id, 'type' => 'context', 'subject' => 'business',
+            'body' => 'Acme sells things.', 'confidence' => 0.8, 'is_active' => true, 'generated_at' => now(),
+        ]);
+
+        $refreshed = app(BusinessDiscoveryService::class)->refreshStage($run);
+
+        $this->assertSame(DiscoveryStage::Recommending, $refreshed->stage);
+    }
+
+    // ── Tenant isolation ─────────────────────────────────────────────────────
+
+    public function test_retry_never_touches_another_companys_discovery_run(): void
+    {
+        $otherCompany = Company::factory()->create();
+
+        MarketingChannel::factory()->for($this->company)->create([
+            'type' => MarketingChannelType::Website, 'handle_or_url' => 'https://a.example.com',
+        ]);
+        MarketingChannel::factory()->for($otherCompany)->create([
+            'type' => MarketingChannelType::Website, 'handle_or_url' => 'https://b.example.com',
+        ]);
+
+        $this->bindRegistry($this->fakeAutoDiscoverableConnector(MarketingChannelType::Website, 'website_crawl', shouldFail: true));
+
+        $runA = app(BusinessDiscoveryService::class)->start($this->company);
+        $runB = app(BusinessDiscoveryService::class)->start($otherCompany);
+
+        $integrationB = Integration::withoutGlobalScopes()->where('company_id', $otherCompany->id)->first();
+        $attemptB = DiscoveryConnectorAttempt::where('discovery_run_id', $runB->id)->first();
+
+        $this->queueFullPipelineFixtures();
+        $this->bindRegistry($this->fakeAutoDiscoverableConnector(MarketingChannelType::Website, 'website_crawl'));
+
+        app(BusinessDiscoveryService::class)->retry($runA->fresh());
+
+        // Company A's retry must never touch company B's run, attempt, or integration.
+        $this->assertSame(DiscoveryStage::CompletedWithErrors, $runB->fresh()->stage);
+        $this->assertSame(DiscoveryAttemptStatus::Failed, $attemptB->fresh()->status);
+        $this->assertSame('error', $integrationB->fresh()->status);
+        $this->assertSame(0, Recommendation::withoutGlobalScopes()->where('company_id', $otherCompany->id)->count());
+    }
+
     // ── Idempotency ──────────────────────────────────────────────────────────
 
     public function test_running_discovery_twice_reuses_the_same_integration_and_never_duplicates_assets(): void
