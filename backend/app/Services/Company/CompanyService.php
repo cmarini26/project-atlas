@@ -3,6 +3,7 @@
 namespace App\Services\Company;
 
 use App\Models\Catalog;
+use App\Models\Channel;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\DigitalTwin;
@@ -37,6 +38,22 @@ class CompanyService
             DigitalTwin::create([
                 'company_id' => $company->id,
                 'status' => 'initializing',
+            ]);
+
+            // DecisionEngine::evaluate() refuses to commit a Decision (and
+            // therefore never produces a Recommendation) for a company with
+            // zero active Channel rows — a real publishing destination, not
+            // a declared MarketingChannel asset. Seed a default draft-only
+            // blog channel so every company can reach a Recommendation from
+            // day one; the user can add real connected channels (email,
+            // social) through Settings later. This restores behavior the
+            // pre-Milestone-15 onboarding flow used to seed directly in
+            // OnboardingController before the wizard was rewritten.
+            Channel::create([
+                'company_id' => $company->id,
+                'type' => 'blog',
+                'name' => 'Blog',
+                'is_active' => true,
             ]);
 
             CompanyMembership::create([

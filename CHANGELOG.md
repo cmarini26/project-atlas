@@ -6,6 +6,21 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Fix] Onboarding never seeded a Channel, so DecisionEngine could never commit — 2026-07-14
+
+`DecisionEngine::evaluate()` refuses to commit a Decision (Guard 5, "channel availability") for a company with zero active `App\Models\Channel` rows — a real publishing destination, distinct from the declared `MarketingChannel` assets Business Discovery Onboarding creates. The pre-Milestone-15 `OnboardingController` used to seed a default active `blog` Channel for exactly this reason; that seed was never carried over when the onboarding wizard was rewritten across Milestone 15 Phases 1–3, so every company onboarding through the new wizard got healthy crawls, Facts, and Opportunities but **zero Recommendations**, silently, with only a log line (`DecisionEngine: no active channels; cannot commit Decision`) revealing why.
+
+### Fixed
+
+- `App\Services\Company\CompanyService::create()` now seeds a default active `blog` Channel alongside the Catalog/DigitalTwin/owner-membership it already creates — restoring the guarantee for every company-creation path, not just the wizard. If a company later connects WordPress for real (`SettingsController::connectWordPress()`), that flow's own `updateOrCreate(['company_id', 'type' => 'blog'], ...)` finds and upgrades this same row in place rather than creating a duplicate.
+
+### Notes
+
+- New test: `CompanyServiceTest::test_seeds_a_default_active_blog_channel`.
+- Does not retroactively fix companies that already onboarded without a Channel — those need a Channel seeded manually or a real channel connected from Settings.
+
+---
+
 ## [Milestone 15 Phase 3 — Business Discovery Cutover and Recovery] — 2026-07-14
 
 Makes Business Discovery the single supported onboarding execution path, adds retry/recovery for a partial or stuck run, and closes an indefinite-spinner gap in the stage model. See [Milestone-15-Phase-3-Review.md](docs/reviews/Milestone-15-Phase-3-Review.md).

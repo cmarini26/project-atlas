@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Discovery;
 
+use App\Models\Channel;
 use App\Models\Company;
 use App\Models\DigitalTwin;
 use App\Models\User;
@@ -79,6 +80,24 @@ class CompanyServiceTest extends TestCase
         $this->assertDatabaseCount('catalogs', 1);
         $this->assertDatabaseCount('digital_twins', 1);
         $this->assertDatabaseCount('company_memberships', 1);
+        $this->assertDatabaseCount('channels', 1);
+    }
+
+    public function test_seeds_a_default_active_blog_channel(): void
+    {
+        // DecisionEngine::evaluate() refuses to commit a Decision (and
+        // therefore never produces a Recommendation) for a company with
+        // zero active Channel rows — without this seed, a company can have
+        // healthy Facts/Knowledge/Opportunities and still never see a
+        // Recommendation. See CHANGELOG "no active channels" fix.
+        $owner = User::factory()->create();
+        $company = $this->service->create($owner, ['name' => 'Test Co']);
+
+        $channel = Channel::where('company_id', $company->id)->first();
+
+        $this->assertNotNull($channel);
+        $this->assertSame('blog', $channel->type);
+        $this->assertTrue($channel->is_active);
     }
 
     public function test_generates_a_unique_slug_when_another_company_already_has_the_same_name(): void
