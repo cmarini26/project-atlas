@@ -13,6 +13,7 @@ use App\Models\Integration;
 use App\Models\MarketingChannel;
 use App\Services\MarketingPresence\MarketingPresenceService;
 use App\Services\Observatory\IntegrationService;
+use App\Services\Publishing\WordPressPublisher;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -24,6 +25,7 @@ class SettingsController extends Controller
     public function __construct(
         private readonly IntegrationService $integrationService,
         private readonly MarketingPresenceService $marketingPresence,
+        private readonly WordPressPublisher $wordPressPublisher,
     ) {}
 
     public function index(Request $request): Response
@@ -39,6 +41,7 @@ class SettingsController extends Controller
                 'type' => $i->type,
                 'name' => $i->name,
                 'status' => $i->status,
+                'last_error' => $i->last_error,
                 'next_run_at' => $i->next_run_at !== null ? (string) $i->next_run_at : null,
                 'last_run_at' => $i->last_run_at !== null ? (string) $i->last_run_at : null,
             ]);
@@ -219,18 +222,35 @@ class SettingsController extends Controller
             ['name' => (string) parse_url($siteUrl, PHP_URL_HOST), 'config' => ['site_url' => $siteUrl], 'is_active' => true],
         );
 
+        // Ping the site with the submitted credentials before ever reporting
+        // "connected" — WordPressPublisher::ping() only needs company_id and
+        // the raw credentials, not a persisted row, so we validate first and
+        // decide the stored status from a real result instead of assuming
+        // success (see docs/reviews/Channel-Publishing-Reality-Audit.md).
+        $candidateCredentials = new ChannelCredentials([
+            'company_id' => $company->id,
+            'channel_type' => 'blog',
+            'credentials' => json_encode([
+                'username' => $validated['username'],
+                'app_password' => $validated['app_password'],
+            ]),
+        ]);
+
+        $ping = $this->wordPressPublisher->ping($candidateCredentials);
+
         ChannelCredentials::withoutGlobalScopes()->updateOrCreate(
             ['company_id' => $company->id, 'channel_type' => 'blog'],
             [
                 'provider_type' => 'wordpress',
-                'credentials' => json_encode([
-                    'username' => $validated['username'],
-                    'app_password' => $validated['app_password'],
-                ]),
-                'status' => 'active',
+                'credentials' => $candidateCredentials->credentials,
+                'status' => $ping->reachable ? 'active' : 'error',
                 'expires_at' => null,
             ],
         );
+
+        if (! $ping->reachable) {
+            return back()->withErrors(['app_password' => "Couldn't connect to WordPress with those credentials: {$ping->error}"]);
+        }
 
         return back()->with('success', 'WordPress connected.');
     }

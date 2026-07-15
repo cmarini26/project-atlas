@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\App;
 
+use App\Domain\Publishing\ValueObjects\PingResult;
 use App\Jobs\SyncIntegration;
 use App\Models\Channel;
 use App\Models\ChannelCredentials;
@@ -10,8 +11,10 @@ use App\Models\CompanyMembership;
 use App\Models\InstagramAccount;
 use App\Models\Integration;
 use App\Models\User;
+use App\Services\Publishing\WordPressPublisher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Mockery;
 use Tests\TestCase;
 
 class SettingsControllerTest extends TestCase
@@ -146,9 +149,13 @@ class SettingsControllerTest extends TestCase
             ->assertInertia(fn ($page) => $page->where('wordpress_channel', null));
     }
 
-    public function test_connect_wordpress_creates_channel_and_credentials(): void
+    public function test_connect_wordpress_creates_channel_and_credentials_when_the_site_is_reachable(): void
     {
         [$user, $company] = $this->userWithCompany();
+
+        $publisher = Mockery::mock(WordPressPublisher::class);
+        $publisher->shouldReceive('ping')->once()->andReturn(new PingResult(reachable: true));
+        $this->app->instance(WordPressPublisher::class, $publisher);
 
         $this->actingAs($user)
             ->post('/app/settings/wordpress/connect', [
@@ -168,6 +175,32 @@ class SettingsControllerTest extends TestCase
             'channel_type' => 'blog',
             'provider_type' => 'wordpress',
             'status' => 'active',
+        ]);
+    }
+
+    public function test_connect_wordpress_rejects_unreachable_or_invalid_credentials(): void
+    {
+        // Task 2.1 (production-readiness plan): don't report "connected"
+        // without verifying the site/account first.
+        [$user, $company] = $this->userWithCompany();
+
+        $publisher = Mockery::mock(WordPressPublisher::class);
+        $publisher->shouldReceive('ping')->once()->andReturn(new PingResult(reachable: false, error: 'Invalid application password'));
+        $this->app->instance(WordPressPublisher::class, $publisher);
+
+        $this->actingAs($user)
+            ->post('/app/settings/wordpress/connect', [
+                'site_url' => 'https://blog.cbb-auctions.example/',
+                'username' => 'atlas',
+                'app_password' => 'wrong-password',
+            ])
+            ->assertSessionHasErrors(['app_password']);
+
+        $this->assertDatabaseHas('channel_credentials', [
+            'company_id' => $company->id,
+            'channel_type' => 'blog',
+            'provider_type' => 'wordpress',
+            'status' => 'error',
         ]);
     }
 

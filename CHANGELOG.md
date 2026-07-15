@@ -6,6 +6,22 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Fix] WordPress connect no longer reports "connected" without verifying credentials — 2026-07-15
+
+Production-readiness gap plan, Task 2.1 (`backend/.hermes/plans/2026-07-15_094741-atlas-production-readiness-gap-plan.md`). `SettingsController::connectWordPress()` previously saved any submitted site URL/username/Application Password as `status: 'active'` unconditionally — a typo'd password or an unreachable site still showed as a green "Connected" WordPress channel in Settings, and the falsehood would only surface later, silently, whenever a blog campaign happened to try to publish (or up to 30 minutes later via the existing `CheckChannelHealth` scheduled job).
+
+### Fixed
+
+- `SettingsController::connectWordPress()` now calls `WordPressPublisher::ping()` with the submitted credentials before persisting anything as `active`. A real, live check (`GET /wp-json/wp/v2/users/me` with HTTP Basic Auth) runs synchronously during the connect request.
+- On success: behavior is unchanged — `ChannelCredentials` is saved with `status: 'active'`.
+- On failure: `ChannelCredentials` is saved with `status: 'error'` (not `'active'`) and the request redirects back with a field-level validation error (`app_password`) naming the real reason the site rejected the connection, instead of a false "WordPress connected." success message.
+
+### Notes
+
+- New tests: `SettingsControllerTest::test_connect_wordpress_rejects_unreachable_or_invalid_credentials`; `test_connect_wordpress_creates_channel_and_credentials_when_the_site_is_reachable` now mocks `WordPressPublisher::ping()` rather than relying on an implicit (and non-deterministic) real network call to a fake domain.
+- Does not change ongoing health monitoring (`CheckChannelHealth` already re-pings and flips `status` to `'error'` if a previously-valid connection later breaks) — this fix only closes the connect-time gap.
+- Does not change global channel-capability labeling (`resources/js/lib/channelCapability.ts` still reports `blog` as `draft_only` platform-wide) — that file describes a platform-wide default, not a specific company's live connection state, and reconciling it fully against real per-company `supports_publishing` truth is a separate, larger Phase 0 slice (`backend/.hermes/plans/2026-07-15_094741-atlas-production-readiness-gap-plan.md`), not part of this change.
+
 ## [Fix] Onboarding never seeded a Channel, so DecisionEngine could never commit — 2026-07-14
 
 `DecisionEngine::evaluate()` refuses to commit a Decision (Guard 5, "channel availability") for a company with zero active `App\Models\Channel` rows — a real publishing destination, distinct from the declared `MarketingChannel` assets Business Discovery Onboarding creates. The pre-Milestone-15 `OnboardingController` used to seed a default active `blog` Channel for exactly this reason; that seed was never carried over when the onboarding wizard was rewritten across Milestone 15 Phases 1–3, so every company onboarding through the new wizard got healthy crawls, Facts, and Opportunities but **zero Recommendations**, silently, with only a log line (`DecisionEngine: no active channels; cannot commit Decision`) revealing why.
