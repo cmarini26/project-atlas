@@ -58,6 +58,11 @@ class DashboardController extends Controller
             ->limit(3)
             ->get();
 
+        // Drives the Dashboard's progressive reveal: a brand-new company
+        // with zero campaigns ever created gets the Health card full-width
+        // instead of sharing a row with a guaranteed-empty Campaigns card.
+        $hasCampaignHistory = $recentCampaigns->isNotEmpty();
+
         $recentExecutions = Execution::with(['channel', 'contentAsset'])
             ->where('company_id', $company->id)
             ->latest()
@@ -112,6 +117,7 @@ class DashboardController extends Controller
                 'channel' => $e->channel ? ['type' => $e->channel->type] : null,
             ])->values()->all(),
             'health' => $health,
+            'has_campaign_history' => $hasCampaignHistory,
         ]);
     }
 }

@@ -2,34 +2,36 @@
 
 namespace App\Domain\Onboarding;
 
-use App\Enums\MarketingChannelType;
-
 /**
  * Which MarketingChannelTypes need identifying details before the
- * onboarding wizard's Asset Details step (Milestone 15 Phase 1) considers
- * them complete, and what those details are. Deliberately a plain,
- * declarative map rather than a class hierarchy — this is intentionally
- * the minimal version of the richer AssetFieldSchema registry
- * docs/specs/Business-Discovery-Onboarding.md §5.4 designs for Phase 3
- * (Discovery orchestration); that phase is not built here, so this phase
- * only needs "what does this step require," not "what can auto-discover."
+ * onboarding wizard's Asset Details step considers them complete.
+ *
+ * Deliberately scoped to only what Discovery can currently act on
+ * (`ConnectorRegistry::autoDiscoverableFor()` — Website today) rather than
+ * every type with a plausible URL field. Collecting a URL for Instagram/
+ * Facebook/LinkedIn/etc. at onboarding time was pure friction: Discovery
+ * never used it (those types are declared-only until connected for real
+ * from Settings), so asking for it up front only slowed the wizard down.
+ * Deferred fields are filled in later from `/app/settings/marketing-presence`,
+ * which already has an add/edit form for exactly this. See the UI-rethink
+ * plan, Workstream C.1.
  */
 final class AssetDetailRequirements
 {
     /**
      * Types where the Asset Details step must collect something before
      * the wizard considers the asset "detailed." Every other declarable
-     * type (Email, Events, Print, TikTok, Other) has only optional fields.
+     * type has only optional fields, filled in later from Settings.
      *
      * @var list<string>
      */
-    public const REQUIRES_DETAILS = [
-        'website', 'instagram', 'facebook', 'linkedin', 'google_business_profile', 'youtube', 'x',
-    ];
+    public const REQUIRES_DETAILS = ['website'];
 
     /**
      * Whether a declared asset's currently-stored handle_or_url/metadata
-     * satisfy this type's minimum identifying-info requirement.
+     * satisfy this type's minimum identifying-info requirement. Website is
+     * the only type in REQUIRES_DETAILS today, needing both a URL and a
+     * platform; every other type is satisfied unconditionally.
      *
      * @param  array<string, mixed>  $metadata
      */
@@ -39,10 +41,6 @@ final class AssetDetailRequirements
             return true;
         }
 
-        if ($type === MarketingChannelType::Website->value) {
-            return filled($handleOrUrl) && filled($metadata['platform'] ?? null);
-        }
-
-        return filled($handleOrUrl);
+        return filled($handleOrUrl) && filled($metadata['platform'] ?? null);
     }
 }

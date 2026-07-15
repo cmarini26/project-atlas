@@ -8,9 +8,9 @@ import OnboardingChecklist from '@/Components/Dashboard/OnboardingChecklist.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import PageHeader from '@/Components/UI/PageHeader.vue'
+import Card from '@/Components/UI/Card.vue'
 import ChannelCapabilityBadge from '@/Components/UI/ChannelCapabilityBadge.vue'
 import {
-  RectangleStackIcon,
   PaperAirplaneIcon,
   HomeIcon,
   ClockIcon,
@@ -54,6 +54,7 @@ interface DashboardProps {
   pending_recommendation: Recommendation | null
   recent_campaigns: Campaign[]
   recent_executions: RecentExecution[]
+  has_campaign_history: boolean
 }
 
 defineProps<DashboardProps>()
@@ -138,7 +139,10 @@ function formatDate(date: string | null): string {
       />
     </div>
 
-    <div data-tour="health-card" class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+    <div
+      data-tour="health-card"
+      :class="['grid grid-cols-1 gap-4 mb-6', has_campaign_history ? 'lg:grid-cols-2' : '']"
+    >
       <!-- Business Brain health -->
       <HealthCard
         :health="{
@@ -150,14 +154,16 @@ function formatDate(date: string | null): string {
         }"
       />
 
-      <!-- Recent campaigns -->
-      <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5">
-        <div class="flex items-center justify-between mb-4">
+      <!-- Recent campaigns — only shares the row once there's real history;
+           a brand-new company gets the Health card full-width instead of a
+           guaranteed-empty box crowding it. -->
+      <Card v-if="has_campaign_history">
+        <template #header>
           <h2 class="text-sm font-semibold text-[var(--color-text-primary)]">Recent Campaigns</h2>
           <Link href="/app/campaigns" class="text-xs text-[var(--color-text-link)] hover:underline">View all</Link>
-        </div>
+        </template>
 
-        <div v-if="recent_campaigns.length > 0" class="space-y-3">
+        <div class="space-y-3">
           <div
             v-for="campaign in recent_campaigns"
             :key="campaign.id"
@@ -171,19 +177,15 @@ function formatDate(date: string | null): string {
             </Badge>
           </div>
         </div>
-
-        <EmptyState v-else title="No campaigns yet" description="Campaigns appear here after you approve a recommendation.">
-          <template #icon><RectangleStackIcon class="size-6" /></template>
-        </EmptyState>
-      </div>
+      </Card>
     </div>
 
     <!-- Recent executions -->
-    <div data-tour="recent-executions" class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5">
-      <div class="flex items-center justify-between mb-4">
+    <Card data-tour="recent-executions">
+      <template #header>
         <h2 class="text-sm font-semibold text-[var(--color-text-primary)]">Recent Publishing Activity</h2>
         <Link href="/app/publishing" class="text-xs text-[var(--color-text-link)] hover:underline">View all</Link>
-      </div>
+      </template>
 
       <div v-if="recent_executions.length > 0" class="space-y-3">
         <div
@@ -211,6 +213,6 @@ function formatDate(date: string | null): string {
       <EmptyState v-else title="No activity yet" description="Simulated publishing activity appears here once campaigns run — no live channels are connected yet.">
         <template #icon><PaperAirplaneIcon class="size-6" /></template>
       </EmptyState>
-    </div>
+    </Card>
   </div>
 </template>

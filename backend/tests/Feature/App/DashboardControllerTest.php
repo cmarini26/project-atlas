@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\App;
 
+use App\Models\Campaign;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\DigitalTwin;
@@ -90,6 +91,36 @@ class DashboardControllerTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->has('pending_recommendation')
             );
+    }
+
+    public function test_has_campaign_history_is_false_for_a_brand_new_company(): void
+    {
+        // Drives the Dashboard's progressive reveal (UI rethink Workstream
+        // C.3) — a company with zero campaigns ever created shouldn't share
+        // a row with a guaranteed-empty Campaigns card.
+        [$user] = $this->userWithCompanyAndIntegration();
+
+        $this->actingAs($user)
+            ->get('/app')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('has_campaign_history', false));
+    }
+
+    public function test_has_campaign_history_is_true_once_a_campaign_exists(): void
+    {
+        [$user, $company] = $this->userWithCompanyAndIntegration();
+
+        Campaign::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'title' => 'Silver Age Email Campaign',
+            'campaign_type' => 'email_campaign',
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs($user)
+            ->get('/app')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('has_campaign_history', true));
     }
 
     /** @return array{User, Company} */

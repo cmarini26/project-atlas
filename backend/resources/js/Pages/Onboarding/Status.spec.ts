@@ -53,7 +53,7 @@ describe('Onboarding/Status', () => {
     wrapper.unmount()
   })
 
-  it('renders per-asset connector status underneath Discover', async () => {
+  it('collapses per-asset connector detail behind a disclosure by default', async () => {
     mockFetchOnce({
       ...emptyProgress,
       stage: 'analyzing',
@@ -64,6 +64,12 @@ describe('Onboarding/Status', () => {
     })
     const wrapper = mount(Status)
     await flushPromises()
+
+    // Not shown until expanded — implementation detail, not needed by default.
+    expect(wrapper.text()).not.toContain('Facebook')
+
+    const toggle = wrapper.findAll('button').find((b) => b.text().includes('Show details'))
+    await toggle?.trigger('click')
 
     expect(wrapper.text()).toContain('Website')
     expect(wrapper.text()).toContain('Facebook')

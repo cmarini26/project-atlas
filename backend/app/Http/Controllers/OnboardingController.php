@@ -188,6 +188,9 @@ class OnboardingController extends Controller
         $assets = $validated['assets'];
         $errors = [];
 
+        // Website is the only type in AssetDetailRequirements::REQUIRES_DETAILS
+        // today — every other declared asset is optional here and detailed
+        // later from Settings. See App\Domain\Onboarding\AssetDetailRequirements.
         foreach ($channels as $channel) {
             $type = $channel->type->value;
 
@@ -195,9 +198,7 @@ class OnboardingController extends Controller
                 continue;
             }
 
-            $rules = $type === 'website'
-                ? ['url' => ['required', 'url', 'max:500'], 'platform' => ['required', 'string']]
-                : [($type === 'google_business_profile' ? 'business_name_or_url' : 'url') => ['required', 'string', 'max:500']];
+            $rules = ['url' => ['required', 'url', 'max:500'], 'platform' => ['required', 'string']];
 
             $validator = Validator::make($assets[$type] ?? [], $rules);
 

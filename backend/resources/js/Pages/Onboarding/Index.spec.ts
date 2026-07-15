@@ -77,30 +77,25 @@ describe('Onboarding/Index', () => {
     }
   })
 
-  it('prevents marking more than three assets as primary', async () => {
+  it('does not ask the user to pick primary assets — it is auto-defaulted', async () => {
+    // Milestone: UI rethink Workstream C.2 — picking "primary" assets was
+    // removed from onboarding entirely; it's auto-defaulted server-side
+    // from a fixed priority order and editable later from Settings.
     const wrapper = mount(Index, { props: { ...baseProps, initial_step: 4 } })
 
-    // Enable four assets first.
+    expect(wrapper.text()).not.toContain('Primary')
+    expect(wrapper.text()).not.toContain('mark up to three as primary')
+
     const enableCheckboxes = wrapper.findAll('input[type="checkbox"]')
     for (let i = 0; i < 4; i++) {
       await enableCheckboxes[i].setValue(true)
     }
 
-    // Now the "Primary" checkboxes exist — mark the first three, then a fourth.
-    const primaryCheckboxes = wrapper.findAll('label').filter((l) => l.text() === 'Primary')
-    for (let i = 0; i < 3; i++) {
-      await primaryCheckboxes[i].find('input').setValue(true)
-    }
-
-    expect(wrapper.text()).not.toContain('You can mark at most three assets as primary.')
-
-    const remainingPrimaryCheckboxes = wrapper.findAll('label').filter((l) => l.text() === 'Primary')
-    await remainingPrimaryCheckboxes[3].find('input').setValue(true)
-
-    expect(wrapper.text()).toContain('You can mark at most three assets as primary.')
+    await wrapper.find('form').trigger('submit.prevent')
+    expect(postMock).toHaveBeenCalledWith('/onboarding/assets', expect.anything())
   })
 
-  it('only renders detail forms for enabled assets', () => {
+  it('only renders a detail form for Website — every other asset is deferred to Settings', () => {
     const wrapper = mount(Index, {
       props: {
         ...baseProps,
@@ -112,10 +107,10 @@ describe('Onboarding/Index', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('Tell us a bit more about each one')
+    expect(wrapper.text()).toContain('Tell us a bit more about your website')
     expect(wrapper.find('#detail-website-url').exists()).toBe(true)
     expect(wrapper.find('#detail-website-platform').exists()).toBe(true)
-    expect(wrapper.find('#detail-instagram-url').exists()).toBe(true)
+    expect(wrapper.find('#detail-instagram-url').exists()).toBe(false)
     expect(wrapper.find('#detail-facebook-url').exists()).toBe(false)
   })
 

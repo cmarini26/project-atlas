@@ -1,10 +1,16 @@
 /**
- * The 10 Marketing Assets cards shown in onboarding's Marketing Assets step
- * (Milestone 15 Phase 1), and the identifying-detail fields collected for
- * each in the following Asset Details step. Deliberately a curated subset
- * of the full 12 MarketingChannelType values (excludes TikTok, Other) —
- * mirrors OnboardingController::ASSET_CARD_TYPES on the PHP side. See
+ * The 10 Marketing Assets cards shown in onboarding's Marketing Assets step,
+ * and the identifying-detail fields collected for each in the following
+ * Asset Details step. Deliberately a curated subset of the full 12
+ * MarketingChannelType values (excludes TikTok, Other) — mirrors
+ * OnboardingController::ASSET_CARD_TYPES on the PHP side. See
  * docs/specs/Business-Discovery-Onboarding.md §2.4-2.5.
+ *
+ * Only Website requires details up front (2026-07-14, Workstream C.1) —
+ * that's the only type Discovery can currently auto-discover from a URL
+ * alone; every other type is declared now and detailed later from
+ * /app/settings/marketing-presence, so onboarding doesn't front-load
+ * fields Discovery won't use yet.
  */
 
 export interface OnboardingAssetType {
@@ -16,12 +22,12 @@ export interface OnboardingAssetType {
 
 export const ONBOARDING_ASSET_TYPES: OnboardingAssetType[] = [
   { type: 'website', label: 'Website', requiresDetails: true },
-  { type: 'google_business_profile', label: 'Google Business Profile', requiresDetails: true },
-  { type: 'instagram', label: 'Instagram', requiresDetails: true },
-  { type: 'facebook', label: 'Facebook', requiresDetails: true },
-  { type: 'linkedin', label: 'LinkedIn', requiresDetails: true },
-  { type: 'x', label: 'X', requiresDetails: true },
-  { type: 'youtube', label: 'YouTube', requiresDetails: true },
+  { type: 'google_business_profile', label: 'Google Business Profile', requiresDetails: false },
+  { type: 'instagram', label: 'Instagram', requiresDetails: false },
+  { type: 'facebook', label: 'Facebook', requiresDetails: false },
+  { type: 'linkedin', label: 'LinkedIn', requiresDetails: false },
+  { type: 'x', label: 'X', requiresDetails: false },
+  { type: 'youtube', label: 'YouTube', requiresDetails: false },
   { type: 'email', label: 'Email Newsletter', requiresDetails: false },
   { type: 'events', label: 'Events', requiresDetails: false },
   { type: 'print', label: 'Print', requiresDetails: false },

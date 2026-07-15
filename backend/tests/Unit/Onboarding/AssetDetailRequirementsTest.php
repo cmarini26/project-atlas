@@ -15,18 +15,15 @@ class AssetDetailRequirementsTest extends TestCase
         $this->assertTrue(AssetDetailRequirements::isSatisfied('website', 'https://acme.com', ['platform' => 'wordpress']));
     }
 
-    public function test_url_only_types_require_a_handle_or_url(): void
-    {
-        foreach (['instagram', 'facebook', 'linkedin', 'youtube', 'x', 'google_business_profile'] as $type) {
-            $this->assertFalse(AssetDetailRequirements::isSatisfied($type, null, []), "{$type} should require a handle_or_url");
-            $this->assertFalse(AssetDetailRequirements::isSatisfied($type, '', []), "{$type} should treat an empty string as missing");
-            $this->assertTrue(AssetDetailRequirements::isSatisfied($type, 'https://example.com/acme', []), "{$type} should be satisfied once a URL is set");
-        }
-    }
-
     public function test_optional_types_never_require_anything(): void
     {
-        foreach (['email', 'events', 'print', 'tiktok', 'other'] as $type) {
+        // Workstream C.1 (UI rethink) — only Website requires details up
+        // front in onboarding; every other declarable type (including
+        // Instagram/Facebook/LinkedIn/YouTube/X/Google Business, which used
+        // to require a URL here) is declared now and detailed later from
+        // Settings, since Discovery can't act on those details during
+        // onboarding anyway.
+        foreach (['instagram', 'facebook', 'linkedin', 'youtube', 'x', 'google_business_profile', 'email', 'events', 'print', 'tiktok', 'other'] as $type) {
             $this->assertTrue(AssetDetailRequirements::isSatisfied($type, null, []), "{$type} should never require details");
         }
     }

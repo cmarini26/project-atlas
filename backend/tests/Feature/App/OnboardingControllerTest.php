@@ -64,7 +64,28 @@ class OnboardingControllerTest extends TestCase
             ->assertInertia(fn ($page) => $page->where('initial_step', 4));
     }
 
-    public function test_index_shows_step_5_when_an_enabled_asset_is_missing_details(): void
+    public function test_index_shows_step_5_when_website_is_missing_details(): void
+    {
+        // Only Website requires details up front (Workstream C.1) — a
+        // declared Instagram asset with no handle_or_url no longer blocks
+        // completion; a declared Website with no URL still does.
+        [$user, $company] = $this->userWithCompany();
+        OnboardingProfile::create(['company_id' => $company->id, 'business_goals' => ['increase_sales']]);
+        MarketingChannel::create([
+            'company_id' => $company->id, 'type' => 'website', 'display_name' => 'Website',
+            'importance' => 'secondary', 'objective' => ['seo'],
+        ]);
+
+        $this->actingAs($user)
+            ->get('/onboarding')
+            ->assertInertia(fn ($page) => $page
+                ->where('initial_step', 5)
+                ->has('enabled_assets', 1)
+                ->where('enabled_assets.0.type', 'website')
+            );
+    }
+
+    public function test_index_skips_step_5_when_only_a_non_website_asset_is_declared(): void
     {
         [$user, $company] = $this->userWithCompany();
         OnboardingProfile::create(['company_id' => $company->id, 'business_goals' => ['increase_sales']]);
@@ -75,11 +96,7 @@ class OnboardingControllerTest extends TestCase
 
         $this->actingAs($user)
             ->get('/onboarding')
-            ->assertInertia(fn ($page) => $page
-                ->where('initial_step', 5)
-                ->has('enabled_assets', 1)
-                ->where('enabled_assets.0.type', 'instagram')
-            );
+            ->assertInertia(fn ($page) => $page->where('initial_step', 6));
     }
 
     public function test_index_shows_step_6_when_all_asset_details_are_satisfied(): void
@@ -312,14 +329,21 @@ class OnboardingControllerTest extends TestCase
             ->assertSessionHasErrors(['assets.website.url', 'assets.website.platform']);
     }
 
-    public function test_asset_details_step_requires_url_for_instagram(): void
+    public function test_asset_details_step_no_longer_requires_a_url_for_instagram(): void
     {
+        // Workstream C.1 (UI rethink) — only Website requires details up
+        // front; Instagram (and every other non-Website type) is declared
+        // now and detailed later from Settings, since Discovery can't act
+        // on those details during onboarding anyway.
         [$user, $company] = $this->userWithCompany();
         $this->declareAsset($company, 'instagram');
 
         $this->actingAs($user)
             ->post('/onboarding/asset-details', ['assets' => ['instagram' => []]])
-            ->assertSessionHasErrors('assets.instagram.url');
+            ->assertRedirect(route('onboarding'));
+
+        $channel = MarketingChannel::where('company_id', $company->id)->where('type', 'instagram')->first();
+        $this->assertNull($channel->handle_or_url);
     }
 
     public function test_asset_details_step_accepts_business_name_or_url_for_google_business(): void

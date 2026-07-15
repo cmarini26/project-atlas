@@ -1,10 +1,19 @@
 # Atlas Customer Dashboard — Design System
 
-**Milestone:** 10.1  
-**Date:** 2026-06-27  
-**Stack:** Vue 3 · TypeScript · Tailwind CSS v4 · Inertia.js  
-**Font:** Instrument Sans (400 / 500 / 600), loaded via Bunny fonts  
-**Status:** Specification — no code written yet
+**Milestone:** 10.1 (color/type/elevation rethink: 2026-07-14)
+**Date:** 2026-06-27, revised 2026-07-14
+**Stack:** Vue 3 · TypeScript · Tailwind CSS v4 · Inertia.js
+**Font:** Instrument Sans (400 / 500 / 600), loaded via Bunny fonts
+**Status:** Implemented — see `backend/resources/css/app.css` for the authoritative token values
+
+> **2026-07-14 revision:** the accent hue, neutral ramp, type scale, and card
+> border/shadow rules below were reworked to read as a designed identity
+> rather than default-Tailwind. Sections 2–4, 8–10 reflect the current
+> tokens; sections 11–19 (tables, cards for specific domains, timelines,
+> empty states, animations) describe patterns that still apply but haven't
+> all been rebuilt onto the new primitives yet — cross-check against
+> `backend/resources/js/Components/UI/` before assuming a code example here
+> is current.
 
 ---
 
@@ -84,26 +93,23 @@ Atlas looks closest to a trusted advisor portal — clean, intelligent, purposef
 
 ### Type Scale
 
-All sizes in `rem` (base 16px). Line heights optimize for reading long rationale text, not scanning tables.
+All sizes in `rem` (base 16px). Collapsed from 9 steps to 6 in the 2026-07-14 revision — fewer, more clearly distinct sizes read as intentional hierarchy; near-duplicate small sizes (11/12/13px) were noise, not signal.
 
 | Token | Size | Line Height | Weight | Usage |
 |-------|------|-------------|--------|-------|
-| `text-display` | 30px / 1.875rem | 1.2 (36px) | 600 | Page hero moments: onboarding completion, first recommendation |
-| `text-heading-1` | 24px / 1.5rem | 1.33 (32px) | 600 | Page titles (`<h1>`) |
-| `text-heading-2` | 20px / 1.25rem | 1.4 (28px) | 600 | Section headings (`<h2>`), card titles in detail views |
-| `text-heading-3` | 16px / 1rem | 1.5 (24px) | 600 | Subsection headings (`<h3>`), card titles in list views |
-| `text-body-lg` | 16px / 1rem | 1.625 (26px) | 400 | Recommendation rationale paragraphs — primary reading text |
-| `text-body` | 14px / 0.875rem | 1.57 (22px) | 400 | General interface text, card body, table cells |
-| `text-body-sm` | 13px / 0.8125rem | 1.54 (20px) | 400 | Secondary text, captions, helper text |
-| `text-label` | 12px / 0.75rem | 1.33 (16px) | 500 | Form labels, column headers, section eyebrows |
-| `text-label-sm` | 11px / 0.6875rem | 1.45 (16px) | 500 | Tight labels only: status badges, chip text |
+| `text-hero` | 44px / 2.75rem | 1.1 | 650 | The few genuine "hero" moments: dashboard headline, onboarding completion, marketing hero |
+| `text-display` | 30px / 1.875rem | 1.2 (36px) | 600 | Page hero moments: first recommendation |
+| `text-heading` | 20px / 1.25rem | 1.35 | 600 | Page titles (`<h1>`), section headings (`<h2>`) — merges the old `heading-1`/`heading-2` split |
+| `text-subheading` | 16px / 1rem | 1.5 | 600 | Subsection headings (`<h3>`), card titles in list views |
+| `text-body` | 15px / 0.9375rem | 1.6 | 400 | General interface text, card body, table cells, recommendation rationale — merges the old `body-lg`/`body` split (bumped from 14px, which read thin) |
+| `text-caption` | 12px / 0.75rem | 1.4 | 500 | Form labels, column headers, section eyebrows, secondary/helper text, chip text — merges the old `body-sm`/`label`/`label-sm` three-way split into one small-text step |
 | `text-mono` | 13px / 0.8125rem | 1.54 (20px) | 400 | IDs, technical values, raw keys — use `ui-monospace` |
 
 ### Typography Rules
 
-**Label style.** Field labels use `text-label`, `text-muted`, uppercase, `letter-spacing: 0.06em`. Never use uppercase for body text or headings — only for labels and column headers.
+**Label style.** Field labels use `text-caption`, `text-muted`, uppercase, `letter-spacing: 0.06em`. Never use uppercase for body text or headings — only for labels and column headers.
 
-**Rationale text uses `text-body-lg`.** The "why now / why this / why this channel / why it will work" explanations are the most important reading on the platform. They get 16px / 26px line height — the same consideration you would give editorial prose.
+**Rationale text uses `text-body`.** The "why now / why this / why this channel / why it will work" explanations are the most important reading on the platform — they get the full 15px/1.6 body treatment, the same consideration you would give editorial prose.
 
 **Number display.** Metric cards display their primary number at `text-display` or `text-heading-1`. Use `font-variant-numeric: tabular-nums` on any number that changes or sits in a column so digits don't shift layout.
 
@@ -157,84 +163,73 @@ All sizes in `rem` (base 16px). Line heights optimize for reading long rationale
 
 ### Philosophy
 
-One accent. Neutral warmth everywhere else. Status communicated through muted tones, never through saturation.
+One accent, used with real range. Neutral warmth everywhere else, tinted toward the accent hue rather than pure gray. Status communicated through 4 muted hues, never through saturation.
 
-The base neutral is **stone** (Tailwind's warm gray family — slightly warmer than slate, avoiding the cold blue-gray of pure grays). Stone reads as calm and natural.
+The base neutral is still **stone** (Tailwind's warm gray family), but every neutral now carries a whisper of the accent's violet hue folded in — this is the single highest-leverage "feels designed, not default" move (the same trick Linear/Vercel use on their own gray ramps): nobody consciously notices it, they just perceive the palette as more cohesive.
 
-The accent is **indigo** — trustworthy, clear, not electric. Used exclusively for interactive elements: primary buttons, links, focus rings, active nav items. Nothing decorative is indigo.
+The accent is **"Signal"** — a deeper blue-violet (`#6d5ce8`), not stock indigo. Indigo-500 is the single most-reused SaaS accent in the world (default shadcn/ui, every Tailwind demo); shifting hue (~265°→~285°) and pulling chroma down slightly de-genericizes it immediately while staying in the same "calm, trustworthy" register. Used exclusively for interactive elements: primary buttons, links, focus rings, active nav items, and now also "in progress/queued" status (see below). Nothing decorative is accent-colored outside 2-3 deliberate "moment" locations (marketing hero, onboarding completion, first-recommendation empty state).
 
 ### Semantic Token System
 
-Define semantic tokens in `@theme {}`. Implementation references tokens, never raw colors.
+Define semantic tokens in `@theme {}`. Implementation references tokens, never raw colors. **The values below are documentation of intent — `backend/resources/css/app.css` is the authoritative source; check it directly if the two ever disagree.**
 
 ```css
 @theme {
   /* ── Surfaces ─────────────────────────────────── */
-  --color-surface:           #fafaf9;   /* page background      stone-50  */
-  --color-surface-elevated:  #ffffff;   /* cards, panels                  */
-  --color-surface-subtle:    #f5f5f4;   /* inputs, code, hover  stone-100 */
-  --color-surface-overlay:   #292524;   /* modal backdrop dark  stone-800 */
+  --color-surface:           #f7f6f4;   /* page background, violet-tinted stone */
+  --color-surface-elevated:  #ffffff;   /* cards, panels — the one pure-white anchor */
+  --color-surface-subtle:    #efeeea;   /* inputs, code, hover */
+  --color-surface-overlay:   #1b1a2e;   /* modal backdrop dark — violet-tinted charcoal */
 
   /* ── Borders ──────────────────────────────────── */
-  --color-border:            #e7e5e4;   /* default borders      stone-200 */
-  --color-border-strong:     #d6d3d1;   /* table dividers       stone-300 */
-  --color-border-focus:      #6366f1;   /* focus ring           indigo-500 */
+  --color-border:            #e5e2dc;   /* default borders — reserved for NESTED content, see §8 */
+  --color-border-strong:     #d3cec4;   /* structural dividers only (sidebar rule, table header) */
+  --color-border-focus:      #6d5ce8;   /* focus ring */
 
   /* ── Text ─────────────────────────────────────── */
-  --color-text-primary:      #1c1917;   /* headings, emphasis   stone-950 */
-  --color-text-secondary:    #44403c;   /* body text            stone-700 */
-  --color-text-muted:        #78716c;   /* captions, labels     stone-500 */
-  --color-text-placeholder:  #a8a29e;   /* input placeholders   stone-400 */
-  --color-text-disabled:     #d6d3d1;   /* disabled elements    stone-300 */
-  --color-text-inverse:      #fafaf9;   /* text on dark         stone-50  */
-  --color-text-link:         #4f46e5;   /* inline links         indigo-600 */
+  --color-text-primary:      #18161f;   /* headings, emphasis — violet-tinted near-black */
+  --color-text-secondary:    #433f4d;   /* body text */
+  --color-text-muted:        #736d7a;   /* captions, labels */
+  --color-text-placeholder:  #a29da8;   /* input placeholders */
+  --color-text-disabled:     #d3cec4;   /* disabled elements */
+  --color-text-inverse:      #f7f6f4;   /* text on dark */
+  --color-text-link:         #5641d6;   /* inline links */
 
-  /* ── Accent (indigo) ──────────────────────────── */
-  --color-accent-50:         #eef2ff;
-  --color-accent-100:        #e0e7ff;
-  --color-accent-200:        #c7d2fe;
-  --color-accent-500:        #6366f1;   /* primary buttons, active states */
-  --color-accent-600:        #4f46e5;   /* hover on primary               */
-  --color-accent-700:        #4338ca;   /* pressed / dark                 */
+  /* ── Accent — "Signal" blue-violet ─────────────── */
+  --color-accent-50:         #f1f0fe;
+  --color-accent-100:        #e3e1fc;
+  --color-accent-200:        #c7c3f9;
+  --color-accent-400:        #8b7ff2;   /* dark-surface accent text */
+  --color-accent-500:        #6d5ce8;   /* primary buttons, active states */
+  --color-accent-600:        #5641d6;   /* hover on primary               */
+  --color-accent-700:        #4531ad;   /* pressed / links on light       */
+  --color-accent-900:        #241a5c;   /* text-on-accent-tint, dark hero bg */
 
-  /* ── Status: Open / Active ────────────────────── */
-  --color-status-open-bg:    #eff6ff;   /* blue-50   */
-  --color-status-open-text:  #1d4ed8;   /* blue-700  */
-  --color-status-open-border:#bfdbfe;   /* blue-200  */
-
-  /* ── Status: Pending (needs attention) ────────── */
-  --color-status-pending-bg:    #fffbeb; /* amber-50  */
-  --color-status-pending-text:  #92400e; /* amber-800 */
-  --color-status-pending-border:#fde68a; /* amber-200 */
-
-  /* ── Status: Success / Approved ──────────────── */
-  --color-status-success-bg:    #f0fdf4; /* green-50  */
-  --color-status-success-text:  #166534; /* green-800 */
-  --color-status-success-border:#bbf7d0; /* green-200 */
-
-  /* ── Status: Neutral / Rejected / Cancelled ──── */
-  /* Rejection is a valid user action, not a failure. Stone — not red. */
-  --color-status-neutral-bg:    #f5f5f4; /* stone-100 */
-  --color-status-neutral-text:  #57534e; /* stone-600 */
-  --color-status-neutral-border:#e7e5e4; /* stone-200 */
-
-  /* ── Status: Error / Failed (technical failures) */
-  --color-status-error-bg:    #fff1f2;  /* rose-50   */
-  --color-status-error-text:  #9f1239;  /* rose-800  */
-  --color-status-error-border:#fecdd3;  /* rose-200  */
-
-  /* ── Status: Scheduled / Queued ──────────────── */
-  --color-status-queued-bg:    #f5f3ff; /* violet-50  */
-  --color-status-queued-text:  #5b21b6; /* violet-800 */
-  --color-status-queued-border:#ddd6fe; /* violet-200 */
+  /* ── Semantic feedback — 4 hues (collapsed from 7) ── */
+  --color-success-surface:   #f0faf3;
+  --color-success-border:    #c3e8cf;
+  --color-success-text:      #146c43;
+  --color-danger-surface:    #fdf1f2;
+  --color-danger-border:     #f5cdd2;
+  --color-danger-text:       #9f2a3a;
+  --color-warning-surface:   #fdf7ec;
+  --color-warning-border:    #f2debb;
+  --color-warning-text:      #8a5a10;
+  /* "info"/"in progress"/"queued" reuse the accent ramp directly —
+     no separate blue or violet hue competing with the accent anymore. */
+  --color-info-surface:      var(--color-accent-50);
+  --color-info-border:       var(--color-accent-200);
+  --color-info-text:         var(--color-accent-700);
 }
 ```
 
 ### Status Color Assignments
 
-| Status value | Color family | Rationale |
+Collapsed from 7 hues to 4 (2026-07-14): the separate "open" blue and "queued/executing" violet hues were redundant with each other and with the accent — reusing the accent for anything actionable/in-progress means fewer hues compete for attention, so the ones that remain carry more meaning.
+
+| Status value | Color | Rationale |
 |---|---|---|
-| `open` (Opportunity) | Blue | Active, needs processing |
+| `open` (Opportunity) | Accent (was blue) | Active, needs processing — actionable, reuses the accent |
 | `pending` (Recommendation) | Amber | Awaiting user decision |
 | `approved` | Green | Positive completion |
 | `rejected` | Stone/neutral | Valid user choice, not a failure |
@@ -242,13 +237,13 @@ Define semantic tokens in `@theme {}`. Implementation references tokens, never r
 | `draft` | Stone/neutral | In-progress, not alarming |
 | `completed` | Green | Successful completion |
 | `published` | Green | Successfully delivered |
-| `queued` | Violet | Waiting for system action |
-| `executing` | Violet | System is working |
+| `queued` | Accent (was violet) | Waiting for system action |
+| `executing` | Accent (was violet) | System is working |
 | `failed` | Rose | Technical failure requiring attention |
 | `error` | Rose | Technical error |
 | `initializing` | Amber | System is warming up |
 | `active` | Green | Healthy operational state |
-| `selected` | Blue | Chosen for processing |
+| `selected` | Accent (was blue) | Chosen for processing |
 | `dismissed` | Stone/neutral | Intentionally closed |
 | `expired` | Stone/neutral | Natural lifecycle end |
 
@@ -466,49 +461,59 @@ Cards are the primary container for all dashboard content.
 └─────────────────────────────────────────┘
 ```
 
+### Core rule (2026-07-14): shadow OR border, never both
+
+The pre-2026-07-14 spec put a border AND a shadow on every default card — with 5+ cards per screen, that's a doubled-edge treatment repeated everywhere, and a major source of "busy." The rule now:
+
+- **Default card/panel: shadow only, no border.** Soft elevation implies structure without a hard outline.
+- **Nested/inset content *inside* a card** (a rationale quadrant, a code/id block): **border only**, no shadow, `--color-surface-subtle` fill — borders are now a containment signal (something is *inside* something), never the default outer-card treatment.
+- **Structural dividers** (sidebar/content split, table header rule): a single `--color-border-strong` line, used sparingly at true seams only — not decoratively around every widget.
+- Only the 1-2 things per screen that should visually command attention (the pending recommendation prompt, an alert) get **both** a shadow and a colored left accent bar — this reserves the "extra decoration" budget for what should actually stand out, implementing the §1 "one primary action per screen" principle at the token level.
+
 ### Card variants
 
 **Default card**
 ```
 Background:  white (#ffffff)
-Border:      1px solid var(--color-border)          (#e7e5e4)
-Radius:      12px
-Shadow:      0 1px 2px rgb(0 0 0 / 0.05)
-Padding:     24px
+Border:      none
+Radius:      14px (--radius-md)
+Shadow:      var(--shadow-card) — 0 1px 2px rgb(24 22 31/0.04), 0 1px 1px rgb(24 22 31/0.03)
+Padding:     24px (--space-card)
 ```
 
-**Highlighted card** — the active pending recommendation
+**Highlighted card** — the active pending recommendation (the one exception that gets both treatments)
 ```
 Background:  white
-Border:      1px solid var(--color-accent-200)       (#c7d2fe)
-Left accent: 4px solid var(--color-accent-500)       (#6366f1)
-Radius:      0 12px 12px 0   (right side rounded, left flush to accent stripe)
-Shadow:      0 1px 3px rgb(99 102 241 / 0.10)        (subtle indigo tint)
+Left accent: 4px solid var(--color-accent-500)
+Radius:      0 14px 14px 0   (right side rounded, left flush to accent stripe)
+Shadow:      var(--shadow-accent) — 0 4px 16px -4px rgb(109 92 232/0.25)
 Padding:     24px
 ```
 
 **Subtle / secondary card**
 ```
-Background:  var(--color-surface-subtle)             (#f5f5f4)
+Background:  var(--color-surface-subtle)
 Border:      none
-Radius:      8px
+Radius:      8px (--radius-sm)
 Shadow:      none
 Padding:     20px
 ```
 
-**Ghost card** (nested inside another card)
+**Nested/inset content** (inside another card — the one place borders belong now)
 ```
-Background:  transparent
+Background:  var(--color-surface-subtle)
 Border:      1px solid var(--color-border)
-Radius:      8px
+Radius:      8px (--radius-sm)
 Shadow:      none
 Padding:     16px
 ```
 
 ### Card padding rules
 
-- Standard card: 24px all sides
-- Compact card (list contexts): 16px all sides
+Exactly two sanctioned values — reducing the number of *valid choices* is what stops padding drift (confirmed in the wild: `p-5`/`p-6` mixed across pages pre-2026-07-14), more than the scale itself:
+
+- Standard card: 24px all sides (`--space-card`)
+- Compact card (list/dense contexts): 16px all sides (`--space-card-compact`)
 - Card header with divider: 20px bottom, 24px sides
 - Card footer with actions: 16px top, 24px sides, 20px bottom
 
@@ -554,11 +559,11 @@ Never use a destructive (red) button for Reject. Rejection is a valid, learning-
 
 **Primary**
 ```
-Background:  var(--color-accent-500)     (#6366f1)
+Background:  var(--color-accent-500)     (#6d5ce8)
 Text:        white
 Border:      none
-Hover bg:    var(--color-accent-600)     (#4f46e5)
-Active bg:   var(--color-accent-700)     (#4338ca)
+Hover bg:    var(--color-accent-600)     (#5641d6)
+Active bg:   var(--color-accent-700)     (#4531ad)
 Disabled:    opacity-40, cursor not-allowed
 Focus ring:  2px var(--color-accent-500), 2px offset
 ```
@@ -566,10 +571,10 @@ Focus ring:  2px var(--color-accent-500), 2px offset
 **Secondary**
 ```
 Background:  white
-Text:        var(--color-accent-600)     (#4f46e5)
+Text:        var(--color-accent-600)     (#5641d6)
 Border:      1.5px solid var(--color-accent-500)
-Hover bg:    var(--color-accent-50)      (#eef2ff)
-Active bg:   var(--color-accent-100)     (#e0e7ff)
+Hover bg:    var(--color-accent-50)      (#f1f0fe)
+Active bg:   var(--color-accent-100)     (#e3e1fc)
 ```
 
 **Tertiary / Ghost**
@@ -620,15 +625,15 @@ Replace icon/label with an animated spinner. Width is fixed (no layout shift). D
 ```
 Height:          40px
 Background:      white
-Border:          1px solid var(--color-border-strong)   (#d6d3d1)
-Border radius:   6px
+Border:          1px solid var(--color-border-strong)   (#d3cec4)
+Border radius:   8px (--radius-sm)
 Padding:         0 12px
-Font size:       14px (text-body)
+Font size:       15px (text-body)
 Placeholder:     var(--color-text-placeholder)
 
 Focus:
   border-color:  var(--color-accent-500)
-  box-shadow:    0 0 0 3px rgb(99 102 241 / 0.15)
+  box-shadow:    0 0 0 3px rgb(109 92 232 / 0.15)
 
 Error:
   border-color:  #f43f5e    (rose-500)
@@ -649,7 +654,7 @@ Used for content editing on the Recommendation detail page. Generous min-height 
 ### Form label
 
 ```
-Font size:       12px (text-label)
+Font size:       12px (text-caption)
 Font weight:     500 (medium)
 Color:           var(--color-text-muted)
 Text transform:  uppercase
@@ -662,7 +667,7 @@ Labels are always positioned above the control. No inline or placeholder-as-labe
 ### Helper text
 
 ```
-Font size:       12px (text-body-sm)
+Font size:       12px (text-caption)
 Color:           var(--color-text-muted)
 Margin top:      6px
 ```
@@ -670,8 +675,8 @@ Margin top:      6px
 ### Error text
 
 ```
-Font size:       12px (text-body-sm)
-Color:           #be123c    (rose-700)
+Font size:       12px (text-caption)
+Color:           var(--color-danger-text)
 Margin top:      6px
 Icon:            ExclamationCircleIcon (16px), inline-leading
 ```
@@ -1264,7 +1269,7 @@ All text must meet WCAG 2.1 AA at minimum. Target AAA for body text.
 | Status badge text on badge background | 4.5:1 | — |
 | White text on accent-500 (primary button) | 4.5:1 | — |
 
-Check computed values: `indigo-500 (#6366f1)` on white = ~5.9:1. Passes AA. Stone-500 (#78716c) on white = ~4.6:1. Passes AA.
+Check computed values: `--color-accent-500 (#6d5ce8)` on white = ~5.4:1. Passes AA. `--color-text-muted (#736d7a)` on white = ~4.7:1. Passes AA.
 
 ### Keyboard navigation
 
@@ -1360,58 +1365,9 @@ All color definitions use semantic CSS custom properties. When dark mode is adde
 
 ## Appendix A: Tailwind v4 `@theme` Summary
 
-The full custom token block that extends the base Tailwind theme in `resources/css/app.css`:
+This appendix is illustrative only — **`backend/resources/css/app.css` is the single source of truth**; it also carries a deprecated block of the pre-2026-07-14 type-scale tokens (`--text-heading-1/-2/-3`, `--text-body-lg/-sm`, `--text-label`/`-sm`) kept alive only for `resources/js/Components/Marketing/*` (the landing page), which hasn't been migrated onto the new 6-step scale yet (Workstream B.7 in the UI-rethink plan). Do not copy this appendix into new code — read the CSS file directly.
 
-```css
-@import 'tailwindcss';
-
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
-
-@theme {
-  /* Typography */
-  --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
-
-  /* Colors — surfaces */
-  --color-surface:            #fafaf9;
-  --color-surface-elevated:   #ffffff;
-  --color-surface-subtle:     #f5f5f4;
-  --color-surface-overlay:    #292524;
-
-  /* Colors — borders */
-  --color-border:             #e7e5e4;
-  --color-border-strong:      #d6d3d1;
-  --color-border-focus:       #6366f1;
-
-  /* Colors — text */
-  --color-text-primary:       #1c1917;
-  --color-text-secondary:     #44403c;
-  --color-text-muted:         #78716c;
-  --color-text-placeholder:   #a8a29e;
-  --color-text-disabled:      #d6d3d1;
-  --color-text-inverse:       #fafaf9;
-  --color-text-link:          #4f46e5;
-
-  /* Colors — accent (indigo) */
-  --color-accent-50:          #eef2ff;
-  --color-accent-100:         #e0e7ff;
-  --color-accent-200:         #c7d2fe;
-  --color-accent-500:         #6366f1;
-  --color-accent-600:         #4f46e5;
-  --color-accent-700:         #4338ca;
-
-  /* Transitions */
-  --duration-fast:            100ms;
-  --duration-base:            150ms;
-  --duration-smooth:          200ms;
-  --duration-slow:            300ms;
-  --ease-standard:            cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-out:                 cubic-bezier(0, 0, 0.2, 1);
-}
-```
-
-Status colors use Tailwind's built-in `blue`, `amber`, `green`, `stone`, `rose`, `violet` families directly — no custom tokens needed since they map cleanly to existing Tailwind scales.
+Shape of the current token set (see `app.css` for exact values): typography (`--font-sans`/`--font-mono`, 6-step `--text-*` scale plus the deprecated aliases), surfaces/borders/text colors (violet-tinted neutrals), the `--color-accent-*` "Signal" ramp (50/100/200/400/500/600/700/900), semantic feedback colors (success/danger/warning/info — info reuses the accent ramp), gradients (`--gradient-accent`, `--gradient-hero`), transitions (unchanged from the original spec), spacing (`--space-card`, `--space-card-compact`, `--space-page`, `--space-section`), radius (`--radius-sm`/`-md`/`-lg`/`-full`), and the shadow scale (`--shadow-xs`/`-card`/`-raised`/`-modal`/`-accent`) that backs the "shadow OR border, never both" card rule in §8.
 
 ---
 

@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test'
 
 test.describe('onboarding smoke', () => {
-  test('walks the new business discovery wizard and reaches the Discovery placeholder', async ({ page }) => {
+  test('walks the new business discovery wizard through to a real recommendation', async ({ page }) => {
+    test.setTimeout(5 * 60 * 1000)
+
     const runId = Date.now().toString()
     const email = `atlas-e2e-${runId}@example.test`
     const companyName = `Atlas E2E ${runId}`
@@ -37,8 +39,8 @@ test.describe('onboarding smoke', () => {
     await page.getByText('Website', { exact: true }).click()
     await page.getByRole('button', { name: 'Continue' }).click()
 
-    // Step 5: Asset Details
-    await expect(page.getByRole('heading', { name: 'Tell us a bit more about each one' })).toBeVisible()
+    // Step 5: Asset Details (current flow is website-only)
+    await expect(page.getByRole('heading', { name: 'Tell us a bit more about your website' })).toBeVisible()
     await page.locator('#detail-website-url').fill('https://cbbauctions.com')
     await page.locator('#detail-website-platform').selectOption('custom')
     await page.getByRole('button', { name: 'Continue' }).click()
@@ -55,10 +57,15 @@ test.describe('onboarding smoke', () => {
     await expect(page.getByRole('heading', { name: 'Atlas is ready to learn about your business.' })).toBeVisible()
     await page.getByRole('button', { name: 'Start Discovery' }).click()
 
-    // Phase 1 only persists onboarding data and navigates to the existing
-    // placeholder/status screen — it does not dispatch real discovery, so
-    // this test stops here rather than waiting for a recommendation that
-    // Phase 1 never produces.
+    // Business Discovery now really runs: a real crawl of the declared
+    // website, real Fact extraction, real Opportunity/Decision/Campaign
+    // generation, ending in a real Recommendation — Status.vue polls and
+    // redirects there automatically once one exists.
     await page.waitForURL(/\/onboarding\/status/)
+    await page.waitForURL(/\/app\/recommendations\//, { timeout: 4 * 60 * 1000 })
+
+    await expect(page).toHaveURL(/\/app\/recommendations\//)
+    await expect(page.getByRole('heading', { name: /campaign/i })).toBeVisible()
+    await expect(page.getByText('Pending review')).toBeVisible()
   })
 })

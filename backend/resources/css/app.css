@@ -10,33 +10,35 @@
     --font-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas,
         'DejaVu Sans Mono', monospace;
 
-    /* ── Surfaces ─────────────────────────────────────────────── */
-    --color-surface: #fafaf9;
+    /* ── Surfaces (warm neutrals, tinted toward the accent hue) ── */
+    --color-surface: #f7f6f4;
     --color-surface-elevated: #ffffff;
-    --color-surface-subtle: #f5f5f4;
-    --color-surface-overlay: #292524;
+    --color-surface-subtle: #efeeea;
+    --color-surface-overlay: #1b1a2e;
 
     /* ── Borders ──────────────────────────────────────────────── */
-    --color-border: #e7e5e4;
-    --color-border-strong: #d6d3d1;
-    --color-border-focus: #6366f1;
+    --color-border: #e5e2dc;
+    --color-border-strong: #d3cec4;
+    --color-border-focus: #6d5ce8;
 
-    /* ── Text ─────────────────────────────────────────────────── */
-    --color-text-primary: #1c1917;
-    --color-text-secondary: #44403c;
-    --color-text-muted: #78716c;
-    --color-text-placeholder: #a8a29e;
-    --color-text-disabled: #d6d3d1;
-    --color-text-inverse: #fafaf9;
-    --color-text-link: #4f46e5;
+    /* ── Text (violet-tinted near-blacks) ─────────────────────── */
+    --color-text-primary: #18161f;
+    --color-text-secondary: #433f4d;
+    --color-text-muted: #736d7a;
+    --color-text-placeholder: #a29da8;
+    --color-text-disabled: #d3cec4;
+    --color-text-inverse: #f7f6f4;
+    --color-text-link: #5641d6;
 
-    /* ── Accent (indigo) ──────────────────────────────────────── */
-    --color-accent-50: #eef2ff;
-    --color-accent-100: #e0e7ff;
-    --color-accent-200: #c7d2fe;
-    --color-accent-500: #6366f1;
-    --color-accent-600: #4f46e5;
-    --color-accent-700: #4338ca;
+    /* ── Accent — "Signal" blue-violet (replaces stock indigo) ─── */
+    --color-accent-50: #f1f0fe;
+    --color-accent-100: #e3e1fc;
+    --color-accent-200: #c7c3f9;
+    --color-accent-400: #8b7ff2;
+    --color-accent-500: #6d5ce8;
+    --color-accent-600: #5641d6;
+    --color-accent-700: #4531ad;
+    --color-accent-900: #241a5c;
 
     /* ── Secondary accents (domain-concept color coding) ─────────── */
     --color-coral-500: #fb7185;
@@ -44,23 +46,29 @@
     --color-amber-500: #f59e0b;
     --color-teal-500: #14b8a6;
 
-    /* ── Gradients ────────────────────────────────────────────── */
+    /* ── Gradients — reserved for 2-3 "moment" locations only,
+       never on cards/buttons/badges in daily app use ─────────── */
     --gradient-accent: linear-gradient(135deg, var(--color-accent-500), var(--color-accent-700));
-    --gradient-hero: radial-gradient(120% 120% at 15% 0%, #eef2ff 0%, #fdf2f8 45%, #fff7ed 100%);
+    --gradient-hero: radial-gradient(
+        120% 120% at 15% -10%,
+        color-mix(in oklch, var(--color-accent-500) 22%, white) 0%,
+        var(--color-surface) 55%,
+        var(--color-surface) 100%
+    );
 
-    /* ── Semantic feedback ────────────────────────────────────── */
-    --color-success-surface: #f0fdf4;
-    --color-success-border: #bbf7d0;
-    --color-success-text: #166534;
-    --color-danger-surface: #fff1f2;
-    --color-danger-border: #fecdd3;
-    --color-danger-text: #9f1239;
-    --color-warning-surface: #fffbeb;
-    --color-warning-border: #fde68a;
-    --color-warning-text: #92400e;
-    --color-info-surface: #eff6ff;
-    --color-info-border: #bfdbfe;
-    --color-info-text: #1e40af;
+    /* ── Semantic feedback — 4 hues, "in progress" reuses accent ── */
+    --color-success-surface: #f0faf3;
+    --color-success-border: #c3e8cf;
+    --color-success-text: #146c43;
+    --color-danger-surface: #fdf1f2;
+    --color-danger-border: #f5cdd2;
+    --color-danger-text: #9f2a3a;
+    --color-warning-surface: #fdf7ec;
+    --color-warning-border: #f2debb;
+    --color-warning-text: #8a5a10;
+    --color-info-surface: var(--color-accent-50);
+    --color-info-border: var(--color-accent-200);
+    --color-info-text: var(--color-accent-700);
 
     /* ── Transitions ──────────────────────────────────────────── */
     --duration-fast: 100ms;
@@ -70,11 +78,38 @@
     --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
     --ease-out: cubic-bezier(0, 0, 0.2, 1);
 
-    /* ── Typography scale (docs/design/System.md §2) ─────────────── */
+    /* ── Typography scale (docs/design/System.md §2) — 6 steps ──── */
+    --text-hero: 2.75rem;
+    --text-hero--line-height: 1.1;
+    --text-hero--font-weight: 650;
+    --text-hero--letter-spacing: -0.02em;
+
     --text-display: 1.875rem;
     --text-display--line-height: 1.2;
     --text-display--font-weight: 600;
+    --text-display--letter-spacing: -0.01em;
 
+    --text-heading: 1.25rem;
+    --text-heading--line-height: 1.35;
+    --text-heading--font-weight: 600;
+    --text-heading--letter-spacing: -0.005em;
+
+    --text-subheading: 1rem;
+    --text-subheading--line-height: 1.5;
+    --text-subheading--font-weight: 600;
+
+    --text-body: 0.9375rem;
+    --text-body--line-height: 1.6;
+
+    --text-caption: 0.75rem;
+    --text-caption--line-height: 1.4;
+    --text-caption--font-weight: 500;
+    --text-caption--letter-spacing: 0.02em;
+
+    /* ── Deprecated type-scale aliases — still consumed by
+       resources/js/Components/Marketing/* (the landing page), not yet
+       migrated to the 6-step scale above. Remove once that migration
+       lands (Workstream B.7) and a grep confirms zero references. ── */
     --text-heading-1: 1.5rem;
     --text-heading-1--line-height: 1.333;
     --text-heading-1--font-weight: 600;
@@ -90,9 +125,6 @@
     --text-body-lg: 1rem;
     --text-body-lg--line-height: 1.625;
 
-    --text-body: 0.875rem;
-    --text-body--line-height: 1.571;
-
     --text-body-sm: 0.8125rem;
     --text-body-sm--line-height: 1.538;
 
@@ -103,6 +135,26 @@
     --text-label-sm: 0.6875rem;
     --text-label-sm--line-height: 1.454;
     --text-label-sm--font-weight: 500;
+
+    /* ── Spacing — card padding restricted to two sanctioned values ── */
+    --space-card: 1.5rem; /* 24px — standard card padding */
+    --space-card-compact: 1rem; /* 16px — dense/list card padding */
+    --space-page: 2.5rem; /* 40px — page horizontal padding */
+    --space-section: 2rem; /* 32px — gap between major page sections */
+
+    /* ── Radius — 4 sanctioned values ─────────────────────────── */
+    --radius-sm: 0.5rem; /* 8px — inputs, buttons, small chips */
+    --radius-md: 0.875rem; /* 14px — cards, panels */
+    --radius-lg: 1.25rem; /* 20px — modals, onboarding panels, hero containers */
+    --radius-full: 999px; /* avatars, pills, badges */
+
+    /* ── Shadows — elevation via shadow, borders reserved for nested
+       content; only the one highlighted card per screen gets --shadow-accent ── */
+    --shadow-xs: 0 1px 2px 0 rgb(24 22 31 / 0.03);
+    --shadow-card: 0 1px 2px 0 rgb(24 22 31 / 0.04), 0 1px 1px 0 rgb(24 22 31 / 0.03);
+    --shadow-raised: 0 4px 12px -2px rgb(24 22 31 / 0.08), 0 2px 4px -2px rgb(24 22 31 / 0.04);
+    --shadow-modal: 0 16px 40px -8px rgb(24 22 31 / 0.18), 0 4px 12px -4px rgb(24 22 31 / 0.08);
+    --shadow-accent: 0 4px 16px -4px rgb(109 92 232 / 0.25);
 }
 
 /* Skeleton pulse animation */

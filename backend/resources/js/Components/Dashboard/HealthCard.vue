@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3'
 import { computed } from 'vue'
+import Card from '@/Components/UI/Card.vue'
 
 interface Health {
   twin_status: string
@@ -42,11 +43,11 @@ const healthLabelColor = computed(() => {
 </script>
 
 <template>
-  <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5">
-    <div class="flex items-center justify-between mb-4">
+  <Card>
+    <template #header>
       <h2 class="text-sm font-semibold text-[var(--color-text-primary)]">Business Brain</h2>
       <Link href="/app/brain" class="text-xs text-[var(--color-text-link)] hover:underline">View all</Link>
-    </div>
+    </template>
 
     <div class="flex items-center justify-between mb-4">
       <span :class="['text-sm font-medium', statusColors[health.twin_status] ?? 'text-[var(--color-text-muted)]']">
@@ -72,5 +73,5 @@ const healthLabelColor = computed(() => {
         <dd class="text-lg font-semibold text-[var(--color-text-primary)] tabular-nums">{{ health.integration_count }}</dd>
       </div>
     </dl>
-  </div>
+  </Card>
 </template>

@@ -1,7 +1,16 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { router, Head } from '@inertiajs/vue3'
+import {
+  ExclamationTriangleIcon,
+  LightBulbIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+} from '@heroicons/vue/24/outline'
 import AuthLayout from '@/Layouts/AuthLayout.vue'
+import Button from '@/Components/UI/Button.vue'
 
 interface ConnectorStatus {
   type: string
@@ -48,6 +57,11 @@ const progress = ref<DiscoveryProgress>({
 
 const loading = ref(true)
 const retrying = ref(false)
+// Per-asset connector detail is implementation detail most people don't
+// need to read while waiting — collapsed by default during the normal
+// in-progress state. Not used in the completed_with_errors state, where
+// that same detail is always visible because it's actually actionable there.
+const detailsExpanded = ref(false)
 const startTime = Date.now()
 let intervalId: ReturnType<typeof setInterval> | null = null
 
@@ -93,6 +107,12 @@ const succeededConnectors = computed(() => progress.value.connectors.filter((c) 
 const recommendationHref = computed(() =>
   progress.value.first_recommendation_id ? `/app/recommendations/${progress.value.first_recommendation_id}` : '/app',
 )
+
+const checkingSummary = computed((): string => {
+  const count = progress.value.connectors.length
+  if (count === 0) return 'Atlas is checking your declared marketing assets.'
+  return `Atlas is checking ${count} declared asset${count === 1 ? '' : 's'}.`
+})
 
 function ensurePolling(): void {
   if (intervalId === null) {
@@ -166,30 +186,24 @@ onUnmounted(() => {
       <!-- Every attempted connector failed — an honest terminal state, not a dead end -->
       <div v-if="isCompletedWithErrors">
         <div class="mb-5 flex items-center justify-center">
-          <div class="size-12 rounded-full bg-red-50 flex items-center justify-center">
-            <svg class="size-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
+          <div class="size-12 rounded-full bg-rose-50 flex items-center justify-center">
+            <ExclamationTriangleIcon class="size-6 text-rose-500" aria-hidden="true" />
           </div>
         </div>
-        <h1 class="text-base font-semibold text-[var(--color-text-primary)] mb-2">Atlas couldn't discover anything yet</h1>
-        <p class="text-sm text-[var(--color-text-muted)] mb-6">None of your declared assets could be reached automatically. Double-check the details below, or connect an account for real from Settings.</p>
+        <h1 class="text-[length:var(--text-subheading)] font-semibold text-[var(--color-text-primary)] mb-2">Atlas couldn't discover anything yet</h1>
+        <p class="text-[length:var(--text-body)] text-[var(--color-text-muted)] mb-6">None of your declared assets could be reached automatically. Double-check the details below, or connect an account for real from Settings.</p>
         <div class="space-y-2 text-left max-w-sm mx-auto mb-6" aria-live="polite">
-          <div v-for="connector in progress.connectors" :key="connector.type" class="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)]">
+          <div v-for="connector in progress.connectors" :key="connector.type" class="flex items-center justify-between gap-3 px-3 py-2 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)]">
             <span class="text-sm text-[var(--color-text-primary)]">{{ connector.label }}</span>
             <span class="text-xs text-[var(--color-text-muted)]">{{ connectorIcon[connector.status] }} {{ connectorNote(connector) ?? connector.status }}</span>
           </div>
         </div>
         <div class="flex items-center justify-center gap-3">
-          <a href="/onboarding" class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-raised)] transition-colors duration-[var(--duration-fast)]">Review asset details</a>
-          <button
-            v-if="progress.retry_available"
-            type="button"
-            :disabled="retrying"
-            class="py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
-            @click="retryDiscovery"
-          >
+          <Button as="a" href="/onboarding" variant="secondary">Review asset details</Button>
+          <Button v-if="progress.retry_available" :loading="retrying" @click="retryDiscovery">
             {{ retrying ? 'Retrying…' : 'Try again' }}
-          </button>
-          <a href="/app" class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-raised)] transition-colors duration-[var(--duration-fast)]">Go to dashboard</a>
+          </Button>
+          <Button as="a" href="/app" variant="secondary">Go to dashboard</Button>
         </div>
       </div>
 
@@ -197,24 +211,18 @@ onUnmounted(() => {
       <div v-else-if="isNoOpportunities">
         <div class="mb-5 flex items-center justify-center">
           <div class="size-12 rounded-full bg-[var(--color-accent-50)] flex items-center justify-center">
-            <svg class="size-6 text-[var(--color-accent-600)]" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" /></svg>
+            <LightBulbIcon class="size-6 text-[var(--color-accent-600)]" aria-hidden="true" />
           </div>
         </div>
-        <h1 class="text-base font-semibold text-[var(--color-text-primary)] mb-2">Atlas learned your business — no campaign opportunity yet</h1>
-        <p class="text-sm text-[var(--color-text-muted)] mb-3">Atlas gathered {{ progress.facts_created }} fact{{ progress.facts_created === 1 ? '' : 's' }} about your business, but didn't find a strong enough opportunity from this scan.</p>
+        <h1 class="text-[length:var(--text-subheading)] font-semibold text-[var(--color-text-primary)] mb-2">Atlas learned your business — no campaign opportunity yet</h1>
+        <p class="text-[length:var(--text-body)] text-[var(--color-text-muted)] mb-3">Atlas gathered {{ progress.facts_created }} fact{{ progress.facts_created === 1 ? '' : 's' }} about your business, but didn't find a strong enough opportunity from this scan.</p>
         <p class="text-xs text-[var(--color-text-muted)] mb-6">Atlas keeps learning — a recommendation will appear on your dashboard as soon as it finds a strong opportunity.</p>
         <div class="flex items-center justify-center gap-3">
-          <a href="/app" class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] transition-colors duration-[var(--duration-fast)]">Go to dashboard</a>
-          <a href="/app/brain" class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-raised)] transition-colors duration-[var(--duration-fast)]">See what Atlas learned</a>
-          <button
-            v-if="progress.retry_available"
-            type="button"
-            :disabled="retrying"
-            class="py-2.5 px-6 text-sm font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-raised)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
-            @click="retryDiscovery"
-          >
+          <Button as="a" href="/app">Go to dashboard</Button>
+          <Button as="a" href="/app/brain" variant="secondary">See what Atlas learned</Button>
+          <Button v-if="progress.retry_available" variant="secondary" :loading="retrying" @click="retryDiscovery">
             {{ retrying ? 'Retrying…' : 'Try again' }}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -224,11 +232,11 @@ onUnmounted(() => {
       <div v-else-if="isCompleted">
         <div class="mb-5 flex items-center justify-center">
           <div class="size-12 rounded-full bg-[var(--color-accent-50)] flex items-center justify-center">
-            <svg class="size-6 text-[var(--color-accent-600)]" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+            <CheckCircleIcon class="size-6 text-[var(--color-accent-600)]" aria-hidden="true" />
           </div>
         </div>
-        <h1 class="text-base font-semibold text-[var(--color-text-primary)] mb-2">Atlas discovered your business</h1>
-        <p class="text-sm text-[var(--color-text-muted)] mb-4">Here's what Atlas found:</p>
+        <h1 class="text-[length:var(--text-subheading)] font-semibold text-[var(--color-text-primary)] mb-2">Atlas discovered your business</h1>
+        <p class="text-[length:var(--text-body)] text-[var(--color-text-muted)] mb-4">Here's what Atlas found:</p>
         <ul class="text-left max-w-sm mx-auto space-y-1.5 text-sm text-[var(--color-text-secondary)] mb-6" aria-live="polite">
           <li v-for="connector in succeededConnectors" :key="connector.type">✓ {{ connector.label }}</li>
           <li>✓ Business Brain updated</li>
@@ -237,27 +245,27 @@ onUnmounted(() => {
           <li>✓ {{ progress.opportunities_found }} opportunit{{ progress.opportunities_found === 1 ? 'y' : 'ies' }} found</li>
           <li>✓ {{ progress.recommendations_generated }} recommendation{{ progress.recommendations_generated === 1 ? '' : 's' }} generated</li>
         </ul>
-        <a :href="recommendationHref" class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] transition-colors duration-[var(--duration-fast)]">View my recommendation</a>
+        <Button as="a" :href="recommendationHref">View my recommendation</Button>
       </div>
 
       <!-- Timeout message (no error, but discovery is still running after 5 min) -->
       <div v-else-if="isTimedOut">
         <div class="mb-5 flex items-center justify-center">
           <div class="size-12 rounded-full bg-[var(--color-accent-50)] flex items-center justify-center">
-            <svg class="size-6 text-[var(--color-accent-600)]" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+            <ClockIcon class="size-6 text-[var(--color-accent-600)]" aria-hidden="true" />
           </div>
         </div>
-        <h1 class="text-base font-semibold text-[var(--color-text-primary)] mb-2">This is taking a moment</h1>
-        <p class="text-sm text-[var(--color-text-muted)] mb-6">Atlas is still discovering your business. You can leave this page — your first recommendation will be waiting on the dashboard when it's ready.</p>
-        <a href="/app" class="inline-block py-2.5 px-6 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] transition-colors duration-[var(--duration-fast)]">Go to dashboard</a>
+        <h1 class="text-[length:var(--text-subheading)] font-semibold text-[var(--color-text-primary)] mb-2">This is taking a moment</h1>
+        <p class="text-[length:var(--text-body)] text-[var(--color-text-muted)] mb-6">Atlas is still discovering your business. You can leave this page — your first recommendation will be waiting on the dashboard when it's ready.</p>
+        <Button as="a" href="/app">Go to dashboard</Button>
       </div>
 
       <!-- Normal in-progress state -->
       <template v-else>
-        <h1 class="text-base font-semibold text-[var(--color-text-primary)] mb-1">
+        <h1 class="text-[length:var(--text-subheading)] font-semibold text-[var(--color-text-primary)] mb-1">
           {{ loading ? 'Checking in with Atlas…' : 'Atlas is discovering your business' }}
         </h1>
-        <p class="text-sm text-[var(--color-text-muted)] mb-6">This usually takes a few minutes. You can leave and come back.</p>
+        <p class="text-[length:var(--text-body)] text-[var(--color-text-muted)] mb-6">{{ checkingSummary }} This usually takes a few minutes — you can leave and come back.</p>
 
         <!-- Four-stage progress -->
         <div class="flex items-center gap-1.5 mb-6" aria-live="polite">
@@ -277,12 +285,24 @@ onUnmounted(() => {
           </template>
         </div>
 
-        <!-- Per-asset connector detail underneath Discover -->
-        <div class="space-y-2 text-left max-w-sm mx-auto" aria-live="polite">
+        <!-- Per-asset connector detail — collapsed by default; this is
+             implementation detail, not something most people need to read
+             while waiting. -->
+        <button
+          type="button"
+          class="inline-flex items-center gap-1 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] mb-3"
+          @click="detailsExpanded = !detailsExpanded"
+        >
+          {{ detailsExpanded ? 'Hide details' : 'Show details' }}
+          <ChevronUpIcon v-if="detailsExpanded" class="size-3.5" aria-hidden="true" />
+          <ChevronDownIcon v-else class="size-3.5" aria-hidden="true" />
+        </button>
+
+        <div v-if="detailsExpanded" class="space-y-2 text-left max-w-sm mx-auto" aria-live="polite">
           <div
             v-for="connector in progress.connectors"
             :key="connector.type"
-            class="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)]"
+            class="flex items-center justify-between gap-3 px-3 py-2 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-subtle)]"
           >
             <span class="text-sm text-[var(--color-text-primary)]">{{ connectorIcon[connector.status] }} {{ connector.label }}</span>
             <span v-if="connectorNote(connector)" class="text-xs text-[var(--color-text-muted)]">{{ connectorNote(connector) }}</span>
