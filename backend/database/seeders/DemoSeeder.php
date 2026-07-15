@@ -107,7 +107,7 @@ class DemoSeeder extends Seeder
             [
                 'name' => 'Website Crawl',
                 'status' => 'active',
-                'config' => json_encode(['url' => 'https://cbbauctions.com']),
+                'config' => ['url' => 'https://cbbauctions.com'],
                 'next_run_at' => now()->addDays(7),
                 'last_successful_run_at' => now()->subHours(6),
             ]

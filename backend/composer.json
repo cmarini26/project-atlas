@@ -50,10 +50,10 @@
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan queue:work --queue=high,ai,default,observations,publishing,analytics,maintenance --tries=3\" \"php artisan schedule:work\" \"php artisan pail\" \"npm run dev\" --names=queue,scheduler,logs,vite --kill-others"
+            "npx concurrently -c \"#3b82f6,#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:work --queue=high,ai,default,observations,publishing,analytics,maintenance --tries=3\" \"php artisan schedule:work\" \"php artisan pail\" \"npm run dev\" --names=serve,queue,scheduler,logs,vite --kill-others"
         ],
         "test": [
-            "@php artisan config:clear --ansi @no_additional_args",
+            "@php artisan config:clear --ansi",
             "@php artisan test"
         ],
         "post-autoload-dump": [

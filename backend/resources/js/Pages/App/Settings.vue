@@ -15,6 +15,7 @@ interface Integration {
   type: string
   name: string | null
   status: string
+  last_error: string | null
   next_run_at: string | null
   last_run_at: string | null
 }
@@ -401,6 +402,9 @@ function retakeTour(): void {
               <Badge :variant="integrationStatusVariants[integration.status] ?? 'muted'">{{ integration.status }}</Badge>
             </div>
             <p class="text-xs text-[var(--color-text-muted)]">Last synced: {{ formatDate(integration.last_run_at) }}</p>
+            <p v-if="integration.status === 'error' && integration.last_error" class="text-xs text-rose-600 mt-1">
+              {{ integration.last_error }}
+            </p>
           </div>
           <button
             type="button"

@@ -34,6 +34,17 @@ class DiscoveryPlanner
             return null;
         }
 
+        // handle_or_url is nullable end-to-end (declaring a channel doesn't
+        // require it yet), but every auto-discoverable connector needs it to
+        // build a working Integration config. Without this guard, a blank
+        // value reaches WebsiteConnector::buildIntegrationConfig() as
+        // ['url' => null], which SsrfValidator then rejects on every retry
+        // forever. Treat "declared but no handle/url yet" the same as "not
+        // auto-discoverable yet" — the user fills it in later via Settings.
+        if (blank($channel->handle_or_url)) {
+            return null;
+        }
+
         return DiscoveryAssetPlan::create(
             $connector->connectorType(),
             $connector->buildIntegrationConfig($channel),

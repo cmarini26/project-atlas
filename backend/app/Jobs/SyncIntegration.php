@@ -6,6 +6,7 @@ use App\AI\Exceptions\AiProviderOverloadedException;
 use App\Events\IntegrationSyncCompleted;
 use App\Events\IntegrationSyncFailed;
 use App\Events\IntegrationSyncStarted;
+use App\Jobs\Exceptions\IntegrationSyncProducedNoResultsException;
 use App\Models\Integration;
 use App\Services\Observatory\Connectors\ConnectorRegistry;
 use App\Services\Observatory\ObservationService;
@@ -44,6 +45,10 @@ class SyncIntegration implements ShouldBeUnique, ShouldQueue
 
         $connector = $registry->resolve($integration);
         $results = $connector->sync($integration);
+
+        if ($results->isEmpty()) {
+            throw IntegrationSyncProducedNoResultsException::create();
+        }
 
         $recorded = $observations->recordAll($integration, $results);
 
