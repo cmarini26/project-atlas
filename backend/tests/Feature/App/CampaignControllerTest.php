@@ -6,12 +6,13 @@ use App\Models\Campaign;
 use App\Models\Channel;
 use App\Models\Company;
 use App\Models\CompanyMembership;
+use App\Models\ContentAsset;
 use App\Models\Decision;
 use App\Models\EmailAudience;
 use App\Models\EmailContact;
+use App\Models\EmailRecipientSnapshot;
 use App\Models\Execution;
 use App\Models\MarketingChannel;
-use App\Models\ContentAsset;
 use App\Models\Opportunity;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -242,6 +243,85 @@ class CampaignControllerTest extends TestCase
         $this->assertStringNotContainsString('a@example.com', $response->getContent() ?: '');
     }
 
+    public function test_recipient_outcomes_is_null_when_no_send_has_ever_been_queued(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $campaign = $this->createCampaign($company);
+
+        $this->actingAs($user)
+            ->get("/app/campaigns/{$campaign->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('email_audience_selector.recipient_outcomes', null)
+            );
+    }
+
+    public function test_recipient_outcomes_aggregates_snapshot_statuses_honestly(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $campaign = $this->createCampaign($company);
+        $execution = $this->makeEmailExecution($company, $campaign);
+
+        EmailRecipientSnapshot::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'campaign_id' => $campaign->id, 'execution_id' => $execution->id,
+            'email' => 'sent1@example.com', 'status' => 'sent', 'provider_message_id' => 'pm-1',
+        ]);
+        EmailRecipientSnapshot::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'campaign_id' => $campaign->id, 'execution_id' => $execution->id,
+            'email' => 'sent2@example.com', 'status' => 'sent', 'provider_message_id' => 'pm-2',
+        ]);
+        EmailRecipientSnapshot::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'campaign_id' => $campaign->id, 'execution_id' => $execution->id,
+            'email' => 'failed@example.com', 'status' => 'failed', 'skipped_reason' => 'Invalid address',
+        ]);
+        EmailRecipientSnapshot::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'campaign_id' => $campaign->id, 'execution_id' => $execution->id,
+            'email' => 'pending@example.com', 'status' => 'pending',
+        ]);
+
+        $response = $this->actingAs($user)
+            ->get("/app/campaigns/{$campaign->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('email_audience_selector.recipient_outcomes.pending', 1)
+                ->where('email_audience_selector.recipient_outcomes.accepted', 2)
+                ->where('email_audience_selector.recipient_outcomes.failed', 1)
+                ->where('email_audience_selector.recipient_outcomes.skipped', 0)
+                ->where('email_audience_selector.recipient_outcomes.total', 4)
+            );
+
+        // Aggregate counts only — no raw recipient address or failure
+        // reason text ever crosses into the page props.
+        $content = $response->getContent() ?: '';
+        $this->assertStringNotContainsString('sent1@example.com', $content);
+        $this->assertStringNotContainsString('sent2@example.com', $content);
+        $this->assertStringNotContainsString('failed@example.com', $content);
+        $this->assertStringNotContainsString('pending@example.com', $content);
+        $this->assertStringNotContainsString('Invalid address', $content);
+    }
+
+    public function test_recipient_outcomes_do_not_leak_another_companys_counts(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $campaign = $this->createCampaign($company);
+
+        $other = Company::withoutGlobalScopes()->create(['name' => 'Other', 'slug' => 'other-outcomes']);
+        $otherCampaign = $this->createCampaign($other);
+        $otherExecution = $this->makeEmailExecution($other, $otherCampaign);
+
+        EmailRecipientSnapshot::withoutGlobalScopes()->create([
+            'company_id' => $other->id, 'campaign_id' => $otherCampaign->id, 'execution_id' => $otherExecution->id,
+            'email' => 'other@example.com', 'status' => 'sent', 'provider_message_id' => 'pm-other',
+        ]);
+
+        $this->actingAs($user)
+            ->get("/app/campaigns/{$campaign->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('email_audience_selector.recipient_outcomes', null)
+            );
+    }
+
     /** @return array{User, Company} */
     private function userWithCompany(string $role = 'owner'): array
     {
@@ -283,6 +363,22 @@ class CampaignControllerTest extends TestCase
             'campaign_type' => 'social_post',
             'title' => 'Test Campaign',
             'status' => 'draft',
+        ]);
+    }
+
+    private function makeEmailExecution(Company $company, Campaign $campaign): Execution
+    {
+        $channel = Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'type' => 'email', 'name' => 'Email', 'is_active' => true,
+        ]);
+        $asset = ContentAsset::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'campaign_id' => $campaign->id, 'channel_id' => $channel->id,
+            'type' => 'email', 'body' => 'Body.', 'status' => 'scheduled',
+        ]);
+
+        return Execution::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'campaign_id' => $campaign->id, 'content_asset_id' => $asset->id,
+            'channel_id' => $channel->id, 'status' => 'completed', 'idempotency_key' => 'test-key-'.uniqid(),
         ]);
     }
 }

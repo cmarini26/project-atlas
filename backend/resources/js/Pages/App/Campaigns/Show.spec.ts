@@ -41,7 +41,7 @@ describe('Campaigns/Show — Email audience targeting', () => {
     const wrapper = mount(Show, {
       props: {
         ...baseProps,
-        email_audience_selector: { audiences: [], selected: null, linked_marketing_channel: null },
+        email_audience_selector: { audiences: [], selected: null, linked_marketing_channel: null, recipient_outcomes: null },
       },
     })
 
@@ -56,6 +56,7 @@ describe('Campaigns/Show — Email audience targeting', () => {
           audiences: [],
           selected: null,
           linked_marketing_channel: { supports_publishing: true },
+          recipient_outcomes: null,
         },
       },
     })
@@ -74,6 +75,7 @@ describe('Campaigns/Show — Email audience targeting', () => {
           ],
           selected: null,
           linked_marketing_channel: null,
+          recipient_outcomes: null,
         },
       },
     })
@@ -92,6 +94,7 @@ describe('Campaigns/Show — Email audience targeting', () => {
           audiences: [{ id: 'aud-1', name: 'Empty List', member_count: 0 }],
           selected: { id: 'aud-1', name: 'Empty List', member_count: 0 },
           linked_marketing_channel: null,
+          recipient_outcomes: null,
         },
       },
     })
@@ -107,6 +110,7 @@ describe('Campaigns/Show — Email audience targeting', () => {
           audiences: [{ id: 'aud-1', name: 'Newsletter', member_count: 42 }],
           selected: { id: 'aud-1', name: 'Newsletter', member_count: 42 },
           linked_marketing_channel: null,
+          recipient_outcomes: null,
         },
       },
     })
@@ -123,6 +127,7 @@ describe('Campaigns/Show — Email audience targeting', () => {
           audiences: [{ id: 'aud-1', name: 'Newsletter', member_count: 42 }],
           selected: null,
           linked_marketing_channel: null,
+          recipient_outcomes: null,
         },
       },
     })
@@ -133,5 +138,70 @@ describe('Campaigns/Show — Email audience targeting', () => {
     await audienceForm?.trigger('submit.prevent')
 
     expect(patchMock).toHaveBeenCalledWith('/app/campaigns/camp-1/email-audience', expect.anything())
+  })
+})
+
+describe('Campaigns/Show — recipient send outcomes', () => {
+  afterEach(() => {
+    patchMock.mockClear()
+  })
+
+  it('renders nothing when no send has ever been queued', () => {
+    const wrapper = mount(Show, {
+      props: {
+        ...baseProps,
+        email_audience_selector: {
+          audiences: [],
+          selected: null,
+          linked_marketing_channel: null,
+          recipient_outcomes: null,
+        },
+      },
+    })
+
+    expect(wrapper.text()).not.toContain('Send outcomes')
+  })
+
+  it('renders aggregate counts with honest, non-delivery-implying language', () => {
+    const wrapper = mount(Show, {
+      props: {
+        ...baseProps,
+        email_audience_selector: {
+          audiences: [],
+          selected: { id: 'aud-1', name: 'Newsletter', member_count: 4 },
+          linked_marketing_channel: { supports_publishing: true },
+          recipient_outcomes: { pending: 1, accepted: 2, failed: 1, skipped: 0, total: 4 },
+        },
+      },
+    })
+
+    expect(wrapper.text()).toContain('Send outcomes')
+    expect(wrapper.text()).toContain('Accepted by provider')
+    expect(wrapper.text()).toContain('Send failed')
+    expect(wrapper.text()).toContain('Pending')
+    expect(wrapper.text()).toContain('Skipped (duplicate)')
+    expect(wrapper.text()).toContain('4 recipients targeted in total')
+
+    // Must never claim delivery/open/click — only provider acceptance.
+    expect(wrapper.text()).not.toContain('Delivered')
+    expect(wrapper.text()).not.toContain('Opened')
+    expect(wrapper.text()).not.toContain('Clicked')
+  })
+
+  it('renders zero counts correctly rather than hiding the section', () => {
+    const wrapper = mount(Show, {
+      props: {
+        ...baseProps,
+        email_audience_selector: {
+          audiences: [],
+          selected: null,
+          linked_marketing_channel: null,
+          recipient_outcomes: { pending: 0, accepted: 0, failed: 4, skipped: 0, total: 4 },
+        },
+      },
+    })
+
+    expect(wrapper.text()).toContain('Send outcomes')
+    expect(wrapper.text()).toContain('4 recipients targeted in total')
   })
 })

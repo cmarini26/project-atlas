@@ -7,6 +7,7 @@ use App\Models\Campaign;
 use App\Models\Company;
 use App\Models\ContentAsset;
 use App\Models\EmailAudience;
+use App\Models\EmailRecipientSnapshot;
 use App\Models\Execution;
 use App\Models\MarketingChannel;
 use Illuminate\Http\RedirectResponse;
@@ -99,6 +100,29 @@ class CampaignController extends Controller
             ? EmailAudience::withCount('members')->find($campaign->email_audience_id)
             : null;
 
+        // Aggregate counts only — never the recipient rows themselves.
+        // EmailRecipientSnapshot.email is real PII (a real contact's
+        // address); this page has no privileged per-recipient detail view
+        // designed to hold it, so only "how many" is exposed here, never
+        // "who." `null` means no audience-targeted send has ever been
+        // queued for this campaign (distinct from all-zero, which can't
+        // actually happen — see EmailAudienceService::
+        // snapshotRecipientsForExecution(), which never persists zero rows
+        // without EmailPublisher having already rejected the empty case).
+        $recipientOutcomeCounts = EmailRecipientSnapshot::withoutGlobalScopes()
+            ->where('campaign_id', $campaign->id)
+            ->selectRaw('status, count(*) as count')
+            ->groupBy('status')
+            ->pluck('count', 'status');
+
+        $recipientOutcomes = $recipientOutcomeCounts->isEmpty() ? null : [
+            'pending' => (int) ($recipientOutcomeCounts['pending'] ?? 0),
+            'accepted' => (int) ($recipientOutcomeCounts['sent'] ?? 0),
+            'failed' => (int) ($recipientOutcomeCounts['failed'] ?? 0),
+            'skipped' => (int) ($recipientOutcomeCounts['skipped'] ?? 0),
+            'total' => (int) $recipientOutcomeCounts->sum(),
+        ];
+
         return Inertia::render('App/Campaigns/Show', [
             'campaign' => [
                 'id' => $campaign->id,
@@ -171,6 +195,7 @@ class CampaignController extends Controller
                 'linked_marketing_channel' => $emailMarketingChannel ? [
                     'supports_publishing' => (bool) $emailMarketingChannel->supports_publishing,
                 ] : null,
+                'recipient_outcomes' => $recipientOutcomes,
             ],
         ]);
     }

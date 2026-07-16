@@ -6,6 +6,35 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Feature] Surface email audience execution results honestly in the campaign UI — 2026-07-16
+
+Production-readiness gap plan, Phase 1A. The previous slice wired a real multi-recipient send and recorded per-recipient outcomes in `email_recipient_snapshots`, but explicitly flagged that no UI read any of it — an operator approving/sending a campaign had no way to tell how many recipients actually went out versus failed versus were skipped. This slice closes that gap with aggregate counts only; it does not add any new sending, retry, or import capability.
+
+### What's shown, and why not more
+
+- `CampaignController::show()` now aggregates `email_recipient_snapshots` for the campaign with a single grouped count query (`selectRaw('status, count(*) as count')->groupBy('status')`) and adds `recipient_outcomes` to the existing `email_audience_selector` prop — extending the established shared prop rather than adding new top-level surface area.
+- The raw `sent` status is relabeled `accepted` at the prop-shaping boundary, not just in a frontend label map, so the data itself can't be misread as "delivered." `Campaigns/Show.vue` renders it as "Accepted by provider," alongside "Send failed," "Pending," and "Skipped (duplicate)," with an explicit caption that provider acceptance does not confirm delivery, opens, or clicks — this page has no per-recipient delivery/open/click signal today (that lives separately in `CampaignKpiService`, pulled campaign-wide from the provider, not per recipient).
+- `recipient_outcomes` is `null` when no audience-targeted send has ever been queued for the campaign (distinct from all-zero counts, which can't actually occur — `EmailAudienceService::snapshotRecipientsForExecution()` never persists snapshot rows without `EmailPublisher` having already rejected an empty audience) — the UI hides the whole "Send outcomes" block in that case rather than showing a misleading zeroed table.
+- Only aggregate integer counts are exposed. No recipient email address, `skipped_reason` text, or other row-level data crosses into the page props — there is no privileged per-recipient detail view designed to hold that PII yet, so none was added in this slice.
+
+### Files changed
+
+- `app/Http/Controllers/App/CampaignController.php` — new `recipient_outcomes` aggregation and prop key.
+- `resources/js/Pages/App/Campaigns/Show.vue` — new "Send outcomes" block, `EmailRecipientOutcomes` type, and `recipientOutcomeLabels`.
+- `tests/Feature/App/CampaignControllerTest.php` — new tests + `makeEmailExecution()` helper.
+- `resources/js/Pages/App/Campaigns/Show.spec.ts` — new tests; existing fixtures updated with `recipient_outcomes`.
+
+### Tests added
+
+- `CampaignControllerTest` (+3): `recipient_outcomes` is `null` with no send ever queued; aggregates snapshot statuses honestly (2 accepted, 1 failed, 1 pending) with no raw email address or `skipped_reason` text ever appearing in the response body; another company's snapshot rows never affect this company's campaign page.
+- `Campaigns/Show.spec.ts` (+3): renders nothing when `recipient_outcomes` is `null`; renders all four labels plus the honest caption and explicitly asserts `Delivered`/`Opened`/`Clicked` never appear; renders the section even when some counts are zero.
+
+## Remaining risks and intentionally deferred work
+
+- **`Publishing.vue` still carries stale, now-inaccurate "simulated" language** (`"Atlas doesn't publish to live external channels yet — every entry below is a simulated, internally logged send"`), unrelated to and out of scope for this slice — Email/WordPress/Meta are all real sends when connected. This is a broader, multi-channel product-truth cleanup, not something folded into this task.
+- **No per-recipient detail/drill-down view.** Only aggregate counts are shown; there's no way for an operator to see which specific recipient failed or why, since no privileged view exists to hold that PII yet.
+- **No suppression handling, CSV import, or batch-send API work** — all explicitly out of scope per this task's own rules, unchanged from prior slices.
+
 ## [Fix] Postmark analytics normalization omitted the canonical cross-channel keys — 2026-07-16
 
 `CampaignKpiService::aggregate()` reads `normalised_reach`/`normalised_engagement`/`normalised_clicks` from every provider's `normalize()` output to sum reach/engagement/clicks across every channel a campaign used. `PostmarkAnalyticsProvider::normalize()` emitted `normalised_clicks` but never `normalised_reach`/`normalised_engagement` — a real Postmark send produced a real `ExecutionMetric` row, but `CampaignKpiService` silently computed zero reach and zero engagement for it, since `$m['normalised_reach'] ?? 0` falls back to zero for any metrics array missing the key. A campaign mixing email and Meta channels would under-report its true combined reach/engagement with no visible error.
@@ -58,7 +87,6 @@ Production-readiness gap plan, Phase 1A. The previous slice built the contact/au
 - **No per-recipient retry** — a recipient marked `failed` stays `failed`; there is no "retry just the failed ones" action yet (only "retry the whole Execution," which — by design — only ever affects still-`Pending` rows going forward, since already-`Sent`/`Failed` rows are left alone).
 - **No UI surfacing of `recipients_sent`/`recipients_failed` yet** — the data is real and queryable (`Execution.result.metadata`, `email_recipient_snapshots`), but `Campaigns/Show.vue`/`Publishing.vue` don't render it yet. Flagged, not silently left inconsistent with a claim — no UI currently claims per-recipient delivery visibility that would need correcting.
 
-
 ## [Feature] Email contacts, audiences, and campaign targeting — the minimal recipient model — 2026-07-16
 
 Production-readiness gap plan, Phase 1A ("Email Production Completion"). Postmark connection/verification/test-send/capability-truth were already complete, but `EmailPayload` supported exactly one recipient and no company-scoped model existed for contacts, lists, or membership — a connected Postmark account had nothing safe to send a real campaign to beyond a single hardcoded address.
@@ -93,7 +121,6 @@ Production-readiness gap plan, Phase 1A ("Email Production Completion"). Postmar
 - **Internationalized email addresses are accepted but not IDN/punycode-normalized** — documented as a known limitation in `EmailContact`'s docblock, not silently assumed correct; Postmark's own non-ASCII domain handling is unverified.
 - **Retention**: `email_recipient_snapshots` rows are immutable and cascade-delete only if their parent `Execution`/`Campaign`/`Company` is deleted — there is no independent retention/expiry policy for them yet, and they contain the same contact PII (email/name) the `email_contacts` table does. This should be included in whatever data-export/deletion story a future legal/compliance pass produces (same note the WordPress/Postmark connect-flow CHANGELOG entries already flagged for `email_recipients`/`email_suppressions`).
 
-
 ## [Feature] Company-facing Postmark connection, verification, test send, and disconnect — 2026-07-15
 
 Production-readiness gap plan, Phase 1A ("Email Production Completion"). `PostmarkEmailProvider`, `PostmarkAnalyticsProvider`, and `PostmarkWebhookHandler` were already real, but no company could ever reach them — no Settings UI, no controller action, no way for `ChannelCredentials.provider_type` to ever become `'postmark'` outside of `DemoSeeder`. This closes that gap using the exact same patterns already shipped for WordPress (`connectWordPress()`) and Meta (`MetaOAuthController`) — no new credential model, no new capability resolver, no rebuilt providers.
@@ -122,7 +149,6 @@ Production-readiness gap plan, Phase 1A ("Email Production Completion"). `Postma
 - Deliberately did not implement (per this slice's scope): recipient lists/bulk audience sending, suppression-list enforcement, scheduling, additional providers, OAuth, or an analytics UI redesign — see `docs/architecture/EmailArchitecture.md` for that follow-on work.
 - Deliberately did not extend `PingResult` to carry Postmark's server display name as "safe identifying metadata" — the connect flow already reports enough (status + `last_used_at`) without touching a value object shared by every other provider's `ping()` for a non-essential nicety.
 
-
 ## [Fix] Publishing.vue, Dashboard.vue, and Campaigns/Show.vue can now show "Connected" for a real channel — 2026-07-15
 
 Production-readiness gap plan, Phase 0 (channel capability truth), closing the follow-up flagged in the previous entry below. `resolveChannelCapability()` and `MarketingChannel.supports_publishing` were already correctly wired (Meta OAuth connect/revoke, `CheckChannelHealth`), but three pages rendered `<ChannelCapabilityBadge :channel-type="..." />` with no `linked-marketing-channel` prop at all, so they always fell back to the global default and could never show "Connected" for a company that had genuinely connected a real channel.
@@ -139,7 +165,6 @@ No new capability resolver, no change to `resolveChannelCapability()`'s logic, n
 
 - New tests: `PublishingControllerTest::test_execution_channel_includes_the_linked_marketing_channels_publishing_status`, `DashboardControllerTest::test_recent_execution_channel_includes_the_linked_marketing_channels_publishing_status`, `CampaignControllerTest::test_show_includes_the_linked_marketing_channels_publishing_status_on_content_assets_and_executions`.
 - `blog` (WordPress) still cannot show "Connected" through this mechanism on any page — it has no `MarketingChannelType` equivalent, so there's no declared/linked `MarketingChannel` to attach in the first place. Unchanged by this slice; see the audit doc's 2026-07-15 addendum.
-
 
 ## [Fix] Channel capability badges no longer claim Meta is unbuilt, and now reflect real connection state — 2026-07-15
 
@@ -158,7 +183,6 @@ Production-readiness gap plan, Phase 0 (channel capability truth). `resources/js
 - New tests: `MetaOAuthControllerTest::test_callback_marks_a_declared_facebook_channel_as_publishing_verified`, `test_callback_does_not_fail_when_no_declared_channel_exists_to_link`, `test_revoke_marks_declared_meta_channels_as_no_longer_publishing_verified`; `CheckChannelHealthTest::test_marks_the_linked_declared_channel_as_no_longer_publishing_verified_on_failure`, `test_marks_the_linked_declared_channel_as_publishing_verified_again_on_recovery`, `test_does_not_touch_a_declared_channel_that_was_never_linked`; new `resources/js/lib/channelCapability.spec.ts`.
 - Does not thread real per-company connection data through `Publishing.vue`, `Dashboard.vue`, or `Campaigns/Show.vue` — those three pages render `ChannelCapabilityBadge` without a `linked-marketing-channel` prop at all, so they still can't show "Connected" for a live channel. Only the Recommendation approval screen (`ChannelMixCard.vue`/`ApproveActions.vue`) consumes the per-company signal today. Flagged as a follow-up, not fixed here — the audit doc's addendum has the full explanation.
 - Does not give WordPress a `MarketingChannelType` equivalent, so `blog` still can't participate in the same override mechanism. `Settings.vue`'s own `wordpress_channel.status` remains the accurate per-company source of truth for a specific company's WordPress connection today.
-
 
 ## [Fix] WordPress connect no longer reports "connected" without verifying credentials — 2026-07-15
 

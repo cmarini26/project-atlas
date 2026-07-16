@@ -18,10 +18,19 @@ interface EmailAudienceOption {
   member_count: number
 }
 
+interface EmailRecipientOutcomes {
+  pending: number
+  accepted: number
+  failed: number
+  skipped: number
+  total: number
+}
+
 interface EmailAudienceSelector {
   audiences: EmailAudienceOption[]
   selected: EmailAudienceOption | null
   linked_marketing_channel: { supports_publishing: boolean } | null
+  recipient_outcomes: EmailRecipientOutcomes | null
 }
 
 interface ShowProps {
@@ -78,6 +87,19 @@ const executionStatusLabels: Record<string, string> = {
   published: 'Published',
   failed: 'Failed',
   cancelled: 'Cancelled',
+}
+
+// Deliberately not "Delivered"/"Sent successfully" — `accepted` only means
+// Postmark's API accepted the message for that one recipient, which is all
+// EmailRecipientSnapshot actually tracks today. There is no delivery/open/
+// click signal per recipient here (that's ExecutionMetric/CampaignKpiService,
+// a separate, campaign-wide, provider-side pull — not this per-recipient
+// send-time record).
+const recipientOutcomeLabels: Record<keyof Omit<EmailRecipientOutcomes, 'total'>, string> = {
+  pending: 'Pending',
+  accepted: 'Accepted by provider',
+  failed: 'Send failed',
+  skipped: 'Skipped (duplicate)',
 }
 
 function formatDate(date: string | null): string {
@@ -152,6 +174,23 @@ function formatDate(date: string | null): string {
         <span v-if="email_audience_selector.selected.member_count === 0" class="text-amber-600">— this audience is empty, nothing would be sent</span>
       </p>
       <p v-else class="text-xs text-[var(--color-text-muted)]">No audience selected yet.</p>
+
+      <!-- Recipient outcomes — aggregate counts only, never individual
+           addresses. See the recipientOutcomeLabels comment above for why
+           "accepted" is the honest word, not "delivered"/"sent". -->
+      <div v-if="email_audience_selector.recipient_outcomes" class="mt-4 pt-4 border-t border-[var(--color-border)]">
+        <h3 class="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide mb-2">Send outcomes</h3>
+        <dl class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div v-for="(key) in (['pending', 'accepted', 'failed', 'skipped'] as const)" :key="key">
+            <dt class="text-xs text-[var(--color-text-muted)] mb-0.5">{{ recipientOutcomeLabels[key] }}</dt>
+            <dd class="text-lg font-semibold text-[var(--color-text-primary)] tabular-nums">{{ email_audience_selector.recipient_outcomes[key] }}</dd>
+          </div>
+        </dl>
+        <p class="text-xs text-[var(--color-text-muted)] mt-2">
+          {{ email_audience_selector.recipient_outcomes.total }} recipient{{ email_audience_selector.recipient_outcomes.total === 1 ? '' : 's' }} targeted in total.
+          "Accepted by provider" means Postmark accepted the send — it does not confirm delivery, opens, or clicks.
+        </p>
+      </div>
     </div>
 
     <!-- Content assets -->
