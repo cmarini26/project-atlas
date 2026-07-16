@@ -34,6 +34,19 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
+**Production-Readiness Gap Plan — Production Readiness Checklist + WordPress/UI hardening ✅ Complete**
+*Completed: 2026-07-16* — see [Production-Readiness-Checklist.md](ops/Production-Readiness-Checklist.md)
+
+Backfills two more code-side slices shipped since the Phase 0/1 entry below without a STATUS.md entry, plus today's operational-readiness doc work:
+
+- **Task N3 — WordPress connect hardening.** `WordPressPublisher::ping()` didn't catch `ConnectException` (a distinct Guzzle exception from `RequestException` for DNS failure/connection-refused/timeout), so an unreachable host 500'd instead of failing validation cleanly; a 2xx response was accepted as proof of a real WordPress connection with no check that the body actually looked like a WordPress REST user object. Both fixed; `site_url` also restricted to `http`/`https` schemes.
+- **Task N5 — Recommendation/publishing UI capability clarity.** `channelCapability.ts`'s `not_configured`/`coming_later` labels had it backwards relative to what a customer can act on — renamed to "Manual action required" (a real connect flow exists, this company hasn't used it) and "Not configured" (no connect flow exists for anyone) respectively. `ApproveActions.vue`'s per-asset approval line now branches all four capability states distinctly instead of collapsing three into one generic sentence.
+- **Task N4 — `docs/ops/Production-Readiness-Checklist.md`** (new, today). The single, concise go/no-go checklist with Owner/Status columns across all 13 required areas (deployment, env/secrets, domain/SSL/proxy, queue workers, scheduler, database, backups/restore, monitoring/error tracking, transactional email, log retention, legal pages, support/runbook, post-deploy verification) — deliberately not a restatement of [Private-Beta-Execution.md](plans/Private-Beta-Execution.md)'s longer procedures, which remains the canonical Go/No-Go gate and detailed verification steps. Confirmed against current code rather than assumed: e.g. the real queue list is `high`/`ai`/`default`/`observations`/`maintenance` (verified directly against every `onQueue()` call site in `app/Jobs/*.php`), no privacy policy or terms-of-service page exists anywhere in the codebase today, and no dedicated operational runbook document exists yet — all called out explicitly as open gaps rather than assumed done.
+
+No PHP files changed for the doc-authoring portion. 1340 PHP tests (1337 passing, 3 pre-existing skips) + 187 Vitest tests remain green from the two backfilled slices' own sessions.
+
+**Previous milestone:**
+
 **Production-Readiness Gap Plan, Phase 0/1 — Channel truth alignment + real Email channel ✅ Complete**
 *Completed: 2026-07-16* — see [Channel-Capability-Matrix.md](product/Channel-Capability-Matrix.md), [Channel-Publishing-Reality-Audit.md](reviews/Channel-Publishing-Reality-Audit.md)
 

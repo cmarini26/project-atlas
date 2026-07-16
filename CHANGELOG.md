@@ -6,6 +6,18 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Docs] Production Readiness Checklist — 2026-07-16
+
+Production-readiness gap plan, Task N4. New `docs/ops/Production-Readiness-Checklist.md`: a concise, executable go/no-go checklist with Owner/Status columns across all 13 required areas (deployment, production env/secrets, domain/SSL/proxy, queue workers, scheduler, database, backups/restore, monitoring/error tracking, transactional email, log retention, legal pages, support/runbook, post-deploy verification). Deliberately does not restate [Private-Beta-Execution.md](docs/plans/Private-Beta-Execution.md)'s longer procedures or [Production-Topology.md](docs/deployment/Production-Topology.md)'s architecture explanation — both remain canonical for depth; this document links out to them and exists so nothing gets missed in the noise of the longer documents.
+
+Grounded in current code, not assumed: verified the real queue list directly against every `onQueue()` call site in `app/Jobs/*.php` (`high`/`ai`/`default`/`observations`/`maintenance` — confirming `Production-Topology.md`'s five-queue documentation is accurate, and that `composer.json`'s dev script listening on two extra, unused queue names is harmless, not a hidden sixth/seventh queue); confirmed no privacy policy or terms-of-service page exists anywhere in the codebase; confirmed no dedicated operational runbook document exists yet. All three called out as explicit open gaps in the checklist rather than assumed done.
+
+`docs/STATUS.md` updated with a new Current Milestone entry linking to the new checklist, also backfilling two code-side slices (Task N3 WordPress connect hardening, Task N5 recommendation/publishing UI capability clarity) that had CHANGELOG entries but no STATUS.md entry from their own sessions.
+
+No application code changed.
+
+---
+
 ## [Fix] Recommendation/publishing UI now distinguishes manual action required from not configured — 2026-07-16
 
 Production-readiness gap plan, Task N5. Audited Recommendation detail (`ChannelMixCard.vue`/`ApproveActions.vue`), the approval confirmation dialog, `Publishing.vue`, `Dashboard.vue`, and `Campaigns/Show.vue`'s publishing section against the task's four required, distinguishable states: automatic live delivery, simulated/internal processing, manual action required, and not configured. Found the underlying capability data was already correct everywhere (all five surfaces already thread real per-company `linked-marketing-channel` data), but the badge labels for two of the four states had it backwards, and the approval dialog's per-asset outcome line collapsed three distinct non-connected states into one generic sentence.
