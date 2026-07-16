@@ -6,6 +6,14 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Docs] Customer 1 Launch Ownership & Access checklist — 2026-07-16
+
+New `docs/ops/Customer-1-Launch-Ownership.md`: a concise ownership/access roster, distinct from the procedural [Customer-1-Launch-Runbook.md](docs/ops/Customer-1-Launch-Runbook.md) it complements rather than duplicates. Every external account/service from the runbook's Phase 0 (plus a few launch-relevant additions — GitHub, the support channel, the secrets manager/`.env` itself) gets a row with Named Owner, Backup Owner, Access Location, Billing Owner, and Verification Status placeholders. Includes an explicit warning never to paste real secret values into any doc (this one or otherwise), a launch-day contact list, and a final sign-off table distinct from the runbook's technical Go/No-Go gate — this one confirms every account has a real, accountable human attached, not that the infrastructure itself works.
+
+No application code changed.
+
+---
+
 ## [Docs] Customer 1 Launch Runbook — 2026-07-16
 
 New `docs/ops/Customer-1-Launch-Runbook.md`: the concrete, ordered, operator-executed sequence from server provisioning through the CBB Auctions invite — 10 phases (external accounts → server/DNS/SSL → environment config → deploy → queue workers → scheduler → backups/restore drill → monitoring/error tracking → transactional email → legal pages/runbook → post-deploy verification), each with an explicit verification checklist, plus a final Go/No-Go gate and first-week incident/rollback notes. Sequences (not restates) the existing companion docs — Production-Readiness-Checklist.md, Private-Beta-Execution.md, Production-Topology.md, Backup-and-Recovery.md.
