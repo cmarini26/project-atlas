@@ -6,6 +6,22 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Fix] `.env.example` didn't document `SESSION_SECURE_COOKIE` — 2026-07-16
+
+Found while auditing the runbook's in-repo artifacts (`infrastructure/supervisor/atlas-worker.conf`, `infrastructure/cron/atlas-scheduler`, the three `infrastructure/backup/*.sh` scripts, `.env.example`, deployment docs, the error-tracking abstraction) against [Customer-1-Launch-Runbook.md](docs/ops/Customer-1-Launch-Runbook.md)'s expectations. `config/session.php:172` reads `env('SESSION_SECURE_COOKIE')` with no default, but the variable was never mentioned in `.env.example` at all — a real production deploy had no in-repo signal that this needed setting, only the runbook's own Phase 2 template (itself downstream of the same gap `Production-Deployment-Audit.md` already flagged).
+
+### Fixed
+
+- `.env.example` now documents `SESSION_SECURE_COOKIE=` (left blank for local, with a comment explaining why forcing it locally would break plain-HTTP dev, and pointing at the runbook's Phase 2 for the real production value).
+
+### Tests added
+
+- New `EnvExampleTest` (2): `SESSION_SECURE_COOKIE=` is documented; `TRUSTED_PROXIES`/`ERROR_TRACKING_DRIVER`/`ERROR_TRACKING_DSN`/`POSTMARK_API_KEY`/`POSTMARK_MESSAGE_STREAM_ID` remain documented — guards against any of these silently disappearing from the canonical env-var list again.
+
+No other in-repo artifact audited needed a code-level fix — see the audit report for the full ready/needs-edit/missing breakdown.
+
+---
+
 ## [Docs] Customer 1 Launch Ownership & Access checklist — 2026-07-16
 
 New `docs/ops/Customer-1-Launch-Ownership.md`: a concise ownership/access roster, distinct from the procedural [Customer-1-Launch-Runbook.md](docs/ops/Customer-1-Launch-Runbook.md) it complements rather than duplicates. Every external account/service from the runbook's Phase 0 (plus a few launch-relevant additions — GitHub, the support channel, the secrets manager/`.env` itself) gets a row with Named Owner, Backup Owner, Access Location, Billing Owner, and Verification Status placeholders. Includes an explicit warning never to paste real secret values into any doc (this one or otherwise), a launch-day contact list, and a final sign-off table distinct from the runbook's technical Go/No-Go gate — this one confirms every account has a real, accountable human attached, not that the infrastructure itself works.
