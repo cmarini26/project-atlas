@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\App;
 
-use App\Domain\Publishing\ValueObjects\EmailPayload;
 use App\Http\Controllers\Controller;
 use App\Jobs\SyncIntegration;
 use App\Models\Channel;
@@ -14,13 +13,10 @@ use App\Models\Integration;
 use App\Models\MarketingChannel;
 use App\Services\MarketingPresence\MarketingPresenceService;
 use App\Services\Observatory\IntegrationService;
-use App\Services\Publishing\ChannelCredentialsRepository;
-use App\Services\Publishing\Email\EmailProviderRegistry;
-use App\Services\Publishing\Exceptions\PublishingException;
+use App\Services\Publishing\Email\EmailChannelService;
 use App\Services\Publishing\WordPressPublisher;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 use Throwable;
@@ -31,8 +27,7 @@ class SettingsController extends Controller
         private readonly IntegrationService $integrationService,
         private readonly MarketingPresenceService $marketingPresence,
         private readonly WordPressPublisher $wordPressPublisher,
-        private readonly EmailProviderRegistry $emailProviders,
-        private readonly ChannelCredentialsRepository $credentialsRepository,
+        private readonly EmailChannelService $emailChannelService,
     ) {}
 
     public function index(Request $request): Response
@@ -300,10 +295,10 @@ class SettingsController extends Controller
 
     /**
      * Connect (or reconnect/rotate) the company's Postmark server for real
-     * email sending. Postmark's Server API Token is the only credential its
-     * API requires — PostmarkEmailProvider/PostmarkAnalyticsProvider both
-     * read it as a bare string from ChannelCredentials.credentials (not a
-     * JSON blob, unlike WordPress/Meta), so it's stored that way here too.
+     * email sending. Business logic (ping-before-persist, Channel/
+     * ChannelCredentials upsert, capability sync) lives in
+     * EmailChannelService — this action only validates input and translates
+     * the result into a response.
      */
     public function connectEmail(Request $request): RedirectResponse
     {
@@ -316,42 +311,12 @@ class SettingsController extends Controller
             'from_name' => ['nullable', 'string', 'max:255'],
         ]);
 
-        // Ping Postmark with the submitted token before ever reporting
-        // "connected" — same pattern as connectWordPress(): verify first,
-        // decide the stored status from a real result, never assume
-        // success. A bare, unsaved ChannelCredentials is enough for ping().
-        $candidateCredentials = new ChannelCredentials([
-            'company_id' => $company->id,
-            'channel_type' => 'email',
-            'credentials' => $validated['api_token'],
-        ]);
-
-        $provider = $this->emailProviders->for('postmark');
-        $ping = $provider->ping($candidateCredentials);
-
-        $emailChannel = Channel::withoutGlobalScopes()->updateOrCreate(
-            ['company_id' => $company->id, 'type' => 'email'],
-            [
-                'name' => 'Email',
-                'config' => [
-                    'from_email' => $validated['from_email'],
-                    'from_name' => $validated['from_name'] ?? '',
-                ],
-                'is_active' => true,
-            ],
+        $ping = $this->emailChannelService->connect(
+            $company,
+            $validated['api_token'],
+            $validated['from_email'],
+            $validated['from_name'] ?? null,
         );
-
-        ChannelCredentials::withoutGlobalScopes()->updateOrCreate(
-            ['company_id' => $company->id, 'channel_type' => 'email'],
-            [
-                'provider_type' => 'postmark',
-                'credentials' => $candidateCredentials->credentials,
-                'status' => $ping->reachable ? 'active' : 'error',
-                'expires_at' => null,
-            ],
-        );
-
-        $this->syncEmailPublishingCapability($company, $emailChannel, $ping->reachable);
 
         if (! $ping->reachable) {
             return back()->withErrors(['api_token' => "Couldn't connect to Postmark with that token: {$ping->error}"]);
@@ -365,28 +330,16 @@ class SettingsController extends Controller
         /** @var Company $company */
         $company = $request->attributes->get('company');
 
-        ChannelCredentials::withoutGlobalScopes()
-            ->where('company_id', $company->id)
-            ->where('channel_type', 'email')
-            ->update(['status' => 'revoked']);
-
-        $this->syncEmailPublishingCapability($company, null, false);
+        $this->emailChannelService->disconnect($company);
 
         return back()->with('success', 'Postmark disconnected.');
     }
 
     /**
      * Company-authorized test send, proving the connection can actually
-     * deliver — not just that the token is valid. Reuses the exact same
-     * credential resolution (ChannelCredentialsRepository) and provider
-     * (EmailProviderRegistry → PostmarkEmailProvider) real campaign sends
-     * use; a disconnected/revoked/errored company is rejected the same way
-     * EmailPublisher::publish() would reject it, not by a second check.
-     * No Execution/ContentAsset row is created — there is no real campaign
-     * content here, and Execution.content_asset_id is a required unique FK,
-     * so inventing one would pollute Campaigns/Publishing with fake rows.
-     * Logged instead, to the same 'publishing' channel LogChannelPublisher/
-     * LogEmailProvider already use, with no secret in the log line.
+     * deliver — not just that the token is valid. See
+     * EmailChannelService::sendTest() for why no Execution/ContentAsset row
+     * is created for this.
      */
     public function sendEmailTest(Request $request): RedirectResponse
     {
@@ -397,82 +350,10 @@ class SettingsController extends Controller
             'to_email' => ['required', 'email', 'max:255'],
         ]);
 
-        try {
-            $credentials = $this->credentialsRepository->for($company->id, 'email');
-        } catch (PublishingException $e) {
-            return back()->with('error', $e->userMessage());
-        }
+        $result = $this->emailChannelService->sendTest($company, $validated['to_email']);
 
-        $emailChannel = Channel::withoutGlobalScopes()
-            ->where('company_id', $company->id)
-            ->where('type', 'email')
-            ->first();
-
-        /** @var array<string, mixed> $emailChannelConfig */
-        $emailChannelConfig = $emailChannel->config ?? [];
-        $fromEmail = (string) ($emailChannelConfig['from_email'] ?? '');
-
-        if ($fromEmail === '') {
-            return back()->with('error', 'Connect your email channel with a sender address before sending a test.');
-        }
-
-        $payload = new EmailPayload(
-            subject: 'Atlas test email',
-            fromName: (string) ($emailChannelConfig['from_name'] ?? ''),
-            fromEmail: $fromEmail,
-            body: "This is a test email from Atlas for {$company->name}. If you received this, your email connection is working.",
-            previewText: 'Atlas email connection test',
-            toEmail: $validated['to_email'],
-        );
-
-        $provider = $this->emailProviders->for($credentials->provider_type ?? 'log');
-
-        try {
-            $messageId = $provider->send($payload, $credentials);
-        } catch (PublishingException $e) {
-            Log::channel('publishing')->error('SettingsController: email test send failed.', [
-                'company_id' => $company->id,
-                'to_email' => $validated['to_email'],
-                'error' => $e->getMessage(),
-            ]);
-
-            return back()->with('error', "Test email failed: {$e->getMessage()}");
-        }
-
-        Log::channel('publishing')->info('SettingsController: email test send succeeded.', [
-            'company_id' => $company->id,
-            'to_email' => $validated['to_email'],
-            'platform_id' => $messageId,
-        ]);
-
-        return back()->with('success', "Test email sent to {$validated['to_email']}.");
-    }
-
-    /**
-     * Keep the declared `email` MarketingChannel's supports_publishing flag
-     * (the capability-truth signal resolveChannelCapability() reads) in
-     * sync with the real connection state — the same link()/
-     * markPublishingVerified() pair MetaOAuthController::
-     * linkAndVerifyPublishing()/revoke() already use, not a new mechanism.
-     * A company that never declared an `email` MarketingChannel (via
-     * onboarding or /app/settings/marketing-presence) has nothing to link;
-     * the real Channel/ChannelCredentials above remain the source of truth
-     * for actual sending either way.
-     */
-    private function syncEmailPublishingCapability(Company $company, ?Channel $realChannel, bool $verified): void
-    {
-        $declared = MarketingChannel::where('company_id', $company->id)
-            ->where('type', 'email')
-            ->first();
-
-        if ($declared === null) {
-            return;
-        }
-
-        if ($realChannel !== null) {
-            $this->marketingPresence->link($declared, $realChannel);
-        }
-
-        $this->marketingPresence->markPublishingVerified($declared, $verified);
+        return $result->success
+            ? back()->with('success', $result->message)
+            : back()->with('error', $result->message);
     }
 }

@@ -6,6 +6,26 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Refactor] Extract Postmark connect/disconnect/test-send into EmailChannelService — 2026-07-16
+
+Production-readiness gap plan, Task N2. The customer-facing Email channel setup flow (`SettingsController::connectEmail()`/`disconnectEmail()`/`sendEmailTest()`) already existed end-to-end — Settings UI, live ping-before-persist verification, `ChannelCredentials` storage, capability-truth sync — but its business logic lived directly in the controller, at odds with this codebase's "thin controllers, business logic in services" principle (`AGENTS.md`). No behavior changes; existing tests pass unmodified except one log-message wording assertion.
+
+### Changed
+
+- New `App\Services\Publishing\Email\EmailChannelService` owns `connect()`/`disconnect()`/`sendTest()` — the Channel/ChannelCredentials upsert, Postmark ping, and `MarketingChannel.supports_publishing` sync that previously lived inline in `SettingsController`.
+- New `App\Domain\Publishing\ValueObjects\EmailTestSendResult` (readonly `success`/`message`) lets `sendTest()` return a fully-formed outcome — including which user-facing message to show for each failure mode (no credentials, no sender configured, provider rejection) — so the controller action is reduced to validate-input → delegate → flash.
+- `SettingsController`'s constructor no longer depends on `EmailProviderRegistry`/`ChannelCredentialsRepository` directly — both were only ever used by the three email actions now delegated to the service.
+
+### Tests added
+
+- New `EmailChannelServiceTest` (8): connect creates channel + active/error credentials correctly; connect marks the declared `MarketingChannel` publishing-verified; disconnect revokes credentials and unmarks verified; test-send fails honestly with no credentials, with no sender configured, and on provider rejection (without leaking the stored token); test-send succeeds and reports the recipient.
+- `SettingsControllerTest`'s existing 19 email tests pass unchanged (behavior-preserving refactor) except one log-message substring updated to match the new class-name prefix.
+
+## Remaining risks and intentionally deferred work
+
+- **`connectWordPress()` was not given the same extraction** — it still contains its verify-then-persist logic inline in `SettingsController`. Left as-is since this task scoped to email; flagged as a natural follow-up for consistency, not a defect.
+- **No change to recipient/audience configuration UX** — already real (`EmailAudienceService`, `Campaigns/Show.vue` audience selector), unchanged by this refactor.
+
 ## [Feature] Surface email audience execution results honestly in the campaign UI — 2026-07-16
 
 Production-readiness gap plan, Phase 1A. The previous slice wired a real multi-recipient send and recorded per-recipient outcomes in `email_recipient_snapshots`, but explicitly flagged that no UI read any of it — an operator approving/sending a campaign had no way to tell how many recipients actually went out versus failed versus were skipped. This slice closes that gap with aggregate counts only; it does not add any new sending, retry, or import capability.
