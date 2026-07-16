@@ -6,6 +6,29 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Fix] WordPress connect validation didn't handle unreachable hosts or non-WordPress responses — 2026-07-16
+
+Production-readiness gap plan, Task N3. `connectWordPress()` already pinged before persisting `status: 'active'` (fixed 2026-07-15), but `WordPressPublisher::ping()` itself had two real gaps that let bad connections either 500 or falsely report reachable, found while hardening it against the task's explicit failure modes (bad site URL, bad username/password, unreachable host, non-WordPress API responses).
+
+### Fixed
+
+- **Unreachable host caused an uncaught 500, not a validation error.** Guzzle's `ConnectException` (DNS failure, connection refused, timeout) extends `TransferException` directly — it is *not* a `RequestException` subtype — but `ping()`'s catch block only caught `RequestException`. A genuinely unreachable host threw all the way up through `connectWordPress()` uncaught. Added a dedicated `ConnectException` catch returning a clean `PingResult(reachable: false, ...)`.
+- **A 2xx response was treated as proof of a real WordPress connection with no content validation.** Some hosts return `200` for any path (catch-all routing, a misconfigured reverse proxy, a non-WordPress site entirely) — `ping()` never checked the response body actually looked like `/wp-json/wp/v2/users/me`'s real shape. Now decodes the body and requires an `id` field before reporting reachable.
+- **`site_url` accepted any URL scheme.** Changed `'url'` to `'url:http,https'` in `connectWordPress()`'s validation, rejecting `javascript:`/`ftp:`/etc. before ever reaching the ping step.
+- Replaced a `firstOrFail()` channel lookup in `ping()` with a null check + honest `PingResult`, since a bad site URL/unreachable host should never look like an unhandled framework exception at any layer.
+
+### Tests added
+
+- `WordPressPublisherTest` (+3): unreachable host fails cleanly (not an uncaught exception); a non-WordPress 200 response is rejected; no configured site fails cleanly.
+- `SettingsControllerTest` (+1): a non-http(s) `site_url` is rejected by validation before any channel/credentials row is touched.
+
+## Remaining risks and intentionally deferred work
+
+- **Not fixed here, flagged as a separate, real gap found while reading this code:** `WordPressPublisher::supports()` unconditionally claims every `blog`-type channel, including the default placeholder `Channel` `CompanyService` seeds for every company at signup (no site URL, no credentials). Since `WordPressPublisher` is registered ahead of `LogChannelPublisher`, any company that has never connected real WordPress — the vast majority — will get a real `CredentialsNotFoundException` execution failure the moment `DecisionEngine` selects `blog` and a campaign executes, rather than the old simulated/logged success. This is a real, currently-live behavior change from before WordPress became a real publisher, distinct from "bad credentials appear connected" (this task's scope) — it's "no credentials at all still gets routed to the real publisher." Deciding the right fix (fall back to `LogChannelPublisher` when no credentials exist? have `DecisionEngine` avoid unconnected `blog` channels?) is a product decision beyond connect-validation hardening, not addressed in this slice.
+- **`WordPressMediaUploader` was inspected and needed no change** — it already catches the broader `GuzzleException` interface, which correctly covers both `RequestException` and `ConnectException`.
+
+---
+
 ## [Refactor] Extract Postmark connect/disconnect/test-send into EmailChannelService — 2026-07-16
 
 Production-readiness gap plan, Task N2. The customer-facing Email channel setup flow (`SettingsController::connectEmail()`/`disconnectEmail()`/`sendEmailTest()`) already existed end-to-end — Settings UI, live ping-before-persist verification, `ChannelCredentials` storage, capability-truth sync — but its business logic lived directly in the controller, at odds with this codebase's "thin controllers, business logic in services" principle (`AGENTS.md`). No behavior changes; existing tests pass unmodified except one log-message wording assertion.

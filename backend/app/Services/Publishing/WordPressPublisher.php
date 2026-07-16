@@ -12,6 +12,7 @@ use App\Services\Publishing\Contracts\ChannelPublisher;
 use App\Services\Publishing\Exceptions\PublishingException;
 use DateTimeImmutable;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\RequestException;
 
 class WordPressPublisher implements ChannelPublisher
@@ -71,30 +72,67 @@ class WordPressPublisher implements ChannelPublisher
         return $channelType === 'blog';
     }
 
+    /**
+     * Verifies a WordPress site is genuinely reachable and the submitted
+     * Application Password credential really authenticates against it,
+     * before SettingsController::connectWordPress() ever persists
+     * `status: 'active'`. Every failure mode returns a PingResult rather
+     * than throwing, so a bad connect attempt always surfaces as a clean
+     * validation error, never a 500.
+     */
     public function ping(ChannelCredentials $credentials): PingResult
     {
         [$username, $appPassword] = $this->decode($credentials);
-        $siteUrl = '';
+
+        $channel = Channel::withoutGlobalScopes()
+            ->where('company_id', $credentials->company_id)
+            ->where('type', 'blog')
+            ->first();
+
+        if ($channel === null) {
+            return new PingResult(reachable: false, error: 'No WordPress site is configured for this company yet.');
+        }
+
+        /** @var array<string, mixed> $channelConfig */
+        $channelConfig = $channel->config ?? [];
+        $siteUrl = (string) ($channelConfig['site_url'] ?? '');
+
+        if ($siteUrl === '') {
+            return new PingResult(reachable: false, error: 'No site URL is configured.');
+        }
 
         try {
-            $channel = Channel::withoutGlobalScopes()
-                ->where('company_id', $credentials->company_id)
-                ->where('type', 'blog')
-                ->firstOrFail();
-            /** @var array<string, mixed> $channelConfig */
-            $channelConfig = $channel->config ?? [];
-            $siteUrl = (string) ($channelConfig['site_url'] ?? '');
-
-            $this->http->get(rtrim($siteUrl, '/').'/wp-json/wp/v2/users/me', [
+            $response = $this->http->get(rtrim($siteUrl, '/').'/wp-json/wp/v2/users/me', [
                 'auth' => [$username, $appPassword],
             ]);
-
-            return new PingResult(reachable: true);
+        } catch (ConnectException $e) {
+            // DNS failure, connection refused, timeout — a distinct Guzzle
+            // exception branch from RequestException (ConnectException
+            // extends TransferException directly, not RequestException),
+            // so this needs its own catch or an unreachable host would
+            // 500 the connect request instead of failing validation cleanly.
+            return new PingResult(reachable: false, error: "Couldn't reach {$siteUrl}: {$e->getMessage()}");
         } catch (RequestException $e) {
             $body = $e->hasResponse() ? (string) $e->getResponse()?->getBody() : $e->getMessage();
 
             return new PingResult(reachable: false, error: $body);
         }
+
+        // A 2xx response alone doesn't prove this is really a WordPress
+        // REST API — some hosts return 200 for any path (catch-all routing,
+        // a misconfigured reverse proxy, a non-WordPress site entirely).
+        // The real `/wp-json/wp/v2/users/me` endpoint always returns a JSON
+        // object with at least an `id` field for the authenticated user.
+        $decoded = json_decode((string) $response->getBody(), true);
+
+        if (! is_array($decoded) || ! array_key_exists('id', $decoded)) {
+            return new PingResult(
+                reachable: false,
+                error: 'The site responded, but not with a recognizable WordPress REST API user — check the site URL.',
+            );
+        }
+
+        return new PingResult(reachable: true);
     }
 
     /**

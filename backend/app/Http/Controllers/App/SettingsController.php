@@ -235,7 +235,7 @@ class SettingsController extends Controller
         $company = $request->attributes->get('company');
 
         $validated = $request->validate([
-            'site_url' => ['required', 'url', 'max:255'],
+            'site_url' => ['required', 'url:http,https', 'max:255'],
             'username' => ['required', 'string', 'max:255'],
             'app_password' => ['required', 'string', 'max:255'],
         ]);

@@ -18,8 +18,10 @@ use App\Services\Publishing\WordPressMediaUploader;
 use App\Services\Publishing\WordPressPublisher;
 use App\Services\Publishing\WordPressRenderer;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -233,6 +235,64 @@ class WordPressPublisherTest extends TestCase
         $publisher = $this->makePublisher([
             new Response(401, [], json_encode(['message' => 'Invalid application password'])),
         ]);
+
+        $credentials = ChannelCredentials::withoutGlobalScopes()
+            ->where('company_id', $this->company->id)
+            ->where('channel_type', 'blog')
+            ->firstOrFail();
+
+        $result = $publisher->ping($credentials);
+
+        $this->assertFalse($result->reachable);
+        $this->assertNotNull($result->error);
+    }
+
+    public function test_ping_fails_cleanly_when_the_host_is_unreachable(): void
+    {
+        // ConnectException (DNS failure, connection refused, timeout) is a
+        // distinct Guzzle exception branch from RequestException — before
+        // this fix, ping() only caught RequestException, so an unreachable
+        // host would throw uncaught instead of returning a clean PingResult.
+        $publisher = $this->makePublisher([
+            new ConnectException('Could not resolve host', new Request('GET', 'https://blog.cbb-auctions.example')),
+        ]);
+
+        $credentials = ChannelCredentials::withoutGlobalScopes()
+            ->where('company_id', $this->company->id)
+            ->where('channel_type', 'blog')
+            ->firstOrFail();
+
+        $result = $publisher->ping($credentials);
+
+        $this->assertFalse($result->reachable);
+        $this->assertStringContainsString('Could not resolve host', (string) $result->error);
+    }
+
+    public function test_ping_fails_when_the_response_is_not_a_recognizable_wordpress_user(): void
+    {
+        // A 2xx status alone doesn't prove this is really a WordPress site —
+        // some hosts return 200 for any path (catch-all routing, a
+        // misconfigured reverse proxy, a non-WordPress site entirely).
+        $publisher = $this->makePublisher([
+            new Response(200, [], '<html><body>Welcome to example.com</body></html>'),
+        ]);
+
+        $credentials = ChannelCredentials::withoutGlobalScopes()
+            ->where('company_id', $this->company->id)
+            ->where('channel_type', 'blog')
+            ->firstOrFail();
+
+        $result = $publisher->ping($credentials);
+
+        $this->assertFalse($result->reachable);
+        $this->assertStringContainsString('not with a recognizable WordPress', (string) $result->error);
+    }
+
+    public function test_ping_fails_when_no_site_is_configured_yet(): void
+    {
+        $this->channel->delete();
+
+        $publisher = $this->makePublisher([]);
 
         $credentials = ChannelCredentials::withoutGlobalScopes()
             ->where('company_id', $this->company->id)

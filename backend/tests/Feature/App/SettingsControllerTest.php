@@ -217,6 +217,21 @@ class SettingsControllerTest extends TestCase
             ->assertSessionHasErrors(['site_url', 'username', 'app_password']);
     }
 
+    public function test_connect_wordpress_rejects_a_non_http_scheme(): void
+    {
+        [$user] = $this->userWithCompany();
+
+        $this->actingAs($user)
+            ->post('/app/settings/wordpress/connect', [
+                'site_url' => 'javascript:alert(1)',
+                'username' => 'atlas',
+                'app_password' => 'xxxx xxxx xxxx xxxx',
+            ])
+            ->assertSessionHasErrors(['site_url']);
+
+        $this->assertDatabaseMissing('channels', ['type' => 'blog']);
+    }
+
     public function test_disconnect_wordpress_revokes_credentials(): void
     {
         [$user, $company] = $this->userWithCompany();
