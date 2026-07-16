@@ -6,6 +6,16 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Docs] Customer 1 Launch Runbook — 2026-07-16
+
+New `docs/ops/Customer-1-Launch-Runbook.md`: the concrete, ordered, operator-executed sequence from server provisioning through the CBB Auctions invite — 10 phases (external accounts → server/DNS/SSL → environment config → deploy → queue workers → scheduler → backups/restore drill → monitoring/error tracking → transactional email → legal pages/runbook → post-deploy verification), each with an explicit verification checklist, plus a final Go/No-Go gate and first-week incident/rollback notes. Sequences (not restates) the existing companion docs — Production-Readiness-Checklist.md, Private-Beta-Execution.md, Production-Topology.md, Backup-and-Recovery.md.
+
+Every environment variable, script invocation, and file path cited is taken directly from current code (`.env.example`, `infrastructure/backup/*.sh` usage comments, `infrastructure/supervisor/atlas-worker.conf`, `HealthController`, `User::canAccessPanel()`) rather than assumed — including two gaps not in `.env.example` today that this runbook tells the operator to set anyway (`SESSION_SECURE_COOKIE=true`, a real `REDIS_PASSWORD`) and an explicit warning not to run `composer setup` in production (it would blindly run `migrate --force`/`npm run build` before `.env` can be reviewed).
+
+No product feature proposed or implied anywhere — purely operator/infrastructure sequencing of already-code-complete work. No application code changed.
+
+---
+
 ## [Docs] Private Beta Go/No-Go Review — 2026-07-16
 
 New `docs/reviews/Private-Beta-Go-No-Go-Review-2026-07-16.md`: a concise review reconciling the 2026-07-10 Production Deployment Audit against everything shipped since, verified directly against current code rather than trusted from prior documents (re-checked `EnsureCompanyMembership`'s tenant-isolation binding, `bootstrap/app.php`'s security-header/proxy wiring, the real queue list against every `onQueue()` call site, `.env.example`'s current defaults, and that every WordPress/Meta/Postmark test in the codebase is HTTP-mocked with zero live-account verification anywhere).
