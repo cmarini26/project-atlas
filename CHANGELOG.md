@@ -6,6 +6,35 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Feature] Company-facing Postmark connection, verification, test send, and disconnect — 2026-07-15
+
+Production-readiness gap plan, Phase 1A ("Email Production Completion"). `PostmarkEmailProvider`, `PostmarkAnalyticsProvider`, and `PostmarkWebhookHandler` were already real, but no company could ever reach them — no Settings UI, no controller action, no way for `ChannelCredentials.provider_type` to ever become `'postmark'` outside of `DemoSeeder`. This closes that gap using the exact same patterns already shipped for WordPress (`connectWordPress()`) and Meta (`MetaOAuthController`) — no new credential model, no new capability resolver, no rebuilt providers.
+
+### Added
+
+- `SettingsController::connectEmail()` — validates a Postmark Server API Token + sender identity (`from_email`/`from_name`), pings Postmark live via the already-registered `EmailProviderRegistry`/`PostmarkEmailProvider` *before* ever reporting "connected" (mirrors `connectWordPress()`'s verify-then-persist order exactly), then upserts a real `email` `Channel` + `ChannelCredentials` row.
+- `SettingsController::disconnectEmail()` — revokes credentials (idempotent), unmarks publishing-verified.
+- `SettingsController::sendEmailTest()` — company-authorized test send using the exact same `ChannelCredentialsRepository`/`EmailProviderRegistry` real campaign sends use (a disconnected/revoked/errored company is rejected the identical way `EmailPublisher::publish()` already would be, not by a second check). No `Execution`/`ContentAsset` row is created (`content_asset_id` is a required unique FK — inventing one would pollute Campaigns/Publishing with fake rows); logged instead to the existing `'publishing'` log channel, with no secret in the log line.
+- `Settings.vue` — new "Email" card: connect form (token + sender identity) when disconnected; status badge, sender identity, last-verified timestamp, test-send mini-form, and disconnect button when connected. Follows the WordPress card's exact layout/state pattern.
+- Three routes: `POST /app/settings/email/{connect,revoke,test}`.
+
+### Capability truth
+
+`MarketingChannelType::Email` already exists (unlike `blog`/WordPress, which has no enum equivalent), so Email participates in the *existing* mechanism unchanged: `connectEmail()`/`disconnectEmail()` call `MarketingPresenceService::link()` + `markPublishingVerified()` — the same pair `MetaOAuthController::callback()`/`revoke()` already use, not a new resolver. `CheckChannelHealth` (already generic across every `channel_type`) automatically re-verifies Postmark credentials on its existing 30-minute schedule and keeps `supports_publishing` in sync going forward — zero new code needed for ongoing health sync.
+
+### Security
+
+- Storage format matches what `PostmarkEmailProvider`/`PostmarkAnalyticsProvider` already read: a **bare token string** in `ChannelCredentials.credentials` (encrypted via the existing `'encrypted'` cast), not a JSON blob like WordPress/Meta — verified against the real provider code rather than assumed, since getting this wrong would have made every future send silently pass the wrong value as the token.
+- The Settings page prop (`email_channel`) never includes `credentials` — only `provider_type`, sender identity, `status`, `last_used_at`.
+- Verified all four required failure modes (invalid token, network timeout, rate limiting, malformed response) are already handled inside `PostmarkEmailProvider::ping()`/`send()` — no new error-handling code was needed in the controller, only correct consumption of `PingResult`/`PublishingException`.
+
+### Notes
+
+- New tests: 27 in `SettingsControllerTest.php` (connect/reject/rotate/scope/capability-truth/test-send/disconnect/log-safety) using a `Mockery`-mocked `EmailProvider` registered into a fresh `EmailProviderRegistry`, mirroring `CheckChannelHealthTest`'s existing registry-swap pattern; no live Postmark API calls. New `Settings.spec.ts` (11 tests) — connected/disconnected/error states, validation-error display, connect/test-send/disconnect submission, and explicit regression coverage that WordPress/Meta rendering is unchanged.
+- Deliberately did not implement (per this slice's scope): recipient lists/bulk audience sending, suppression-list enforcement, scheduling, additional providers, OAuth, or an analytics UI redesign — see `docs/architecture/EmailArchitecture.md` for that follow-on work.
+- Deliberately did not extend `PingResult` to carry Postmark's server display name as "safe identifying metadata" — the connect flow already reports enough (status + `last_used_at`) without touching a value object shared by every other provider's `ping()` for a non-essential nicety.
+
+
 ## [Fix] Publishing.vue, Dashboard.vue, and Campaigns/Show.vue can now show "Connected" for a real channel — 2026-07-15
 
 Production-readiness gap plan, Phase 0 (channel capability truth), closing the follow-up flagged in the previous entry below. `resolveChannelCapability()` and `MarketingChannel.supports_publishing` were already correctly wired (Meta OAuth connect/revoke, `CheckChannelHealth`), but three pages rendered `<ChannelCapabilityBadge :channel-type="..." />` with no `linked-marketing-channel` prop at all, so they always fell back to the global default and could never show "Connected" for a company that had genuinely connected a real channel.

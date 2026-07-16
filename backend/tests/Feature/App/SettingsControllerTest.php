@@ -10,7 +10,11 @@ use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\InstagramAccount;
 use App\Models\Integration;
+use App\Models\MarketingChannel;
 use App\Models\User;
+use App\Services\Publishing\Email\Contracts\EmailProvider;
+use App\Services\Publishing\Email\EmailProviderRegistry;
+use App\Services\Publishing\Exceptions\PublishingException;
 use App\Services\Publishing\WordPressPublisher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -231,6 +235,423 @@ class SettingsControllerTest extends TestCase
             ->assertRedirect();
 
         $this->assertSame('revoked', $credentials->fresh()->status);
+    }
+
+    // ── Email (Postmark) ─────────────────────────────────────────────────
+
+    public function test_index_includes_null_email_channel_when_not_connected(): void
+    {
+        [$user] = $this->userWithCompany();
+
+        $this->actingAs($user)
+            ->get('/app/settings')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('email_channel', null));
+    }
+
+    public function test_index_includes_connected_email_channel_and_never_exposes_the_token(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+
+        Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'type' => 'email', 'name' => 'Email',
+            'config' => ['from_email' => 'hello@cbb-auctions.example', 'from_name' => 'CBB Auctions'],
+            'is_active' => true,
+        ]);
+        ChannelCredentials::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'channel_type' => 'email', 'provider_type' => 'postmark',
+            'credentials' => 'super-secret-server-token', 'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($user)
+            ->get('/app/settings')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('email_channel.provider_type', 'postmark')
+                ->where('email_channel.from_email', 'hello@cbb-auctions.example')
+                ->where('email_channel.from_name', 'CBB Auctions')
+                ->where('email_channel.status', 'active')
+            );
+
+        $this->assertStringNotContainsString('super-secret-server-token', $response->getContent() ?: '');
+    }
+
+    public function test_index_omits_revoked_email_channel(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+
+        Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'type' => 'email', 'name' => 'Email',
+            'config' => ['from_email' => 'hello@cbb-auctions.example'], 'is_active' => true,
+        ]);
+        ChannelCredentials::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'channel_type' => 'email', 'provider_type' => 'postmark',
+            'credentials' => 'token', 'status' => 'revoked',
+        ]);
+
+        $this->actingAs($user)
+            ->get('/app/settings')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('email_channel', null));
+    }
+
+    public function test_connect_email_creates_channel_and_credentials_when_postmark_is_reachable(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $this->bindEmailProvider(pingResult: new PingResult(reachable: true));
+
+        $this->actingAs($user)
+            ->post('/app/settings/email/connect', [
+                'api_token' => 'server-token-abc123',
+                'from_email' => 'hello@cbb-auctions.example',
+                'from_name' => 'CBB Auctions',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('channels', [
+            'company_id' => $company->id,
+            'type' => 'email',
+        ]);
+        $this->assertDatabaseHas('channel_credentials', [
+            'company_id' => $company->id,
+            'channel_type' => 'email',
+            'provider_type' => 'postmark',
+            'status' => 'active',
+        ]);
+    }
+
+    public function test_connect_email_rejects_invalid_credentials(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $this->bindEmailProvider(pingResult: new PingResult(reachable: false, error: 'Invalid server API token'));
+
+        $this->actingAs($user)
+            ->post('/app/settings/email/connect', [
+                'api_token' => 'wrong-token',
+                'from_email' => 'hello@cbb-auctions.example',
+            ])
+            ->assertSessionHasErrors(['api_token']);
+
+        $this->assertDatabaseHas('channel_credentials', [
+            'company_id' => $company->id,
+            'channel_type' => 'email',
+            'provider_type' => 'postmark',
+            'status' => 'error',
+        ]);
+    }
+
+    public function test_connect_email_requires_valid_input(): void
+    {
+        [$user] = $this->userWithCompany();
+
+        $this->actingAs($user)
+            ->post('/app/settings/email/connect', [])
+            ->assertSessionHasErrors(['api_token', 'from_email']);
+    }
+
+    public function test_connect_email_credentials_are_encrypted_at_rest(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $this->bindEmailProvider(pingResult: new PingResult(reachable: true));
+
+        $this->actingAs($user)->post('/app/settings/email/connect', [
+            'api_token' => 'server-token-abc123',
+            'from_email' => 'hello@cbb-auctions.example',
+        ]);
+
+        $raw = \DB::table('channel_credentials')
+            ->where('company_id', $company->id)
+            ->where('channel_type', 'email')
+            ->value('credentials');
+
+        $this->assertNotNull($raw);
+        $this->assertStringNotContainsString('server-token-abc123', $raw);
+
+        $decrypted = ChannelCredentials::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->where('channel_type', 'email')
+            ->first();
+        $this->assertSame('server-token-abc123', $decrypted->credentials);
+    }
+
+    public function test_reconnect_email_replaces_the_stored_token(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $this->bindEmailProvider(pingResult: new PingResult(reachable: true));
+
+        $this->actingAs($user)->post('/app/settings/email/connect', [
+            'api_token' => 'old-token',
+            'from_email' => 'hello@cbb-auctions.example',
+        ]);
+
+        $this->bindEmailProvider(pingResult: new PingResult(reachable: true));
+
+        $this->actingAs($user)->post('/app/settings/email/connect', [
+            'api_token' => 'new-token',
+            'from_email' => 'hello@cbb-auctions.example',
+        ]);
+
+        $this->assertDatabaseCount('channel_credentials', 1);
+        $credentials = ChannelCredentials::withoutGlobalScopes()
+            ->where('company_id', $company->id)->where('channel_type', 'email')->first();
+        $this->assertSame('new-token', $credentials->credentials);
+    }
+
+    public function test_connecting_email_for_one_company_does_not_affect_another(): void
+    {
+        [$userA, $companyA] = $this->userWithCompany();
+
+        $companyB = Company::withoutGlobalScopes()->create(['name' => 'Other Co', 'slug' => 'other-co']);
+
+        $this->bindEmailProvider(pingResult: new PingResult(reachable: true));
+
+        $this->actingAs($userA)->post('/app/settings/email/connect', [
+            'api_token' => 'company-a-token',
+            'from_email' => 'hello@company-a.example',
+        ]);
+
+        $this->assertDatabaseHas('channel_credentials', ['company_id' => $companyA->id, 'channel_type' => 'email']);
+        $this->assertDatabaseMissing('channel_credentials', ['company_id' => $companyB->id, 'channel_type' => 'email']);
+    }
+
+    public function test_connect_email_marks_the_declared_marketing_channel_as_publishing_verified(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $this->bindEmailProvider(pingResult: new PingResult(reachable: true));
+
+        $declared = MarketingChannel::factory()->create([
+            'company_id' => $company->id,
+            'type' => 'email',
+            'supports_publishing' => false,
+        ]);
+
+        $this->actingAs($user)->post('/app/settings/email/connect', [
+            'api_token' => 'server-token-abc123',
+            'from_email' => 'hello@cbb-auctions.example',
+        ]);
+
+        $declared->refresh();
+        $this->assertTrue($declared->supports_publishing);
+        $this->assertTrue($declared->is_connected);
+        $this->assertNotNull($declared->channel_id);
+    }
+
+    public function test_connect_email_does_not_fail_when_no_declared_channel_exists(): void
+    {
+        [$user] = $this->userWithCompany();
+        $this->bindEmailProvider(pingResult: new PingResult(reachable: true));
+
+        $this->actingAs($user)
+            ->post('/app/settings/email/connect', [
+                'api_token' => 'server-token-abc123',
+                'from_email' => 'hello@cbb-auctions.example',
+            ])
+            ->assertSessionHas('success');
+    }
+
+    public function test_disconnect_email_revokes_credentials(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+
+        Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'type' => 'email', 'name' => 'Email',
+            'config' => ['from_email' => 'hello@cbb-auctions.example'], 'is_active' => true,
+        ]);
+        $credentials = ChannelCredentials::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'channel_type' => 'email', 'provider_type' => 'postmark',
+            'credentials' => 'token', 'status' => 'active',
+        ]);
+
+        $this->actingAs($user)
+            ->post('/app/settings/email/revoke')
+            ->assertRedirect();
+
+        $this->assertSame('revoked', $credentials->fresh()->status);
+    }
+
+    public function test_disconnect_email_is_idempotent(): void
+    {
+        [$user] = $this->userWithCompany();
+
+        $this->actingAs($user)->post('/app/settings/email/revoke')->assertRedirect();
+        $this->actingAs($user)->post('/app/settings/email/revoke')->assertRedirect();
+
+        $this->assertDatabaseCount('channel_credentials', 0);
+    }
+
+    public function test_disconnect_email_unmarks_publishing_verified(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+
+        $channel = Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'type' => 'email', 'name' => 'Email',
+            'config' => ['from_email' => 'hello@cbb-auctions.example'], 'is_active' => true,
+        ]);
+        ChannelCredentials::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'channel_type' => 'email', 'provider_type' => 'postmark',
+            'credentials' => 'token', 'status' => 'active',
+        ]);
+        $declared = MarketingChannel::factory()->create([
+            'company_id' => $company->id,
+            'type' => 'email',
+            'channel_id' => $channel->id,
+            'is_connected' => true,
+            'supports_publishing' => true,
+        ]);
+
+        $this->actingAs($user)->post('/app/settings/email/revoke');
+
+        $this->assertFalse($declared->fresh()->supports_publishing);
+    }
+
+    public function test_disconnect_email_prevents_future_provider_resolution(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+
+        Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'type' => 'email', 'name' => 'Email',
+            'config' => ['from_email' => 'hello@cbb-auctions.example'], 'is_active' => true,
+        ]);
+        ChannelCredentials::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'channel_type' => 'email', 'provider_type' => 'postmark',
+            'credentials' => 'token', 'status' => 'active',
+        ]);
+
+        $this->actingAs($user)->post('/app/settings/email/revoke');
+
+        $this->actingAs($user)
+            ->post('/app/settings/email/test', ['to_email' => 'someone@example.com'])
+            ->assertSessionHas('error');
+    }
+
+    public function test_send_email_test_succeeds_for_connected_company(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+
+        Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'type' => 'email', 'name' => 'Email',
+            'config' => ['from_email' => 'hello@cbb-auctions.example', 'from_name' => 'CBB Auctions'],
+            'is_active' => true,
+        ]);
+        ChannelCredentials::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'channel_type' => 'email', 'provider_type' => 'postmark',
+            'credentials' => 'server-token', 'status' => 'active',
+        ]);
+
+        $provider = $this->bindEmailProvider(sendMessageId: 'msg-test-123');
+
+        $this->actingAs($user)
+            ->post('/app/settings/email/test', ['to_email' => 'owner@example.com'])
+            ->assertSessionHas('success');
+
+        $provider->shouldHaveReceived('send')->once();
+    }
+
+    public function test_send_email_test_fails_for_disconnected_company(): void
+    {
+        [$user] = $this->userWithCompany();
+
+        $this->actingAs($user)
+            ->post('/app/settings/email/test', ['to_email' => 'owner@example.com'])
+            ->assertSessionHas('error');
+    }
+
+    public function test_send_email_test_surfaces_provider_failure_without_leaking_the_token(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+
+        Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'type' => 'email', 'name' => 'Email',
+            'config' => ['from_email' => 'hello@cbb-auctions.example'], 'is_active' => true,
+        ]);
+        ChannelCredentials::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'channel_type' => 'email', 'provider_type' => 'postmark',
+            'credentials' => 'super-secret-server-token', 'status' => 'active',
+        ]);
+
+        $this->bindEmailProvider(sendException: new PublishingException('Postmark rejected the send: Invalid "From" address', retryable: false));
+
+        $response = $this->actingAs($user)
+            ->post('/app/settings/email/test', ['to_email' => 'owner@example.com'])
+            ->assertSessionHas('error');
+
+        $this->assertStringContainsString('Invalid "From" address', (string) session('error'));
+        $this->assertStringNotContainsString('super-secret-server-token', (string) session('error'));
+        $this->assertStringNotContainsString('super-secret-server-token', $response->getContent() ?: '');
+    }
+
+    public function test_send_email_test_requires_a_recipient_address(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+
+        Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'type' => 'email', 'name' => 'Email',
+            'config' => ['from_email' => 'hello@cbb-auctions.example'], 'is_active' => true,
+        ]);
+        ChannelCredentials::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'channel_type' => 'email', 'provider_type' => 'postmark',
+            'credentials' => 'token', 'status' => 'active',
+        ]);
+
+        $this->actingAs($user)
+            ->post('/app/settings/email/test', [])
+            ->assertSessionHasErrors(['to_email']);
+    }
+
+    public function test_credentials_never_appear_in_the_publishing_log(): void
+    {
+        $logPath = storage_path('logs/publishing.log');
+        $before = is_file($logPath) ? filesize($logPath) : 0;
+
+        [$user, $company] = $this->userWithCompany();
+
+        Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'type' => 'email', 'name' => 'Email',
+            'config' => ['from_email' => 'hello@cbb-auctions.example'], 'is_active' => true,
+        ]);
+        ChannelCredentials::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'channel_type' => 'email', 'provider_type' => 'postmark',
+            'credentials' => 'super-secret-server-token', 'status' => 'active',
+        ]);
+
+        $this->bindEmailProvider(sendMessageId: 'msg-test-123');
+
+        $this->actingAs($user)->post('/app/settings/email/test', ['to_email' => 'owner@example.com']);
+
+        $this->assertTrue(is_file($logPath), 'Expected the publishing log to exist after a test send.');
+        $written = substr(file_get_contents($logPath) ?: '', $before);
+        $this->assertStringContainsString('email test send succeeded', $written);
+        $this->assertStringNotContainsString('super-secret-server-token', $written);
+    }
+
+    /**
+     * Binds a fresh EmailProviderRegistry containing a single mocked
+     * EmailProvider (supports() → 'postmark' only), mirroring the pattern
+     * CheckChannelHealthTest already uses for ChannelPublisherRegistry.
+     */
+    private function bindEmailProvider(
+        ?PingResult $pingResult = null,
+        ?string $sendMessageId = null,
+        ?PublishingException $sendException = null,
+    ): EmailProvider {
+        $provider = Mockery::mock(EmailProvider::class);
+        $provider->shouldReceive('supports')->with('postmark')->andReturn(true)->byDefault();
+
+        if ($pingResult !== null) {
+            $provider->shouldReceive('ping')->andReturn($pingResult);
+        }
+
+        if ($sendException !== null) {
+            $provider->shouldReceive('send')->andThrow($sendException);
+        } elseif ($sendMessageId !== null) {
+            $provider->shouldReceive('send')->andReturn($sendMessageId);
+        }
+
+        $registry = new EmailProviderRegistry();
+        $registry->register($provider);
+        $this->app->instance(EmailProviderRegistry::class, $registry);
+
+        return $provider;
     }
 
     public function test_update_saves_company_name(): void

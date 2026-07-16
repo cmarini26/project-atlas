@@ -122,6 +122,11 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
     Route::post('/settings/wordpress/connect', [SettingsController::class, 'connectWordPress'])->name('settings.wordpress.connect');
     Route::post('/settings/wordpress/revoke', [SettingsController::class, 'disconnectWordPress'])->name('settings.wordpress.revoke');
 
+
+    // Email publishing (Postmark) — Server API Token (manual entry), no OAuth.
+    Route::post('/settings/email/connect', [SettingsController::class, 'connectEmail'])->name('settings.email.connect');
+    Route::post('/settings/email/revoke', [SettingsController::class, 'disconnectEmail'])->name('settings.email.revoke');
+    Route::post('/settings/email/test', [SettingsController::class, 'sendEmailTest'])->name('settings.email.test');
     // Marketing Presence
     Route::get('/settings/marketing-presence', [MarketingPresenceController::class, 'index'])->name('settings.marketing-presence');
     Route::post('/settings/marketing-presence', [MarketingPresenceController::class, 'store'])->name('settings.marketing-presence.store');

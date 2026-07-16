@@ -50,6 +50,14 @@ interface WordPressChannel {
   status: string
 }
 
+interface EmailChannel {
+  provider_type: string
+  from_email: string
+  from_name: string
+  status: string
+  last_used_at: string | null
+}
+
 const props = defineProps<{
   company: CompanyData
   integrations: Integration[]
@@ -57,6 +65,7 @@ const props = defineProps<{
   instagram_account: InstagramAccountData | null
   meta_channels: MetaChannel[]
   wordpress_channel: WordPressChannel | null
+  email_channel: EmailChannel | null
 }>()
 
 const metaChannelLabels: Record<string, string> = {
@@ -82,6 +91,30 @@ function connectWordPress(): void {
 
 function revokeWordPress(): void {
   router.post('/app/settings/wordpress/revoke', {}, { preserveScroll: true })
+}
+
+const emailForm = useForm({
+  api_token: '',
+  from_email: '',
+  from_name: '',
+})
+
+function connectEmail(): void {
+  emailForm.post('/app/settings/email/connect', {
+    onSuccess: () => emailForm.reset(),
+  })
+}
+
+function revokeEmail(): void {
+  router.post('/app/settings/email/revoke', {}, { preserveScroll: true })
+}
+
+const emailTestForm = useForm({
+  to_email: '',
+})
+
+function sendEmailTest(): void {
+  emailTestForm.post('/app/settings/email/test', { preserveScroll: true })
 }
 
 const form = useForm({
@@ -382,6 +415,109 @@ function retakeTour(): void {
           class="py-2 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
         >
           {{ wordPressForm.processing ? 'Connecting…' : 'Connect WordPress' }}
+        </button>
+      </form>
+    </div>
+
+    <!-- Email (Postmark) -->
+    <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5 mb-6">
+      <h2 class="text-sm font-semibold text-[var(--color-text-primary)] mb-4">Email</h2>
+
+      <div v-if="email_channel" class="space-y-4">
+        <div class="flex items-start gap-3">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-0.5">
+              <p class="text-sm font-medium text-[var(--color-text-primary)]">Postmark</p>
+              <Badge :variant="email_channel.status === 'active' ? 'success' : 'muted'">Email</Badge>
+            </div>
+            <p class="text-xs text-[var(--color-text-muted)]">Sending as {{ email_channel.from_name ? `${email_channel.from_name} <${email_channel.from_email}>` : email_channel.from_email }}</p>
+            <p class="text-xs text-[var(--color-text-muted)] mt-1">Status: {{ email_channel.status }}</p>
+            <p v-if="email_channel.last_used_at" class="text-xs text-[var(--color-text-muted)] mt-1">Last verified: {{ formatDate(email_channel.last_used_at) }}</p>
+            <button
+              type="button"
+              class="mt-3 py-1.5 px-3 text-xs font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)] transition-colors duration-[var(--duration-fast)]"
+              @click="revokeEmail"
+            >
+              Disconnect
+            </button>
+          </div>
+        </div>
+
+        <div class="pt-4 border-t border-[var(--color-border)]">
+          <p class="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Send a test email</p>
+          <form class="flex items-start gap-2" @submit.prevent="sendEmailTest">
+            <div class="flex-1">
+              <input
+                id="email-test-to"
+                v-model="emailTestForm.to_email"
+                type="email"
+                placeholder="you@example.com"
+                required
+                class="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)] transition-colors duration-[var(--duration-fast)]"
+              />
+              <p v-if="emailTestForm.errors.to_email" class="mt-1 text-xs text-rose-600">{{ emailTestForm.errors.to_email }}</p>
+            </div>
+            <button
+              type="submit"
+              :disabled="emailTestForm.processing"
+              class="shrink-0 py-2 px-3 text-xs font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+            >
+              {{ emailTestForm.processing ? 'Sending…' : 'Send test' }}
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <form v-else class="space-y-3" @submit.prevent="connectEmail">
+        <p class="text-xs text-[var(--color-text-muted)]">
+          Connect Postmark so Atlas can send real campaign emails. Create a
+          <a href="https://postmarkapp.com/support/article/1008-what-are-server-api-tokens" target="_blank" rel="noopener noreferrer" class="text-[var(--color-text-link)] hover:underline">Server API Token</a>
+          from your Postmark server's API Tokens tab.
+        </p>
+        <div>
+          <label for="email-api-token" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Server API token</label>
+          <input
+            id="email-api-token"
+            v-model="emailForm.api_token"
+            type="password"
+            required
+            :class="[
+              'w-full px-3 py-2 text-sm rounded-lg border bg-white text-[var(--color-text-primary)] transition-colors duration-[var(--duration-fast)]',
+              emailForm.errors.api_token
+                ? 'border-rose-300 focus:outline-none focus:ring-1 focus:ring-rose-400'
+                : 'border-[var(--color-border)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)]',
+            ]"
+          />
+          <p v-if="emailForm.errors.api_token" class="mt-1 text-xs text-rose-600">{{ emailForm.errors.api_token }}</p>
+        </div>
+        <div>
+          <label for="email-from-email" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">From email</label>
+          <input
+            id="email-from-email"
+            v-model="emailForm.from_email"
+            type="email"
+            placeholder="hello@yourbusiness.com"
+            required
+            class="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)] transition-colors duration-[var(--duration-fast)]"
+          />
+          <p v-if="emailForm.errors.from_email" class="mt-1 text-xs text-rose-600">{{ emailForm.errors.from_email }}</p>
+          <p class="mt-1 text-xs text-[var(--color-text-muted)]">Must be a Sender Signature or domain verified in Postmark.</p>
+        </div>
+        <div>
+          <label for="email-from-name" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">From name <span class="normal-case text-[var(--color-text-placeholder)]">(optional)</span></label>
+          <input
+            id="email-from-name"
+            v-model="emailForm.from_name"
+            type="text"
+            class="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)] transition-colors duration-[var(--duration-fast)]"
+          />
+        </div>
+        <button
+          type="submit"
+          :disabled="emailForm.processing"
+          class="py-2 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+        >
+          {{ emailForm.processing ? 'Connecting…' : 'Connect Postmark' }}
         </button>
       </form>
     </div>
