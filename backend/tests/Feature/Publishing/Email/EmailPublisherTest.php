@@ -12,6 +12,7 @@ use App\Models\Company;
 use App\Models\ContentAsset;
 use App\Models\Decision;
 use App\Models\DigitalTwin;
+use App\Models\EmailRecipientSnapshot;
 use App\Models\Execution;
 use App\Models\Opportunity;
 use App\Services\Publishing\ChannelPublisherRegistry;
@@ -23,6 +24,7 @@ use App\Services\Publishing\EmailRenderer;
 use App\Services\Publishing\Exceptions\AuthenticationException;
 use App\Services\Publishing\Exceptions\ContentPolicyViolationException;
 use App\Services\Publishing\Exceptions\CredentialsNotFoundException;
+use App\Services\Publishing\Exceptions\PublishingException;
 use App\Services\Publishing\ExecutionService;
 use App\Services\Publishing\GenericRenderer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -264,6 +266,218 @@ class EmailPublisherTest extends TestCase
         $result = $this->publisher->ping($credentials);
 
         $this->assertTrue($result->reachable);
+    }
+
+    // ── publish() with a recipient snapshot (audience targeting) ──────────────
+
+    /** @return list<EmailRecipientSnapshot> */
+    private function makeSnapshotRecipients(Execution $execution, array $emails): array
+    {
+        $rows = [];
+
+        foreach ($emails as $email) {
+            $rows[] = EmailRecipientSnapshot::create([
+                'company_id' => $this->company->id,
+                'campaign_id' => $this->campaign->id,
+                'execution_id' => $execution->id,
+                'email' => $email,
+                'status' => 'pending',
+            ]);
+        }
+
+        return $rows;
+    }
+
+    public function test_publish_sends_one_email_per_snapshot_recipient(): void
+    {
+        $this->makeCredentials();
+        $asset = $this->makeAsset();
+        $execution = $this->makeExecution($asset);
+        $this->makeSnapshotRecipients($execution, ['a@example.com', 'b@example.com', 'c@example.com']);
+
+        $result = $this->publisher->publish($execution);
+
+        $this->fakeProvider->assertSent(3);
+        $this->assertSame(
+            ['a@example.com', 'b@example.com', 'c@example.com'],
+            collect($this->fakeProvider->sentItems())->pluck('payload.toEmail')->sort()->values()->all(),
+        );
+        $this->assertSame(3, $result->metadata['recipients_sent']);
+        $this->assertSame(0, $result->metadata['recipients_failed']);
+    }
+
+    public function test_publish_marks_each_snapshot_sent_with_its_own_provider_message_id(): void
+    {
+        $this->makeCredentials();
+        $this->fakeProvider->queueMessageId('msg-a')->queueMessageId('msg-b');
+        $asset = $this->makeAsset();
+        $execution = $this->makeExecution($asset);
+        $this->makeSnapshotRecipients($execution, ['a@example.com', 'b@example.com']);
+
+        $this->publisher->publish($execution);
+
+        $snapshots = EmailRecipientSnapshot::withoutGlobalScopes()
+            ->where('execution_id', $execution->id)->orderBy('email')->get();
+
+        $this->assertSame('sent', $snapshots[0]->status->value);
+        $this->assertSame('msg-a', $snapshots[0]->provider_message_id);
+        $this->assertSame('sent', $snapshots[1]->status->value);
+        $this->assertSame('msg-b', $snapshots[1]->provider_message_id);
+    }
+
+    public function test_publish_handles_partial_failure_honestly(): void
+    {
+        $this->makeCredentials();
+        $this->fakeProvider
+            ->queueMessageId('msg-a')
+            ->queueFailure(new PublishingException('Postmark rejected the send: invalid address', retryable: false))
+            ->queueMessageId('msg-c');
+        $asset = $this->makeAsset();
+        $execution = $this->makeExecution($asset);
+        $this->makeSnapshotRecipients($execution, ['a@example.com', 'b@example.com', 'c@example.com']);
+
+        $result = $this->publisher->publish($execution);
+
+        // Partial success does not throw — two of three genuinely sent.
+        $this->assertSame(2, $result->metadata['recipients_sent']);
+        $this->assertSame(1, $result->metadata['recipients_failed']);
+
+        $snapshots = EmailRecipientSnapshot::withoutGlobalScopes()
+            ->where('execution_id', $execution->id)->orderBy('email')->get();
+
+        $this->assertSame('sent', $snapshots[0]->status->value);
+        $this->assertSame('failed', $snapshots[1]->status->value);
+        $this->assertStringContainsString('invalid address', $snapshots[1]->skipped_reason);
+        $this->assertSame('sent', $snapshots[2]->status->value);
+
+        // One failed recipient never implies all three succeeded.
+        $this->assertNotSame(3, $result->metadata['recipients_sent']);
+    }
+
+    public function test_publish_throws_when_every_recipient_fails(): void
+    {
+        $this->makeCredentials();
+        $this->fakeProvider
+            ->queueFailure(new PublishingException('Provider outage', retryable: true))
+            ->queueFailure(new PublishingException('Provider outage', retryable: true));
+        $asset = $this->makeAsset();
+        $execution = $this->makeExecution($asset);
+        $this->makeSnapshotRecipients($execution, ['a@example.com', 'b@example.com']);
+
+        try {
+            $this->publisher->publish($execution);
+            $this->fail('Expected a PublishingException when every recipient fails.');
+        } catch (PublishingException $e) {
+            $this->assertTrue($e->isRetryable());
+        }
+
+        $snapshots = EmailRecipientSnapshot::withoutGlobalScopes()->where('execution_id', $execution->id)->get();
+        $this->assertTrue($snapshots->every(fn ($s) => $s->status->value === 'failed'));
+    }
+
+    public function test_publish_throws_non_retryable_when_the_audience_snapshot_is_empty(): void
+    {
+        $this->makeCredentials();
+        $asset = $this->makeAsset();
+        $execution = $this->makeExecution($asset);
+        // Simulate "an audience was selected and every member already
+        // processed" — e.g. a retry after a fully-successful prior attempt
+        // found nothing left to do — by creating only an already-Sent row,
+        // no Pending ones.
+        EmailRecipientSnapshot::create([
+            'company_id' => $this->company->id,
+            'campaign_id' => $this->campaign->id,
+            'execution_id' => $execution->id,
+            'email' => 'already-done@example.com',
+            'status' => 'sent',
+            'provider_message_id' => 'msg-prior',
+        ]);
+
+        try {
+            $this->publisher->publish($execution);
+            $this->fail('Expected a PublishingException when there are no pending recipients left.');
+        } catch (PublishingException $e) {
+            $this->assertFalse($e->isRetryable());
+        }
+
+        $this->fakeProvider->assertNotSent();
+    }
+
+    public function test_publish_does_not_resend_to_a_recipient_already_marked_sent_by_a_prior_attempt(): void
+    {
+        $this->makeCredentials();
+        $asset = $this->makeAsset();
+        $execution = $this->makeExecution($asset);
+        [$pendingSnapshot] = $this->makeSnapshotRecipients($execution, ['pending@example.com']);
+        EmailRecipientSnapshot::create([
+            'company_id' => $this->company->id,
+            'campaign_id' => $this->campaign->id,
+            'execution_id' => $execution->id,
+            'email' => 'already-sent@example.com',
+            'status' => 'sent',
+            'provider_message_id' => 'msg-prior',
+        ]);
+
+        $this->publisher->publish($execution);
+
+        $this->fakeProvider->assertSent(1);
+        $this->assertSame('pending@example.com', $this->fakeProvider->sentItems()[0]['payload']->toEmail);
+        $this->assertSame('sent', $pendingSnapshot->fresh()->status->value);
+    }
+
+    public function test_publish_does_not_leak_another_companys_snapshot_rows(): void
+    {
+        $otherCompany = Company::withoutGlobalScopes()->create(['name' => 'Other', 'slug' => 'other-co']);
+        $otherChannel = Channel::withoutGlobalScopes()->create([
+            'company_id' => $otherCompany->id, 'type' => 'email', 'name' => 'Email', 'is_active' => true,
+        ]);
+        $otherOpportunity = Opportunity::withoutGlobalScopes()->create([
+            'company_id' => $otherCompany->id, 'subject_type' => 'catalog_item', 'type' => 'featured_item',
+            'title' => 'Other', 'description' => 'Desc', 'relevance_score' => 80, 'timing_score' => 75,
+            'confidence_score' => 70, 'urgency_score' => 65, 'composite_score' => 73,
+            'status' => 'selected', 'detected_at' => now(),
+        ]);
+        $otherDecision = Decision::withoutGlobalScopes()->create([
+            'company_id' => $otherCompany->id, 'opportunity_id' => $otherOpportunity->id,
+            'campaign_type' => 'featured_item', 'channel_ids' => [$otherChannel->id],
+            'rationale' => [], 'confidence_score' => 70, 'status' => 'recommended', 'decided_at' => now(),
+        ]);
+        $otherCampaign = Campaign::withoutGlobalScopes()->create([
+            'company_id' => $otherCompany->id, 'decision_id' => $otherDecision->id,
+            'campaign_type' => 'featured_item', 'title' => 'Other Campaign',
+            'blueprint_version' => '1.0', 'prompt_version' => '1.0',
+            'expected_asset_count' => 1, 'generated_asset_count' => 1, 'status' => 'approved',
+        ]);
+        $otherAsset = ContentAsset::withoutGlobalScopes()->create([
+            'company_id' => $otherCompany->id, 'campaign_id' => $otherCampaign->id,
+            'channel_id' => $otherChannel->id, 'type' => 'email', 'body' => 'Other body.', 'status' => 'scheduled',
+        ]);
+        $otherExecution = Execution::create([
+            'company_id' => $otherCompany->id, 'campaign_id' => $otherCampaign->id,
+            'content_asset_id' => $otherAsset->id, 'channel_id' => $otherChannel->id,
+            'status' => 'queued', 'idempotency_key' => Str::ulid()->toString(),
+        ]);
+        EmailRecipientSnapshot::create([
+            'company_id' => $otherCompany->id,
+            'campaign_id' => $otherCampaign->id,
+            'execution_id' => $otherExecution->id,
+            'email' => 'other-company@example.com',
+            'status' => 'pending',
+        ]);
+
+        $this->makeCredentials();
+        $asset = $this->makeAsset();
+        $execution = $this->makeExecution($asset);
+        $this->makeSnapshotRecipients($execution, ['mine@example.com']);
+
+        $this->publisher->publish($execution);
+
+        // Only this Execution's own recipient was ever sent to — the other
+        // company's pending snapshot row was never touched.
+        $this->fakeProvider->assertSent(1);
+        $this->assertSame('mine@example.com', $this->fakeProvider->sentItems()[0]['payload']->toEmail);
+        $otherSnapshot = EmailRecipientSnapshot::withoutGlobalScopes()->where('execution_id', $otherExecution->id)->first();
+        $this->assertSame('pending', $otherSnapshot->status->value);
     }
 
     // ── Full pipeline integration ─────────────────────────────────────────────

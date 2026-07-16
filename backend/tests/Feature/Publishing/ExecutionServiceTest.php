@@ -12,6 +12,9 @@ use App\Models\Company;
 use App\Models\ContentAsset;
 use App\Models\Decision;
 use App\Models\DigitalTwin;
+use App\Models\EmailAudience;
+use App\Models\EmailContact;
+use App\Models\EmailRecipientSnapshot;
 use App\Models\Execution;
 use App\Models\ExecutionAttempt;
 use App\Models\Opportunity;
@@ -165,6 +168,80 @@ class ExecutionServiceTest extends TestCase
         $executions = $this->service->queueForCampaign($this->campaign);
 
         $this->assertCount(0, $executions);
+    }
+
+    // --- queueForCampaign: audience recipient snapshotting ---
+
+    public function test_queue_for_campaign_snapshots_the_selected_audiences_members(): void
+    {
+        $audience = EmailAudience::create(['company_id' => $this->company->id, 'name' => 'Newsletter', 'status' => 'active']);
+        $contactA = EmailContact::create(['company_id' => $this->company->id, 'email' => 'a@example.com', 'normalized_email' => 'a@example.com']);
+        $contactB = EmailContact::create(['company_id' => $this->company->id, 'email' => 'b@example.com', 'normalized_email' => 'b@example.com']);
+        $audience->members()->attach([$contactA->id, $contactB->id]);
+        $this->campaign->update(['email_audience_id' => $audience->id]);
+
+        $asset = $this->makeApprovedAsset();
+        $executions = $this->service->queueForCampaign($this->campaign);
+
+        $snapshots = EmailRecipientSnapshot::withoutGlobalScopes()->where('execution_id', $executions[0]->id)->get();
+        $this->assertCount(2, $snapshots);
+        $this->assertSame(['a@example.com', 'b@example.com'], $snapshots->pluck('email')->sort()->values()->all());
+        $this->assertNotNull($asset);
+    }
+
+    public function test_queue_for_campaign_does_not_snapshot_when_no_audience_is_selected(): void
+    {
+        $this->makeApprovedAsset();
+
+        $executions = $this->service->queueForCampaign($this->campaign);
+
+        $this->assertDatabaseCount('email_recipient_snapshots', 0);
+        $this->assertNotEmpty($executions);
+    }
+
+    public function test_queue_for_campaign_does_not_snapshot_for_a_non_email_channel(): void
+    {
+        $audience = EmailAudience::create(['company_id' => $this->company->id, 'name' => 'Newsletter', 'status' => 'active']);
+        $contact = EmailContact::create(['company_id' => $this->company->id, 'email' => 'a@example.com', 'normalized_email' => 'a@example.com']);
+        $audience->members()->attach($contact->id);
+        $this->campaign->update(['email_audience_id' => $audience->id]);
+
+        $blogChannel = Channel::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id, 'type' => 'blog', 'name' => 'Blog', 'is_active' => true,
+        ]);
+        ContentAsset::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id,
+            'campaign_id' => $this->campaign->id,
+            'channel_id' => $blogChannel->id,
+            'type' => 'blog_post',
+            'body' => 'Post body.',
+            'status' => 'approved',
+        ]);
+
+        $this->service->queueForCampaign($this->campaign);
+
+        $this->assertDatabaseCount('email_recipient_snapshots', 0);
+    }
+
+    public function test_queue_for_campaign_does_not_leak_another_companys_audience_members(): void
+    {
+        $otherCompany = Company::withoutGlobalScopes()->create(['name' => 'Other', 'slug' => 'other-co']);
+        $otherAudience = EmailAudience::create(['company_id' => $otherCompany->id, 'name' => 'Other List', 'status' => 'active']);
+        $otherContact = EmailContact::create(['company_id' => $otherCompany->id, 'email' => 'other@example.com', 'normalized_email' => 'other@example.com']);
+        $otherAudience->members()->attach($otherContact->id);
+
+        // A same-ID-space audience for THIS company, so email_audience_id
+        // genuinely resolves — but the other company's audience must never
+        // be reachable even if somehow referenced.
+        $ownAudience = EmailAudience::create(['company_id' => $this->company->id, 'name' => 'Own List', 'status' => 'active']);
+        $this->campaign->update(['email_audience_id' => $ownAudience->id]);
+
+        $this->makeApprovedAsset();
+        $executions = $this->service->queueForCampaign($this->campaign);
+
+        $snapshots = EmailRecipientSnapshot::withoutGlobalScopes()->where('execution_id', $executions[0]->id)->get();
+        $this->assertCount(0, $snapshots);
+        $this->assertDatabaseMissing('email_recipient_snapshots', ['email' => 'other@example.com']);
     }
 
     // --- markCompleted ---

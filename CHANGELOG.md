@@ -6,6 +6,45 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Feature] Real multi-recipient email campaign sending, using recipient snapshots — 2026-07-16
+
+Production-readiness gap plan, Phase 1A. The previous slice built the contact/audience/snapshot model and a payload-expansion helper, but explicitly stopped short of wiring a real send — `EmailPublisher`/`PublishContent` still only ever sent to one hardcoded address. This slice wires the real send, without changing `EmailProvider`/`EmailPayload`/`ChannelPublisher` at all.
+
+### Where this hooks in
+
+- **`ExecutionService::queueForCampaign()`** — the single place any Execution is ever created, itself only ever called from `PublishCampaign`, itself only ever dispatched by the `TriggerCampaignPublishing` listener on `RecommendationApproved` (i.e. only after `RecommendationController::approve()` → `ApprovalService::approve()` — human approval remains required, unchanged). Now calls the new `EmailAudienceService::snapshotIfApplicable()` right after creating each Execution — a no-op for every non-email channel and for a campaign with no audience selected, so this is the *only* line added to a service otherwise still completely channel-agnostic.
+- **`EmailPublisher::publish()`** — checks whether any `EmailRecipientSnapshot` rows exist for this Execution. None → unchanged original single-recipient path (`Channel.config.to_email`), so every pre-existing email campaign/test keeps working exactly as before. Some → the new `publishToAudience()` path: expands the rendered payload into one `EmailPayload` per pending snapshot (via last slice's `buildPayloadsForSnapshots()`, now keyed by snapshot ID) and calls `EmailProvider::send()` once per recipient — never a shared To/CC/BCC header.
+
+### Honest partial-failure handling
+
+- A failed recipient is caught and recorded on *that recipient's own* snapshot row (`status: failed`, reason in `skipped_reason`); it never aborts the loop, so one bad address can't block everyone else.
+- If **at least one** recipient succeeds, the Execution reports `completed` — but its `ExecutionResult.metadata` carries `recipients_total`/`recipients_sent`/`recipients_failed`, so "completed" is never conflated with "everyone received it." The per-recipient truth lives in `email_recipient_snapshots`, which a caller must read to know who actually got it.
+- If **zero** recipients succeed, `EmailPublisher` throws a retryable `PublishingException` — `PublishContent`'s existing retry machinery handles it exactly as it already does for a single-recipient failure, no new retry logic needed.
+- A **partial** success does not retry (retrying would re-send duplicates to already-succeeded recipients) — this is a deliberate at-least-once, no-duplicates tradeoff, not an oversight.
+- An audience resolving to zero pending recipients (empty audience, or a retry where every recipient was already processed) throws a non-retryable `PublishingException` — never a fake success.
+- Snapshots are immutable after creation: `EmailPublisher` only ever reads existing rows and updates their own `status`/`provider_message_id`/`skipped_reason` — it never re-queries live audience membership, and a retried Execution correctly skips already-`Sent` recipients (since `buildPayloadsForSnapshots()` only returns `Pending` rows), so a retry can never duplicate-send.
+
+### Files changed
+
+- `app/Services/Publishing/Email/EmailAudienceService.php` — `buildPayloadsForSnapshots()` now returns a `Collection` keyed by snapshot ID (was re-indexed); new `snapshotIfApplicable()`, `markSnapshotSent()`, `markSnapshotFailed()`.
+- `app/Services/Publishing/ExecutionService.php` — one new line in `queueForCampaign()`; new constructor dependency on `EmailAudienceService`.
+- `app/Services/Publishing/EmailPublisher.php` — new `publishToAudience()` private method; `publish()` branches on whether a snapshot exists.
+- `docs/architecture/EmailArchitecture.md` — addendum marking §6's proposal as implemented (under different final table names — see the addendum for why).
+
+### Tests added
+
+- `ExecutionServiceTest` (+4): snapshot created for a selected audience; no snapshot with no audience selected; no snapshot for a non-email channel; another company's audience members never leak into a snapshot.
+- `EmailPublisherTest` (+8): full multi-recipient success; per-recipient message IDs recorded independently; honest partial failure (some sent, some failed, aggregate counts correct, one failure never implies total success); full failure throws retryable; empty/already-fully-processed snapshot throws non-retryable; a retry never re-sends to an already-`Sent` recipient; another company's snapshot rows are never touched by this Execution's send.
+- New `PublishCampaignTest` (2): an unapproved campaign is never queued, sent, or snapshotted (human approval gate proven directly, not just assumed from upstream); an approved campaign is queued and its audience snapshotted correctly.
+
+## Remaining risks and intentionally deferred work
+
+- **No suppression enforcement** — unchanged from the prior slice; still fully deferred, still documented as such rather than silently assumed.
+- **No batch-send optimization** — Postmark's real `POST /email/batch` endpoint is not used; this remains one HTTP call per recipient, which is correct/simple for the audience sizes this slice targets but will need revisiting for genuinely large lists.
+- **No per-recipient retry** — a recipient marked `failed` stays `failed`; there is no "retry just the failed ones" action yet (only "retry the whole Execution," which — by design — only ever affects still-`Pending` rows going forward, since already-`Sent`/`Failed` rows are left alone).
+- **No UI surfacing of `recipients_sent`/`recipients_failed` yet** — the data is real and queryable (`Execution.result.metadata`, `email_recipient_snapshots`), but `Campaigns/Show.vue`/`Publishing.vue` don't render it yet. Flagged, not silently left inconsistent with a claim — no UI currently claims per-recipient delivery visibility that would need correcting.
+
+
 ## [Feature] Email contacts, audiences, and campaign targeting — the minimal recipient model — 2026-07-16
 
 Production-readiness gap plan, Phase 1A ("Email Production Completion"). Postmark connection/verification/test-send/capability-truth were already complete, but `EmailPayload` supported exactly one recipient and no company-scoped model existed for contacts, lists, or membership — a connected Postmark account had nothing safe to send a real campaign to beyond a single hardcoded address.

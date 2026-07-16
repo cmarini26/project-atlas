@@ -1,7 +1,20 @@
 # Email Architecture — Path to Production
 
-**Status:** Architecture proposal for Phase 1 of `backend/.hermes/plans/2026-07-15_094741-atlas-production-readiness-gap-plan.md`.
+**Status:** Architecture proposal for Phase 1 of `backend/.hermes/plans/2026-07-15_094741-atlas-production-readiness-gap-plan.md`. **Partially implemented as of 2026-07-16 — see addendum below.**
 **Scope:** Design only. This document does not change any code.
+
+---
+
+## Addendum — 2026-07-16: multi-recipient sending is now real, not just designed
+
+§6's recommendation ("one Execution per campaign-channel send, with a new recipients table resolved and iterated inside `EmailPublisher::publish()`") is now implemented, under different final names:
+
+- `email_contacts`/`email_audiences`/`email_audience_members` (not a single flat `email_recipients` table — split into contacts, named lists, and membership, since "who is this person" and "which list are they on" turned out to be genuinely separate concerns worth their own tables) replace §10's proposed schema.
+- `email_recipient_snapshots` replaces the "aggregate into `Execution.result` JSON" idea — an immutable per-recipient row (status/skipped_reason/provider_message_id) proved a better fit than a blob, since it can answer "who was this sent to and did it succeed" per-address without parsing JSON, and gives per-recipient delivery-status columns a schema to land in later without a migration.
+- `EmailPublisher::publish()` now genuinely resolves a snapshot (created once at `ExecutionService::queueForCampaign()` time, never re-derived from live audience membership afterward) and calls `EmailProvider::send()` once per pending recipient — exactly §6's plan, now real. `EmailPayload`/`EmailProvider` were **not** changed, contrary to §6's speculation that `EmailPayload` might need "one real change" — the existing single-recipient shape turned out to be sufficient as-is.
+- Partial-failure handling matches §6's original description almost exactly: a batch partially failing is not a full `Execution` failure; per-recipient outcomes live in `email_recipient_snapshots`, not just `Execution.result`.
+
+**Still exactly as designed and still not built:** the suppression list (§7), unsubscribe links, additional providers, and provider-native batch-send optimization (Postmark's `POST /email/batch`) — sending is still strictly one HTTP call per recipient today, by design, not as a stopgap.
 
 ---
 

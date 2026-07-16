@@ -10,6 +10,7 @@ use App\Enums\EmailContactSource;
 use App\Enums\EmailContactStatus;
 use App\Enums\EmailRecipientSnapshotStatus;
 use App\Models\Campaign;
+use App\Models\Channel;
 use App\Models\Company;
 use App\Models\EmailAudience;
 use App\Models\EmailContact;
@@ -36,11 +37,6 @@ use Illuminate\Support\Collection;
  * this slice; Postmark's own handling of non-ASCII domains is unverified,
  * so this deliberately does not claim support it hasn't confirmed. This is
  * a documented limitation, not an oversight.
- *
- * This slice stops at model + payload expansion — it deliberately does not
- * wire a real multi-recipient send yet. See
- * docs/architecture/EmailArchitecture.md §6 for the exact remaining
- * execution slice.
  */
 class EmailAudienceService
 {
@@ -196,35 +192,103 @@ class EmailAudienceService
 
     /**
      * Expands one rendered campaign payload into one EmailPayload per
-     * pending snapshot recipient. Deliberately does NOT change EmailPayload
-     * or EmailProvider's shape — each recipient still gets its own
-     * single-recipient EmailPayload, exactly the shape PostmarkEmailProvider
-     * already accepts, so per-recipient isolation (failures, provider
-     * message IDs, retries, future unsubscribe links, future analytics
-     * correlation) falls out of the existing one-call-per-send contract for
-     * free.
+     * pending snapshot recipient — keyed by snapshot ID (not re-indexed)
+     * specifically so a caller sending each payload can write the outcome
+     * back to the exact snapshot row it came from. Deliberately does NOT
+     * change EmailPayload or EmailProvider's shape — each recipient still
+     * gets its own single-recipient EmailPayload, exactly the shape
+     * PostmarkEmailProvider already accepts, so per-recipient isolation
+     * (failures, provider message IDs, retries, future unsubscribe links,
+     * future analytics correlation) falls out of the existing
+     * one-call-per-send contract for free.
      *
-     * This method only prepares payloads — it does not send anything.
-     * Wiring a real send loop that calls EmailProvider::send() once per
-     * payload and records the per-recipient outcome back onto its snapshot
-     * is the next slice (see docs/architecture/EmailArchitecture.md §6).
+     * Only non-skipped, not-yet-attempted (`Pending`) snapshots are
+     * included — on a retried Execution, snapshots already marked `Sent`/
+     * `Failed` by a prior attempt are excluded, so re-processing an
+     * Execution never re-sends to a recipient it already reached. This
+     * method only prepares payloads — sending and recording per-recipient
+     * outcomes is EmailPublisher::publishToAudience()'s job.
      *
      * @param  Collection<int, EmailRecipientSnapshot>  $snapshots
-     * @return Collection<int, EmailPayload>
+     * @return Collection<string, EmailPayload> keyed by EmailRecipientSnapshot->id
      */
     public function buildPayloadsForSnapshots(PlatformPayload $platformPayload, Collection $snapshots): Collection
     {
         return $snapshots
             ->filter(fn (EmailRecipientSnapshot $s) => $s->status === EmailRecipientSnapshotStatus::Pending)
-            ->map(fn (EmailRecipientSnapshot $s) => new EmailPayload(
-                subject: (string) ($platformPayload->data['subject'] ?? ''),
-                fromName: (string) ($platformPayload->data['from_name'] ?? ''),
-                fromEmail: (string) ($platformPayload->data['from_email'] ?? ''),
-                body: (string) ($platformPayload->data['body'] ?? ''),
-                previewText: (string) ($platformPayload->data['preview_text'] ?? ''),
-                toEmail: $s->email,
-                toName: $s->display_name,
-            ))
-            ->values();
+            ->mapWithKeys(fn (EmailRecipientSnapshot $s) => [
+                $s->id => new EmailPayload(
+                    subject: (string) ($platformPayload->data['subject'] ?? ''),
+                    fromName: (string) ($platformPayload->data['from_name'] ?? ''),
+                    fromEmail: (string) ($platformPayload->data['from_email'] ?? ''),
+                    body: (string) ($platformPayload->data['body'] ?? ''),
+                    previewText: (string) ($platformPayload->data['preview_text'] ?? ''),
+                    toEmail: $s->email,
+                    toName: $s->display_name,
+                ),
+            ]);
+    }
+
+    /**
+     * The email-specific half of Execution creation: if this campaign
+     * targets an audience and this Execution's channel is really `email`,
+     * snapshot that audience's current membership now — once, at the same
+     * moment ExecutionService::queueForCampaign() creates the Execution
+     * (already gated on the campaign being 'approved', i.e. after human
+     * approval). A no-op for every other channel type and for a campaign
+     * with no audience selected, so ExecutionService itself stays
+     * completely channel-agnostic — this is the only line it needs to add.
+     */
+    public function snapshotIfApplicable(Execution $execution, Campaign $campaign): void
+    {
+        if ($campaign->email_audience_id === null) {
+            return;
+        }
+
+        $channel = Channel::withoutGlobalScopes()->find($execution->channel_id);
+
+        if ($channel === null || $channel->type !== 'email') {
+            return;
+        }
+
+        $audience = EmailAudience::withoutGlobalScopes()
+            ->where('company_id', $campaign->company_id)
+            ->find($campaign->email_audience_id);
+
+        if ($audience === null) {
+            return;
+        }
+
+        $this->snapshotRecipientsForExecution($execution, $campaign, $audience);
+    }
+
+    /**
+     * Records that this recipient's send genuinely reached the provider —
+     * called once per successful EmailProvider::send() call, never in bulk,
+     * so a partial failure can never be mistaken for a full success (the
+     * un-updated rows stay Pending/Failed).
+     */
+    public function markSnapshotSent(EmailRecipientSnapshot $snapshot, string $providerMessageId): void
+    {
+        $snapshot->update([
+            'status' => EmailRecipientSnapshotStatus::Sent,
+            'provider_message_id' => $providerMessageId,
+        ]);
+    }
+
+    /**
+     * `skipped_reason` doubles as the general "why didn't this recipient
+     * succeed" text column for both `skipped` (duplicate, decided before
+     * ever calling the provider) and `failed` (the provider rejected/threw
+     * for this specific address) — the smallest schema that supports both,
+     * per this feature's original migration comment, rather than adding a
+     * second reason column for a single extra status value.
+     */
+    public function markSnapshotFailed(EmailRecipientSnapshot $snapshot, string $reason): void
+    {
+        $snapshot->update([
+            'status' => EmailRecipientSnapshotStatus::Failed,
+            'skipped_reason' => $reason,
+        ]);
     }
 }

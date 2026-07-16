@@ -10,13 +10,19 @@ use App\Models\Campaign;
 use App\Models\ContentAsset;
 use App\Models\Execution;
 use App\Models\ExecutionAttempt;
+use App\Services\Publishing\Email\EmailAudienceService;
 use Illuminate\Support\Str;
 
 class ExecutionService
 {
+    public function __construct(private readonly EmailAudienceService $emailAudiences) {}
+
     /**
      * Create Execution records for all approved ContentAssets in a campaign.
-     * Transitions ContentAssets from approved → scheduled.
+     * Transitions ContentAssets from approved → scheduled. Called only from
+     * PublishCampaign, itself gated on Campaign.status === 'approved' — i.e.
+     * only ever reached after human approval (RecommendationController::
+     * approve() → ApprovalService::approve()).
      *
      * @return list<Execution>
      */
@@ -41,6 +47,15 @@ class ExecutionService
             ]);
 
             $asset->update(['status' => 'scheduled']);
+
+            // A no-op for every non-email channel and for a campaign with
+            // no audience selected — see EmailAudienceService::
+            // snapshotIfApplicable()'s own docblock. Snapshotting here,
+            // once, at Execution-creation time, is what "do not re-read
+            // live audience membership after snapshot creation" means in
+            // practice: EmailPublisher (queued, possibly minutes later)
+            // only ever reads the rows created on this line.
+            $this->emailAudiences->snapshotIfApplicable($execution, $campaign);
 
             $executions[] = $execution;
         }
