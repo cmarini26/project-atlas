@@ -135,7 +135,7 @@ export interface Execution {
     executed_at?: string | null
     completed_at: string | null
     last_error?: string | null
-    channel?: { type: string } | null
+    channel?: { type: string; marketing_channel?: { supports_publishing: boolean } | null } | null
 }
 
 // CampaignKpiSnapshot as returned by controllers (uses actual_kpis, snapshotted_at)

@@ -109,7 +109,11 @@ function formatDate(date: string | null): string {
           <div class="flex items-center gap-2 mb-2">
             <Badge variant="muted">{{ asset.type }}</Badge>
             <span v-if="asset.channel?.type" class="text-xs text-[var(--color-text-muted)]">{{ channelLabel(asset.channel.type) }}</span>
-            <ChannelCapabilityBadge v-if="asset.channel?.type" :channel-type="asset.channel.type" />
+            <ChannelCapabilityBadge
+              v-if="asset.channel?.type"
+              :channel-type="asset.channel.type"
+              :linked-marketing-channel="asset.channel.marketing_channel ? { supportsPublishing: asset.channel.marketing_channel.supports_publishing } : null"
+            />
           </div>
           <h3 v-if="asset.title" class="text-sm font-semibold text-[var(--color-text-primary)] mb-1">{{ asset.title }}</h3>
           <p class="text-sm text-[var(--color-text-secondary)] whitespace-pre-line">{{ asset.body }}</p>
@@ -138,7 +142,11 @@ function formatDate(date: string | null): string {
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2">
               <p class="text-sm font-medium text-[var(--color-text-primary)] truncate">{{ execution.channel ? channelLabel(execution.channel.type) : 'Unknown' }}</p>
-              <ChannelCapabilityBadge v-if="execution.channel" :channel-type="execution.channel.type" />
+              <ChannelCapabilityBadge
+                v-if="execution.channel"
+                :channel-type="execution.channel.type"
+                :linked-marketing-channel="execution.channel.marketing_channel ? { supportsPublishing: execution.channel.marketing_channel.supports_publishing } : null"
+              />
             </div>
             <p class="text-xs text-[var(--color-text-muted)]">{{ formatDate(execution.scheduled_at) }}</p>
           </div>

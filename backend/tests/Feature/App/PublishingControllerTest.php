@@ -9,6 +9,7 @@ use App\Models\CompanyMembership;
 use App\Models\ContentAsset;
 use App\Models\Decision;
 use App\Models\Execution;
+use App\Models\MarketingChannel;
 use App\Models\Opportunity;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -69,6 +70,61 @@ class PublishingControllerTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->has('executions.data', 1)
                 ->where('executions.total', 1)
+            );
+    }
+
+    public function test_execution_channel_includes_the_linked_marketing_channels_publishing_status(): void
+    {
+        // Phase 0 product-truth: ChannelCapabilityBadge needs the real
+        // per-company link (not just the channel type) to ever show
+        // "Connected" instead of the generic global-fallback label.
+        [$user, $company] = $this->userWithCompany();
+
+        $channel = Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'facebook',
+            'name' => 'Facebook',
+        ]);
+
+        MarketingChannel::create([
+            'company_id' => $company->id,
+            'channel_id' => $channel->id,
+            'type' => 'facebook',
+            'display_name' => 'Facebook',
+            'status' => 'active',
+            'importance' => 'secondary',
+            'objective' => ['awareness'],
+            'posting_frequency' => 'weekly',
+            'is_connected' => true,
+            'supports_publishing' => true,
+        ]);
+
+        $campaign = $this->createCampaign($company);
+
+        $asset = ContentAsset::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_id' => $campaign->id,
+            'channel_id' => $channel->id,
+            'type' => 'social_post',
+            'body' => 'Test post body',
+            'status' => 'draft',
+        ]);
+
+        Execution::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_id' => $campaign->id,
+            'content_asset_id' => $asset->id,
+            'channel_id' => $channel->id,
+            'status' => 'pending',
+            'idempotency_key' => 'test-key-'.uniqid(),
+        ]);
+
+        $this->actingAs($user)
+            ->get('/app/publishing')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('executions.data.0.channel.type', 'facebook')
+                ->where('executions.data.0.channel.marketing_channel.supports_publishing', true)
             );
     }
 

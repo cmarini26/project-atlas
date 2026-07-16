@@ -3,10 +3,16 @@
 namespace Tests\Feature\App;
 
 use App\Models\Campaign;
+use App\Models\Channel;
 use App\Models\Company;
 use App\Models\CompanyMembership;
+use App\Models\ContentAsset;
+use App\Models\Decision;
 use App\Models\DigitalTwin;
+use App\Models\Execution;
 use App\Models\Integration;
+use App\Models\MarketingChannel;
+use App\Models\Opportunity;
 use App\Models\Recommendation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -121,6 +127,87 @@ class DashboardControllerTest extends TestCase
             ->get('/app')
             ->assertOk()
             ->assertInertia(fn ($page) => $page->where('has_campaign_history', true));
+    }
+
+    public function test_recent_execution_channel_includes_the_linked_marketing_channels_publishing_status(): void
+    {
+        [$user, $company] = $this->userWithCompanyAndIntegration();
+
+        $channel = Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'facebook',
+            'name' => 'Facebook',
+        ]);
+
+        MarketingChannel::create([
+            'company_id' => $company->id,
+            'channel_id' => $channel->id,
+            'type' => 'facebook',
+            'display_name' => 'Facebook',
+            'status' => 'active',
+            'importance' => 'secondary',
+            'objective' => ['awareness'],
+            'posting_frequency' => 'weekly',
+            'is_connected' => true,
+            'supports_publishing' => false,
+        ]);
+
+        $opportunity = Opportunity::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'featured_item',
+            'title' => 'Test Opportunity',
+            'description' => 'A test opportunity.',
+            'status' => 'selected',
+            'composite_score' => 80,
+            'relevance_score' => 80,
+            'timing_score' => 80,
+            'confidence_score' => 80,
+            'urgency_score' => 80,
+            'detected_at' => now(),
+        ]);
+
+        $decision = Decision::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'opportunity_id' => $opportunity->id,
+            'campaign_type' => 'featured_item',
+            'channel_ids' => [],
+            'rationale' => [],
+            'decided_at' => now(),
+        ]);
+
+        $campaign = Campaign::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'decision_id' => $decision->id,
+            'campaign_type' => 'featured_item',
+            'title' => 'Test Campaign',
+            'status' => 'draft',
+        ]);
+
+        $asset = ContentAsset::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_id' => $campaign->id,
+            'channel_id' => $channel->id,
+            'type' => 'social_post',
+            'body' => 'Test post body',
+            'status' => 'draft',
+        ]);
+
+        Execution::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_id' => $campaign->id,
+            'content_asset_id' => $asset->id,
+            'channel_id' => $channel->id,
+            'status' => 'pending',
+            'idempotency_key' => 'test-key-'.uniqid(),
+        ]);
+
+        $this->actingAs($user)
+            ->get('/app')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('recent_executions.0.channel.type', 'facebook')
+                ->where('recent_executions.0.channel.marketing_channel.supports_publishing', false)
+            );
     }
 
     /** @return array{User, Company} */

@@ -18,7 +18,7 @@ interface ExecutionItem {
   executed_at: string | null
   completed_at: string | null
   last_error: string | null
-  channel: { type: string } | null
+  channel: { type: string; marketing_channel: { supports_publishing: boolean } | null } | null
   content_asset: { type: string; body: string } | null
 }
 
@@ -86,7 +86,11 @@ function formatDate(date: string | null): string {
                 <span class="text-sm font-medium text-[var(--color-text-primary)]">
                   {{ execution.channel ? channelLabel(execution.channel.type) : 'Unknown channel' }}
                 </span>
-                <ChannelCapabilityBadge v-if="execution.channel" :channel-type="execution.channel.type" />
+                <ChannelCapabilityBadge
+                  v-if="execution.channel"
+                  :channel-type="execution.channel.type"
+                  :linked-marketing-channel="execution.channel.marketing_channel ? { supportsPublishing: execution.channel.marketing_channel.supports_publishing } : null"
+                />
                 <Badge :variant="statusVariants[execution.status] ?? 'muted'">
                   {{ statusLabels[execution.status] ?? execution.status }}
                 </Badge>

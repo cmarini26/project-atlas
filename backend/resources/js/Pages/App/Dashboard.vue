@@ -40,7 +40,7 @@ interface RecentExecution {
   status: string
   scheduled_at: string | null
   completed_at: string | null
-  channel: { type: string } | null
+  channel: { type: string; marketing_channel: { supports_publishing: boolean } | null } | null
 }
 
 interface DashboardProps {
@@ -198,7 +198,11 @@ function formatDate(date: string | null): string {
               <p class="text-sm text-[var(--color-text-secondary)] truncate">
                 {{ execution.channel ? channelLabel(execution.channel.type) : 'Unknown channel' }}
               </p>
-              <ChannelCapabilityBadge v-if="execution.channel" :channel-type="execution.channel.type" />
+              <ChannelCapabilityBadge
+                v-if="execution.channel"
+                :channel-type="execution.channel.type"
+                :linked-marketing-channel="execution.channel.marketing_channel ? { supportsPublishing: execution.channel.marketing_channel.supports_publishing } : null"
+              />
             </div>
             <p class="text-xs text-[var(--color-text-muted)]">{{ formatDate(execution.scheduled_at) }}</p>
           </div>

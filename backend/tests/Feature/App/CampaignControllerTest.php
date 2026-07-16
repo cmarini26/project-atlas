@@ -3,9 +3,13 @@
 namespace Tests\Feature\App;
 
 use App\Models\Campaign;
+use App\Models\Channel;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\Decision;
+use App\Models\Execution;
+use App\Models\MarketingChannel;
+use App\Models\ContentAsset;
 use App\Models\Opportunity;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -78,6 +82,57 @@ class CampaignControllerTest extends TestCase
         $this->actingAs($user)
             ->get("/app/campaigns/{$campaign->id}")
             ->assertNotFound();
+    }
+
+    public function test_show_includes_the_linked_marketing_channels_publishing_status_on_content_assets_and_executions(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $campaign = $this->createCampaign($company);
+
+        $channel = Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'facebook',
+            'name' => 'Facebook',
+        ]);
+
+        MarketingChannel::create([
+            'company_id' => $company->id,
+            'channel_id' => $channel->id,
+            'type' => 'facebook',
+            'display_name' => 'Facebook',
+            'status' => 'active',
+            'importance' => 'secondary',
+            'objective' => ['awareness'],
+            'posting_frequency' => 'weekly',
+            'is_connected' => true,
+            'supports_publishing' => true,
+        ]);
+
+        $asset = ContentAsset::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_id' => $campaign->id,
+            'channel_id' => $channel->id,
+            'type' => 'social_post',
+            'body' => 'Test post body',
+            'status' => 'draft',
+        ]);
+
+        Execution::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_id' => $campaign->id,
+            'content_asset_id' => $asset->id,
+            'channel_id' => $channel->id,
+            'status' => 'pending',
+            'idempotency_key' => 'test-key-'.uniqid(),
+        ]);
+
+        $this->actingAs($user)
+            ->get("/app/campaigns/{$campaign->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('content_assets.0.channel.marketing_channel.supports_publishing', true)
+                ->where('executions.0.channel.marketing_channel.supports_publishing', true)
+            );
     }
 
     /** @return array{User, Company} */

@@ -6,6 +6,24 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Fix] Publishing.vue, Dashboard.vue, and Campaigns/Show.vue can now show "Connected" for a real channel — 2026-07-15
+
+Production-readiness gap plan, Phase 0 (channel capability truth), closing the follow-up flagged in the previous entry below. `resolveChannelCapability()` and `MarketingChannel.supports_publishing` were already correctly wired (Meta OAuth connect/revoke, `CheckChannelHealth`), but three pages rendered `<ChannelCapabilityBadge :channel-type="..." />` with no `linked-marketing-channel` prop at all, so they always fell back to the global default and could never show "Connected" for a company that had genuinely connected a real channel.
+
+### Fixed
+
+- `PublishingController::index()`, `DashboardController::index()`, `CampaignController::show()` each now build a `$linkedMarketingChannelsByChannelId` map once per request (keyed by `channel_id`, the same pattern already established in `RecommendationController::show()`) and attach `channel.marketing_channel.supports_publishing` to every execution/content-asset row — an O(1) lookup, not a per-row query.
+- `Publishing.vue`, `Dashboard.vue`, `Campaigns/Show.vue` now pass `:linked-marketing-channel` to every `ChannelCapabilityBadge`, resolved from that same data — no array searching in the templates themselves, since the backend already resolves it per row.
+- `resources/js/types/index.ts`'s `Execution.channel` gained the same `marketing_channel` shape `ContentAsset.channel` already had.
+
+No new capability resolver, no change to `resolveChannelCapability()`'s logic, no change to the capability model itself — this only finishes threading data that mechanism already needed into the three pages that weren't providing it.
+
+### Notes
+
+- New tests: `PublishingControllerTest::test_execution_channel_includes_the_linked_marketing_channels_publishing_status`, `DashboardControllerTest::test_recent_execution_channel_includes_the_linked_marketing_channels_publishing_status`, `CampaignControllerTest::test_show_includes_the_linked_marketing_channels_publishing_status_on_content_assets_and_executions`.
+- `blog` (WordPress) still cannot show "Connected" through this mechanism on any page — it has no `MarketingChannelType` equivalent, so there's no declared/linked `MarketingChannel` to attach in the first place. Unchanged by this slice; see the audit doc's 2026-07-15 addendum.
+
+
 ## [Fix] Channel capability badges no longer claim Meta is unbuilt, and now reflect real connection state — 2026-07-15
 
 Production-readiness gap plan, Phase 0 (channel capability truth). `resources/js/lib/channelCapability.ts` and `docs/reviews/Channel-Publishing-Reality-Audit.md` still described the 2026-07-07 reality — "no channel type currently sends to a real external platform" — but real `WordPressPublisher` and `MetaChannelPublisher` implementations, with real per-company connect flows (`SettingsController::connectWordPress()`, `MetaOAuthController`), shipped since then. `MarketingPresenceService::link()`'s own docblock had explicitly deferred setting `supports_publishing` to "a later upgrade" — that upgrade had never happened, so the capability badge could never show "Connected" for any company no matter how genuinely they'd connected a real channel.

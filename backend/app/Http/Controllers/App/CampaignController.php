@@ -7,6 +7,7 @@ use App\Models\Campaign;
 use App\Models\Company;
 use App\Models\ContentAsset;
 use App\Models\Execution;
+use App\Models\MarketingChannel;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -58,6 +59,15 @@ class CampaignController extends Controller
             ->where('campaign_id', $campaign->id)
             ->get();
 
+        // Built once per request and keyed by channel_id so each content
+        // asset/execution below is an O(1) lookup, not a per-row query — see
+        // RecommendationController::show() for the same established pattern.
+        $linkedMarketingChannelsByChannelId = MarketingChannel::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->whereNotNull('channel_id')
+            ->get()
+            ->keyBy('channel_id');
+
         $kpiSnapshot = $campaign->kpiSnapshots()
             ->where('snapshot_type', 'final')
             ->latest('snapshotted_at')
@@ -77,24 +87,42 @@ class CampaignController extends Controller
                 'completed_at' => $campaign->completed_at?->toIso8601String(),
                 'blueprint' => $campaign->blueprint,
             ],
-            'content_assets' => $contentAssets->map(fn ($a) => [
-                'id' => $a->id,
-                'type' => $a->type,
-                'body' => $a->body,
-                'title' => $a->title,
-                'status' => $a->status,
-                'metadata' => $a->metadata ?? [],
-                'channel' => $a->channel ? ['type' => $a->channel->type] : null,
-            ])->values()->all(),
-            'executions' => $executions->map(fn ($e) => [
-                'id' => $e->id,
-                'status' => $e->status,
-                'scheduled_at' => $e->scheduled_at?->toIso8601String(),
-                'executed_at' => $e->executed_at?->toIso8601String(),
-                'completed_at' => $e->completed_at?->toIso8601String(),
-                'last_error' => $e->last_error,
-                'channel' => $e->channel ? ['type' => $e->channel->type] : null,
-            ])->values()->all(),
+            'content_assets' => $contentAssets->map(function (ContentAsset $a) use ($linkedMarketingChannelsByChannelId) {
+                $linked = $a->channel !== null ? $linkedMarketingChannelsByChannelId->get($a->channel->id) : null;
+
+                return [
+                    'id' => $a->id,
+                    'type' => $a->type,
+                    'body' => $a->body,
+                    'title' => $a->title,
+                    'status' => $a->status,
+                    'metadata' => $a->metadata ?? [],
+                    'channel' => $a->channel ? [
+                        'type' => $a->channel->type,
+                        'marketing_channel' => $linked !== null
+                            ? ['supports_publishing' => (bool) $linked->supports_publishing]
+                            : null,
+                    ] : null,
+                ];
+            })->values()->all(),
+            'executions' => $executions->map(function (Execution $e) use ($linkedMarketingChannelsByChannelId) {
+                $linked = $e->channel !== null ? $linkedMarketingChannelsByChannelId->get($e->channel->id) : null;
+
+                return [
+                    'id' => $e->id,
+                    'status' => $e->status,
+                    'scheduled_at' => $e->scheduled_at?->toIso8601String(),
+                    'executed_at' => $e->executed_at?->toIso8601String(),
+                    'completed_at' => $e->completed_at?->toIso8601String(),
+                    'last_error' => $e->last_error,
+                    'channel' => $e->channel ? [
+                        'type' => $e->channel->type,
+                        'marketing_channel' => $linked !== null
+                            ? ['supports_publishing' => (bool) $linked->supports_publishing]
+                            : null,
+                    ] : null,
+                ];
+            })->values()->all(),
             'kpi_snapshot' => $kpiSnapshot ? [
                 'id' => $kpiSnapshot->id,
                 'snapshot_type' => $kpiSnapshot->snapshot_type,
