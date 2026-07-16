@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useForm } from '@inertiajs/vue3'
 import ConfirmDialog from '@/Components/UI/ConfirmDialog.vue'
 import { CAPABILITY_LABELS, channelLabel, resolveChannelCapability } from '@/lib/channelCapability'
+import type { ChannelCapability } from '@/lib/channelCapability'
 import type { ContentAsset } from '@/types'
 
 const props = defineProps<{
@@ -31,13 +32,29 @@ const assetTypeLabels: Record<string, string> = {
   landing_page: 'landing page',
 }
 
+// One outcome sentence per real capability state — see Task N5 (production-
+// readiness gap plan): a customer must be able to tell exactly what happens
+// after approving, and the four states mean four different things:
+// - connected: really sends, automatically.
+// - draft_only: the pipeline runs, but delivery is simulated/logged only —
+//   true for every company, not just this one.
+// - not_configured: nothing stops this specific company but a missing
+//   connection — actionable right now, unlike the other non-connected states.
+// - coming_later: no product path exists yet for anyone; not actionable.
+const approvalOutcomes: Record<ChannelCapability, string> = {
+  connected: 'will really send to this connected channel',
+  draft_only: 'logged internally only — delivery is simulated for every company on this channel type today',
+  not_configured: 'logged internally only for now — connect this channel in Settings to send it for real',
+  coming_later: "logged internally only — this channel type can't send for any company yet",
+}
+
 // Concrete "what will happen" lines shown in the confirmation dialog — one
 // per content asset, naming the content, its destination channel, and that
 // channel's real capability today. See docs/product/Channel-Capability-Matrix.md
 // for the canonical per-channel truth this branches on: a channel with a
 // linked, publishing-verified MarketingChannel (WordPress/Meta/Email, once
 // connected) really sends; every other channel still only logs internally.
-// Must never say "not yet sent live" for a channel that actually is.
+// Must never say a channel is "not yet sent live" when it actually is.
 const approvalEffects = computed(() =>
   (props.contentAssets ?? []).map((asset) => {
     const type = assetTypeLabels[asset.type] ?? asset.type.replace(/_/g, ' ')
@@ -54,9 +71,7 @@ const approvalEffects = computed(() =>
       : null
     const capability = resolveChannelCapability(channelType, linkedMarketingChannel)
     const capabilityNote = CAPABILITY_LABELS[capability]
-    const outcome = capability === 'connected'
-      ? 'will really send to this connected channel'
-      : 'logged internally, not yet sent live'
+    const outcome = approvalOutcomes[capability]
 
     return `Queue the ${type}${title} for ${label} — ${capabilityNote}: ${outcome}.`
   }),

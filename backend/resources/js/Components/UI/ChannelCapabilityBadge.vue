@@ -17,6 +17,11 @@ const variant = computed(() => {
       return 'success' as const
     case 'draft_only':
       return 'warning' as const
+    case 'not_configured':
+      // Distinct from coming_later's muted gray — this state is actionable
+      // by the user right now (connect it in Settings), unlike coming_later
+      // (nothing to configure yet, for anyone).
+      return 'info' as const
     default:
       return 'muted' as const
   }

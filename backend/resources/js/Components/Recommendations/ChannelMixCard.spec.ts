@@ -48,7 +48,7 @@ describe('ChannelMixCard', () => {
     expect(wrapper.text()).toContain('Draft only')
   })
 
-  it('renders draft-only channels with a Not configured or Coming later badge, never implying publishing', () => {
+  it('renders draft-only channels with a Manual action required or Not configured badge, never implying publishing', () => {
     const mix: ChannelMix = {
       ...emptyMix,
       draft_only: [
@@ -60,9 +60,13 @@ describe('ChannelMixCard', () => {
     const wrapper = mount(ChannelMixCard, { props: { channelMix: mix } })
 
     expect(wrapper.text()).toContain('Declared Instagram')
-    expect(wrapper.text()).toContain('Not configured')
+    // instagram has a real Channel equivalent — this company just hasn't
+    // connected it, so it's actionable ("Manual action required"), unlike...
+    expect(wrapper.text()).toContain('Manual action required')
     expect(wrapper.text()).toContain('Local Paper Ad')
-    expect(wrapper.text()).toContain('Coming later')
+    // ...print, which has no Channel equivalent at all — nothing to
+    // configure yet, for any company ("Not configured").
+    expect(wrapper.text()).toContain('Not configured')
     expect(wrapper.text()).not.toContain('Can publish')
   })
 

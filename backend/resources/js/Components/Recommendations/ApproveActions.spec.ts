@@ -65,7 +65,61 @@ describe('ApproveActions', () => {
     expect(dialogText).toContain('Blog')
     // Must never imply the content goes live — no channel truly publishes yet.
     expect(dialogText).toContain('Draft only')
-    expect(dialogText).toContain('not yet sent live')
+    expect(dialogText).toContain('delivery is simulated for every company on this channel type today')
+
+    wrapper.unmount()
+  })
+
+  it('tells the user manual action would enable real sending for a supported-but-unconnected channel', async () => {
+    const unconnectedAssets: ContentAsset[] = [
+      {
+        id: 'asset-3',
+        type: 'social_post',
+        body: 'Body text',
+        title: 'New arrivals',
+        status: 'draft',
+        metadata: {},
+        channel: { type: 'instagram', marketing_channel: null },
+      },
+    ]
+
+    const wrapper = mount(ApproveActions, {
+      props: { recommendationId: 'rec-1', contentAssets: unconnectedAssets },
+      attachTo: document.body,
+    })
+
+    await wrapper.find('button').trigger('click')
+
+    const dialogText = document.body.textContent ?? ''
+    expect(dialogText).toContain('Manual action required')
+    expect(dialogText).toContain('connect this channel in Settings to send it for real')
+
+    wrapper.unmount()
+  })
+
+  it('tells the user a coming-later channel cannot send for anyone yet, not just this company', async () => {
+    const unsupportedAssets: ContentAsset[] = [
+      {
+        id: 'asset-4',
+        type: 'sms',
+        body: 'Body text',
+        title: null,
+        status: 'draft',
+        metadata: {},
+        channel: { type: 'sms' },
+      },
+    ]
+
+    const wrapper = mount(ApproveActions, {
+      props: { recommendationId: 'rec-1', contentAssets: unsupportedAssets },
+      attachTo: document.body,
+    })
+
+    await wrapper.find('button').trigger('click')
+
+    const dialogText = document.body.textContent ?? ''
+    expect(dialogText).toContain('Not configured')
+    expect(dialogText).toContain("can't send for any company yet")
 
     wrapper.unmount()
   })

@@ -60,18 +60,32 @@ export const CHANNEL_CAPABILITY: Record<string, ChannelCapability> = {
   landing_page: 'coming_later',
 }
 
+/**
+ * Four states, four distinct words a customer can act on — see the
+ * production-readiness gap plan's Task N5 ("automatic live delivery,
+ * simulated/internal processing, manual action required, and not
+ * configured"). Note the deliberate naming: `not_configured` (a real connect
+ * flow exists, *this* company just hasn't used it) reads as "Manual action
+ * required" — because it is, the user can fix it right now in Settings —
+ * while `coming_later` (no connect flow/publisher exists for this type at
+ * all) reads as "Not configured," since there is nothing any user could
+ * configure yet. This is the opposite of the two labels' pre-2026-07-16
+ * wording, which had it backwards (`not_configured` said "Not configured,"
+ * `coming_later` said "Coming later" — neither told the user whether *they*
+ * could do anything about it).
+ */
 export const CAPABILITY_LABELS: Record<ChannelCapability, string> = {
   connected: 'Connected',
   draft_only: 'Draft only',
-  coming_later: 'Coming later',
-  not_configured: 'Not configured',
+  coming_later: 'Not configured',
+  not_configured: 'Manual action required',
 }
 
 export const CAPABILITY_DESCRIPTIONS: Record<ChannelCapability, string> = {
-  connected: 'Live — content is sent to a real external channel.',
-  draft_only: "Atlas drafts and queues content, but doesn't yet send it to a live external channel.",
-  coming_later: "Not yet available — Atlas can't create or publish to this channel type yet.",
-  not_configured: 'Supported, but not yet connected for this company.',
+  connected: 'Automatic live delivery — Atlas sends this directly to a real external channel.',
+  draft_only: 'Simulated/internal processing — Atlas drafts and queues content, but delivery is logged internally, never sent to a live channel.',
+  coming_later: "Not configured — there's no way to create or publish to this channel type yet, for any company.",
+  not_configured: 'Manual action required — this channel type is supported, but connect it in Settings before Atlas can send to it automatically.',
 }
 
 export function channelLabel(channelType: string): string {

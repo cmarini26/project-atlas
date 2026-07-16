@@ -6,6 +6,30 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Fix] Recommendation/publishing UI now distinguishes manual action required from not configured — 2026-07-16
+
+Production-readiness gap plan, Task N5. Audited Recommendation detail (`ChannelMixCard.vue`/`ApproveActions.vue`), the approval confirmation dialog, `Publishing.vue`, `Dashboard.vue`, and `Campaigns/Show.vue`'s publishing section against the task's four required, distinguishable states: automatic live delivery, simulated/internal processing, manual action required, and not configured. Found the underlying capability data was already correct everywhere (all five surfaces already thread real per-company `linked-marketing-channel` data), but the badge labels for two of the four states had it backwards, and the approval dialog's per-asset outcome line collapsed three distinct non-connected states into one generic sentence.
+
+### Fixed
+
+- **`channelCapability.ts`'s labels were swapped relative to what a customer can act on.** `not_configured` (a real connect flow exists — Meta OAuth, Postmark — but *this* company hasn't used it) said "Not configured"; `coming_later` (no connect flow exists for anyone, e.g. LinkedIn/X/SMS) said "Coming later." Neither told the user whether *they* could do anything about it. Renamed: `not_configured` → **"Manual action required"** (actionable now, in Settings), `coming_later` → **"Not configured"** (nothing anyone can configure yet). `connected`/`draft_only` labels are unchanged.
+- **`ChannelCapabilityBadge.vue`** gives `not_configured` its own `info` (blue) badge color, distinct from `coming_later`'s `muted` gray — previously both fell through to the same default color, visually indistinguishable despite meaning very different things.
+- **`ApproveActions.vue`'s per-asset confirmation line** previously had only two outcomes: "will really send" for `connected`, and one generic "logged internally, not yet sent live" for everything else. Now branches all four states distinctly — `draft_only` says delivery is simulated *for every company* on that channel type; `not_configured` says connecting it in Settings would enable real sending; `coming_later` says the channel type can't send for *any* company yet. A user can now tell the difference between "nothing to do" and "you could fix this."
+
+### Tests added
+
+- `channelCapability.spec.ts` (+4): locks in the exact label/description text for all four states, specifically guarding against the label swap ever silently reverting.
+- New `ChannelCapabilityBadge.spec.ts` (7, previously no dedicated spec existed): all four states render distinct labels; `not_configured` and `coming_later` render visually distinct colors; the description is exposed via the `title` attribute.
+- `ApproveActions.spec.ts` (+2): the `not_configured` and `coming_later` per-asset outcome sentences.
+- `ChannelMixCard.spec.ts`: updated existing assertions for the swapped labels.
+
+## Remaining risks and intentionally deferred work
+
+- **Publishing.vue/Dashboard.vue/Campaigns/Show.vue's page-level copy stays deliberately binary** ("real for connected channels, simulated for the rest") rather than four-way — these are general orienting sentences above a list of individually-badged rows (each row's own badge already carries the precise state), not per-channel outcome statements the way the approval dialog is. Not changed, since the four-way distinction already exists at the row level.
+- **WordPress still cannot reach `not_configured`/`connected` via the generic badge** — unchanged from the existing, already-documented gap (no `MarketingChannelType` equivalent for `blog`). See `docs/product/Channel-Capability-Matrix.md`.
+
+---
+
 ## [Fix] WordPress connect validation didn't handle unreachable hosts or non-WordPress responses — 2026-07-16
 
 Production-readiness gap plan, Task N3. `connectWordPress()` already pinged before persisting `status: 'active'` (fixed 2026-07-15), but `WordPressPublisher::ping()` itself had two real gaps that let bad connections either 500 or falsely report reachable, found while hardening it against the task's explicit failure modes (bad site URL, bad username/password, unreachable host, non-WordPress API responses).
