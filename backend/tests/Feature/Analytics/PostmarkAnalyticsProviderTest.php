@@ -72,6 +72,41 @@ class PostmarkAnalyticsProviderTest extends TestCase
         $this->assertSame(0, $normalized['bounces_hard']);
     }
 
+    public function test_normalize_emits_the_canonical_cross_channel_keys(): void
+    {
+        // Regression: CampaignKpiService::aggregate() reads
+        // normalised_reach/normalised_engagement/normalised_clicks from
+        // every provider's normalize() output. Postmark previously omitted
+        // normalised_reach and normalised_engagement entirely, so a real
+        // Postmark send silently aggregated as zero reach/engagement.
+        $provider = new PostmarkAnalyticsProvider();
+
+        $raw = ['MessageEvents' => [
+            ['Type' => 'Delivered'],
+            ['Type' => 'Opened'],
+            ['Type' => 'Click'],
+            ['Type' => 'Click'],
+        ]];
+
+        $normalized = $provider->normalize($raw);
+
+        $this->assertSame(1, $normalized['normalised_reach'], 'normalised_reach should mirror delivered');
+        $this->assertSame(3, $normalized['normalised_engagement'], 'normalised_engagement should sum opens + clicks (1 open + 2 clicks)');
+        $this->assertSame(2, $normalized['normalised_clicks']);
+    }
+
+    public function test_normalize_canonical_keys_are_zero_without_delivery_or_engagement(): void
+    {
+        $provider = new PostmarkAnalyticsProvider();
+
+        $normalized = $provider->normalize(['MessageEvents' => [
+            ['Type' => 'Bounced', 'Details' => ['Type' => 'HardBounce']],
+        ]]);
+
+        $this->assertSame(0, $normalized['normalised_reach']);
+        $this->assertSame(0, $normalized['normalised_engagement']);
+    }
+
     public function test_normalize_counts_hard_bounces_and_spam_complaints(): void
     {
         $provider = new PostmarkAnalyticsProvider();

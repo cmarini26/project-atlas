@@ -52,9 +52,29 @@ class PostmarkAnalyticsProvider implements AnalyticsProvider
     /**
      * Postmark's message-details response carries a `MessageEvents` list
      * (Delivered, Opened, Click, Bounced, SpamComplaint,
-     * SubscriptionChange). Counting event types into the keys
-     * LearningService already reads (checkEmailDeliverability(),
-     * checkHighUnsubscribeRate(), checkOptimalTiming()).
+     * SubscriptionChange). Counting event types into two overlapping key
+     * sets, both required:
+     *
+     * 1. Email-specific keys (`delivered`, `bounces_hard`, `spam_complaints`,
+     *    `unsubscribes`, `open_rate`) that LearningService already reads
+     *    (checkEmailDeliverability(), checkHighUnsubscribeRate(),
+     *    checkOptimalTiming()) — these must never be renamed or removed.
+     * 2. The canonical cross-channel `normalised_*` keys
+     *    (AnalyticsProvider::normalize()'s contract, followed today by
+     *    MetaAnalyticsProvider) that CampaignKpiService::aggregate() reads
+     *    to sum reach/engagement/clicks across every channel a campaign
+     *    used. Omitting these was a real bug: a real Postmark send produced
+     *    a real ExecutionMetric row, but CampaignKpiService silently
+     *    computed zero reach and zero engagement for it, because
+     *    `$m['normalised_reach'] ?? 0` and `$m['normalised_engagement'] ?? 0`
+     *    fall back to zero for any metrics array missing those keys.
+     *
+     * `normalised_reach` maps from `delivered` — a delivered message is the
+     * email-channel equivalent of "reached" one recipient.
+     * `normalised_engagement` maps from opens + clicks — the email-channel
+     * equivalent of an interaction, summed the same way Meta's `engagement`
+     * metric is an additive count, not a binary per-post flag.
+     * `normalised_clicks` was already present under this exact name.
      *
      * @param  array<string, mixed>  $raw
      * @return array<string, mixed>
@@ -99,6 +119,9 @@ class PostmarkAnalyticsProvider implements AnalyticsProvider
             // across every ExecutionMetric row for the campaign.
             'open_rate' => $opens > 0 ? 1.0 : 0.0,
             'normalised_clicks' => $clicks,
+            // Canonical cross-channel keys — see the docblock above.
+            'normalised_reach' => $delivered,
+            'normalised_engagement' => $opens + $clicks,
         ];
     }
 

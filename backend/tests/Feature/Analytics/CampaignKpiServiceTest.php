@@ -4,6 +4,8 @@ namespace Tests\Feature\Analytics;
 
 use App\Models\ExecutionMetric;
 use App\Services\Analytics\CampaignKpiService;
+use App\Services\Analytics\MetaAnalyticsProvider;
+use App\Services\Analytics\PostmarkAnalyticsProvider;
 use Illuminate\Support\Str;
 
 class CampaignKpiServiceTest extends AnalyticsTestCase
@@ -66,6 +68,77 @@ class CampaignKpiServiceTest extends AnalyticsTestCase
         $result = $this->service->aggregate($this->campaign->id);
 
         $this->assertNull($result['total_click_rate']);
+    }
+
+    public function test_aggregate_produces_non_zero_reach_and_engagement_from_real_postmark_normalization(): void
+    {
+        // End-to-end regression for the analytics-contract bug: a real
+        // Postmark MessageEvents payload, run through the real provider's
+        // normalize(), must actually contribute non-zero reach/engagement —
+        // not silently aggregate to zero because of a missing key.
+        $provider = new PostmarkAnalyticsProvider();
+
+        $normalized = $provider->normalize(['MessageEvents' => [
+            ['Type' => 'Delivered'],
+            ['Type' => 'Opened'],
+            ['Type' => 'Click'],
+        ]]);
+
+        $this->makeMetric($normalized, true, 'email');
+
+        $result = $this->service->aggregate($this->campaign->id);
+
+        $this->assertEquals(1, $result['total_reach']);
+        $this->assertEquals(2, $result['total_engagement']);
+        $this->assertEquals(1, $result['total_clicks']);
+    }
+
+    public function test_aggregate_combines_postmark_and_meta_channels_correctly(): void
+    {
+        $postmark = new PostmarkAnalyticsProvider();
+        $meta = new MetaAnalyticsProvider();
+
+        $emailMetrics = $postmark->normalize(['MessageEvents' => [
+            ['Type' => 'Delivered'],
+            ['Type' => 'Opened'],
+            ['Type' => 'Click'],
+        ]]);
+
+        $socialMetrics = $meta->normalize(['data' => [
+            ['name' => 'reach', 'values' => [['value' => 500]]],
+            ['name' => 'engagement', 'values' => [['value' => 25]]],
+            ['name' => 'clicks', 'values' => [['value' => 10]]],
+        ]]);
+
+        $this->makeMetric($emailMetrics, true, 'email');
+        $this->makeMetric($socialMetrics, true, 'instagram');
+
+        $result = $this->service->aggregate($this->campaign->id);
+
+        $this->assertEquals(501, $result['total_reach']);
+        $this->assertEquals(27, $result['total_engagement']);
+        $this->assertEquals(11, $result['total_clicks']);
+        $this->assertArrayHasKey('email', $result['channel_breakdown']);
+        $this->assertArrayHasKey('instagram', $result['channel_breakdown']);
+        $this->assertEquals(1, $result['channel_breakdown']['email']['reach']);
+        $this->assertEquals(500, $result['channel_breakdown']['instagram']['reach']);
+    }
+
+    public function test_meta_normalization_is_unchanged_by_the_postmark_fix(): void
+    {
+        $meta = new MetaAnalyticsProvider();
+
+        $normalized = $meta->normalize(['data' => [
+            ['name' => 'reach', 'values' => [['value' => 1500]]],
+            ['name' => 'engagement', 'values' => [['value' => 45]]],
+            ['name' => 'clicks', 'values' => [['value' => 5]]],
+        ]]);
+
+        $this->assertSame([
+            'normalised_reach' => 1500,
+            'normalised_engagement' => 45,
+            'normalised_clicks' => 5,
+        ], $normalized);
     }
 
     public function test_best_channel_returns_channel_with_highest_rate(): void

@@ -19,6 +19,26 @@ interface AnalyticsProvider
      * Normalise the raw provider response into the standard metric key map.
      * Omit keys that are not available — never set them to null or 0.
      *
+     * There is exactly one canonical cross-channel schema, read by
+     * CampaignKpiService::aggregate() to sum/compare metrics across every
+     * channel a campaign used — every implementation MUST emit these three
+     * keys whenever the underlying data is available:
+     *
+     * - `normalised_reach` (int): how many recipients/viewers this execution
+     *   reached (Meta: post reach; email: messages delivered).
+     * - `normalised_engagement` (int): how many interactions occurred
+     *   (Meta: reactions+comments+shares; email: opens+clicks).
+     * - `normalised_clicks` (int): link clicks, tracked separately from
+     *   engagement since not every channel's "engagement" implies a click.
+     *
+     * A provider MAY also return additional, provider-specific keys beyond
+     * this canonical set (e.g. PostmarkAnalyticsProvider's `bounces_hard`,
+     * `spam_complaints`, `unsubscribes`, `open_rate`, consumed directly by
+     * LearningService) — those are additive, not a competing schema.
+     * CampaignKpiService must never be taught to read a provider-specific
+     * key; if a metric needs to be comparable across channels, it belongs
+     * in the canonical set above, mapped by the provider that produces it.
+     *
      * @param  array<string, mixed>  $raw
      * @return array<string, mixed>
      */

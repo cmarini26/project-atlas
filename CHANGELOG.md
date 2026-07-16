@@ -6,6 +6,20 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Fix] Postmark analytics normalization omitted the canonical cross-channel keys — 2026-07-16
+
+`CampaignKpiService::aggregate()` reads `normalised_reach`/`normalised_engagement`/`normalised_clicks` from every provider's `normalize()` output to sum reach/engagement/clicks across every channel a campaign used. `PostmarkAnalyticsProvider::normalize()` emitted `normalised_clicks` but never `normalised_reach`/`normalised_engagement` — a real Postmark send produced a real `ExecutionMetric` row, but `CampaignKpiService` silently computed zero reach and zero engagement for it, since `$m['normalised_reach'] ?? 0` falls back to zero for any metrics array missing the key. A campaign mixing email and Meta channels would under-report its true combined reach/engagement with no visible error.
+
+### Fixed
+
+- `PostmarkAnalyticsProvider::normalize()` now also emits `normalised_reach` (mapped from `delivered` — a delivered message is the email-channel equivalent of "reached" one recipient) and `normalised_engagement` (mapped from `opens + clicks`, the same additive-count shape `MetaAnalyticsProvider`'s `engagement` metric already uses). `normalised_clicks` is unchanged. The email-specific keys `LearningService` already reads (`delivered`, `bounces_hard`, `spam_complaints`, `unsubscribes`, `open_rate`) are untouched.
+- `AnalyticsProvider`'s contract docblock now states explicitly that every implementation must emit the three canonical keys whenever the underlying data is available, and that `CampaignKpiService` must never be taught to read a provider-specific key — if a metric needs to be comparable across channels, it belongs in the canonical set, mapped by whichever provider produces it.
+
+### Tests added
+
+- `PostmarkAnalyticsProviderTest` (+2): the canonical keys are emitted and correctly computed from a real `MessageEvents` payload; both are zero when there's no delivery/engagement, not merely absent.
+- `CampaignKpiServiceTest` (+3): an end-to-end regression proving a real Postmark payload now aggregates non-zero reach/engagement; email and Meta channels combine correctly in the same campaign's totals; Meta's own normalization is unchanged by this fix.
+
 ## [Feature] Real multi-recipient email campaign sending, using recipient snapshots — 2026-07-16
 
 Production-readiness gap plan, Phase 1A. The previous slice built the contact/audience/snapshot model and a payload-expansion helper, but explicitly stopped short of wiring a real send — `EmailPublisher`/`PublishContent` still only ever sent to one hardcoded address. This slice wires the real send, without changing `EmailProvider`/`EmailPayload`/`ChannelPublisher` at all.
