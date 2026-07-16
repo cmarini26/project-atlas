@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3'
+import { Head, Link, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
@@ -12,15 +12,36 @@ import type { Campaign, ContentAsset, Execution, CampaignKpiSnapshot } from '@/t
 // Persistent layout: the sidebar/toast shell survives Inertia visits.
 defineOptions({ layout: AppLayout })
 
+interface EmailAudienceOption {
+  id: string
+  name: string
+  member_count: number
+}
+
+interface EmailAudienceSelector {
+  audiences: EmailAudienceOption[]
+  selected: EmailAudienceOption | null
+  linked_marketing_channel: { supports_publishing: boolean } | null
+}
+
 interface ShowProps {
   campaign: Campaign
   content_assets: ContentAsset[]
   executions: Execution[]
   kpi_snapshot: CampaignKpiSnapshot | null
   decision: { rationale: Record<string, string> | null; expected_impact: Record<string, string | number> | null; confidence_score: number } | null
+  email_audience_selector: EmailAudienceSelector
 }
 
-defineProps<ShowProps>()
+const props = defineProps<ShowProps>()
+
+const audienceForm = useForm({
+  email_audience_id: props.email_audience_selector.selected?.id ?? '',
+})
+
+function selectAudience(): void {
+  audienceForm.patch(`/app/campaigns/${props.campaign.id}/email-audience`, { preserveScroll: true })
+}
 
 const statusVariants: Record<string, 'accent' | 'success' | 'muted' | 'default'> = {
   active: 'accent',
@@ -95,6 +116,42 @@ function formatDate(date: string | null): string {
           <dd class="text-lg font-semibold text-[var(--color-text-primary)] tabular-nums">{{ value }}</dd>
         </div>
       </dl>
+    </div>
+
+    <!-- Email audience targeting -->
+    <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5 mb-6">
+      <div class="flex items-center gap-2 mb-3">
+        <h2 class="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide">Email Audience</h2>
+        <ChannelCapabilityBadge
+          channel-type="email"
+          :linked-marketing-channel="email_audience_selector.linked_marketing_channel ? { supportsPublishing: email_audience_selector.linked_marketing_channel.supports_publishing } : null"
+        />
+      </div>
+
+      <form class="flex items-start gap-2 mb-2" @submit.prevent="selectAudience">
+        <select
+          v-model="audienceForm.email_audience_id"
+          class="flex-1 px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)] transition-colors duration-[var(--duration-fast)]"
+        >
+          <option value="">No audience selected</option>
+          <option v-for="option in email_audience_selector.audiences" :key="option.id" :value="option.id">
+            {{ option.name }} ({{ option.member_count }})
+          </option>
+        </select>
+        <button
+          type="submit"
+          :disabled="audienceForm.processing"
+          class="shrink-0 py-2 px-4 text-sm font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+        >
+          {{ audienceForm.processing ? 'Saving…' : 'Save' }}
+        </button>
+      </form>
+
+      <p v-if="email_audience_selector.selected" class="text-xs text-[var(--color-text-muted)]">
+        {{ email_audience_selector.selected.member_count }} recipient{{ email_audience_selector.selected.member_count === 1 ? '' : 's' }}
+        <span v-if="email_audience_selector.selected.member_count === 0" class="text-amber-600">— this audience is empty, nothing would be sent</span>
+      </p>
+      <p v-else class="text-xs text-[var(--color-text-muted)]">No audience selected yet.</p>
     </div>
 
     <!-- Content assets -->

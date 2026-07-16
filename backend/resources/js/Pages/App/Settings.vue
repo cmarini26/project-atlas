@@ -421,7 +421,15 @@ function retakeTour(): void {
 
     <!-- Email (Postmark) -->
     <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5 mb-6">
-      <h2 class="text-sm font-semibold text-[var(--color-text-primary)] mb-4">Email</h2>
+      <div class="flex items-center justify-between gap-3 mb-4">
+        <h2 class="text-sm font-semibold text-[var(--color-text-primary)]">Email</h2>
+        <Link
+          href="/app/settings/email/audiences"
+          class="shrink-0 py-1.5 px-3 text-xs font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)] transition-colors duration-[var(--duration-fast)]"
+        >
+          Audiences →
+        </Link>
+      </div>
 
       <div v-if="email_channel" class="space-y-4">
         <div class="flex items-start gap-3">

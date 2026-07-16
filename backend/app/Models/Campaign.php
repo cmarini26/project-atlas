@@ -18,6 +18,7 @@ class Campaign extends Model
         'company_id',
         'decision_id',
         'recommendation_id',
+        'email_audience_id',
         'campaign_type',
         'title',
         'strategy',
@@ -49,6 +50,12 @@ class Campaign extends Model
     public function decision(): BelongsTo
     {
         return $this->belongsTo(Decision::class);
+    }
+
+    /** @return BelongsTo<EmailAudience, $this> */
+    public function emailAudience(): BelongsTo
+    {
+        return $this->belongsTo(EmailAudience::class);
     }
 
     /** @return HasMany<ContentAsset, $this> */

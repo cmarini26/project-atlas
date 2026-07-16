@@ -6,6 +6,7 @@ use App\Http\Controllers\App\BusinessBrainController;
 use App\Http\Controllers\App\CampaignController;
 use App\Http\Controllers\App\CompanySelectorController;
 use App\Http\Controllers\App\DashboardController;
+use App\Http\Controllers\App\EmailAudienceController;
 use App\Http\Controllers\App\FeedbackController;
 use App\Http\Controllers\App\LearningController;
 use App\Http\Controllers\App\MarketingHealthController;
@@ -94,6 +95,7 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
     // Campaigns
     Route::get('/campaigns', [CampaignController::class, 'index'])->name('campaigns.index');
     Route::get('/campaigns/{campaign}', [CampaignController::class, 'show'])->name('campaigns.show');
+    Route::patch('/campaigns/{campaign}/email-audience', [CampaignController::class, 'selectEmailAudience'])->name('campaigns.email-audience.select');
 
     // Publishing
     Route::get('/publishing', [PublishingController::class, 'index'])->name('publishing');
@@ -122,11 +124,20 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
     Route::post('/settings/wordpress/connect', [SettingsController::class, 'connectWordPress'])->name('settings.wordpress.connect');
     Route::post('/settings/wordpress/revoke', [SettingsController::class, 'disconnectWordPress'])->name('settings.wordpress.revoke');
 
-
     // Email publishing (Postmark) — Server API Token (manual entry), no OAuth.
     Route::post('/settings/email/connect', [SettingsController::class, 'connectEmail'])->name('settings.email.connect');
     Route::post('/settings/email/revoke', [SettingsController::class, 'disconnectEmail'])->name('settings.email.revoke');
     Route::post('/settings/email/test', [SettingsController::class, 'sendEmailTest'])->name('settings.email.test');
+
+    // Email audiences/contacts — the minimal recipient model for
+    // multi-recipient Email campaigns (Phase 1A).
+    Route::get('/settings/email/audiences', [EmailAudienceController::class, 'index'])->name('settings.email.audiences.index');
+    Route::post('/settings/email/audiences', [EmailAudienceController::class, 'store'])->name('settings.email.audiences.store');
+    Route::patch('/settings/email/audiences/{emailAudience}', [EmailAudienceController::class, 'update'])->name('settings.email.audiences.update');
+    Route::get('/settings/email/audiences/{emailAudience}', [EmailAudienceController::class, 'show'])->name('settings.email.audiences.show');
+    Route::post('/settings/email/audiences/{emailAudience}/members', [EmailAudienceController::class, 'addMember'])->name('settings.email.audiences.members.add');
+    Route::delete('/settings/email/audiences/{emailAudience}/members/{emailContact}', [EmailAudienceController::class, 'removeMember'])->name('settings.email.audiences.members.remove');
+
     // Marketing Presence
     Route::get('/settings/marketing-presence', [MarketingPresenceController::class, 'index'])->name('settings.marketing-presence');
     Route::post('/settings/marketing-presence', [MarketingPresenceController::class, 'store'])->name('settings.marketing-presence.store');

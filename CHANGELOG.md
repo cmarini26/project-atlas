@@ -6,6 +6,41 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Feature] Email contacts, audiences, and campaign targeting — the minimal recipient model — 2026-07-16
+
+Production-readiness gap plan, Phase 1A ("Email Production Completion"). Postmark connection/verification/test-send/capability-truth were already complete, but `EmailPayload` supported exactly one recipient and no company-scoped model existed for contacts, lists, or membership — a connected Postmark account had nothing safe to send a real campaign to beyond a single hardcoded address.
+
+### Added
+
+- **`email_contacts`** — company-scoped contacts. `email`/`normalized_email` (trim + lowercase; see `EmailContact::normalizeEmail()`), `display_name`, `source` (`manual|import|api` — only `manual` reachable via any UI this slice), `consent_status` (`unknown|confirmed|declined`), `status` (`active|archived`). `unique(company_id, normalized_email)` — including archived rows, so "recreating" a contact for a previously-archived email reactivates that same row (`EmailAudienceService::addOrReactivateContact()`, the same `updateOrCreate` upsert idiom already used for `Channel`/`ChannelCredentials`) rather than ever racing a second row for one identity.
+- **`email_audiences`** — named, company-scoped lists (`unique(company_id, name)`), archived via the same status-flip convention `MarketingPresenceController::destroy()` already documents ("soft, reversible disable... never removes the row") — not Eloquent `SoftDeletes`, matched deliberately since contacts need the same non-destructive semantics for their unique-constraint story to work.
+- **`email_audience_members`** — pure pivot (composite primary key, no surrogate `id` — Eloquent's default `attach()`/`syncWithoutDetaching()` pivot insert doesn't populate one). Cross-company membership is rejected in `EmailAudienceService::addMember()` via a new `ContactBelongsToDifferentCompanyException`, mirroring `MarketingPresenceService::link()`'s existing `ChannelBelongsToDifferentCompanyException` pattern — a DB-level cross-table company check isn't portably expressible without triggers, so this is a documented application-layer guarantee.
+- **`campaigns.email_audience_id`** (nullable FK) — a campaign's structured audience reference, distinct from the pre-existing free-text `target_audience` column (an AI-generated description, not an addressable list).
+- **`email_recipient_snapshots`** — an immutable per-`Execution` capture of intended recipients (`unique(execution_id, email)`), taken from audience membership at snapshot time and never re-derived from live membership afterward. Minimal `status`/`skipped_reason`/`provider_message_id` columns exist so a future slice can record real per-recipient delivery outcomes without a schema change — deliberately not a full event ledger.
+- **`EmailAudienceService`** — the single service owning all of this: `createAudience`/`renameAudience`/`archiveAudience`, `addOrReactivateContact`/`archiveContact`, `addMember`/`removeMember`, `snapshotRecipientsForExecution()`, and `buildPayloadsForSnapshots()`.
+- **`EmailAudienceController`** + Settings UX (`Settings/Email/Audiences/{Index,Show}.vue`) — create/rename/archive an audience, add/remove contacts, linked from the existing Email card in `Settings.vue`.
+- **`Campaigns/Show.vue`** — a new "Email Audience" section: select a company-owned audience, see its size and an empty-audience warning, and a `ChannelCapabilityBadge` reflecting the *existing* `resolveChannelCapability()`/`supports_publishing` signal — never hardcoded.
+
+### Multi-recipient payload preparation (not full sending — see Deferred)
+
+`EmailAudienceService::buildPayloadsForSnapshots()` expands one rendered campaign payload into one `EmailPayload` per snapshot recipient. **`EmailPayload` and `EmailProvider` are unchanged** — each recipient still gets its own single-recipient `EmailPayload`, exactly the shape `PostmarkEmailProvider::send()` already accepts, so per-recipient isolation (failures, provider message IDs, retries, future unsubscribe links, future analytics correlation) falls out of the existing one-call-per-send contract for free. No shared `To`/CC/BCC header is ever used.
+
+### Notes
+
+- New tests: `EmailAudienceServiceTest` (16), `EmailAudienceControllerTest` (14), `CampaignControllerTest` additions (7) — contacts dedup/whitespace/case/cross-company/reactivation/DB-uniqueness, audience CRUD/membership/duplicate-prevention, campaign targeting/authorization/empty-audience-safety, and snapshot immutability/company-scoping/dedup. New `Audiences/Index.spec.ts`, `Audiences/Show.spec.ts`, `Campaigns/Show.spec.ts` (Vitest).
+- **A real bug fixed along the way**: the `email_audience_members` migration originally declared a required `id char(26)` primary key, but Eloquent's default `belongsToMany`/`attach()` pivot insert only writes the two FK columns + timestamps — nothing populates a required `id` without a dedicated pivot model. Caught by the service test suite before this ever reached a real database; fixed by using a composite primary key (the standard, idiomatic Eloquent pivot-table shape) instead.
+- **Larastan note for future contributors**: a model needs an explicit `@property EnumType $column` class-level docblock — not just the `casts()` method — for Larastan to correctly type a backed-enum column inside a closure (e.g. `Collection::filter()`). Without it, Larastan falls back to the raw migration `enum()` string-literal union and reports false `identical.alwaysFalse` errors. All four new models follow `MarketingChannel`'s existing precedent for this.
+
+## Remaining risks and intentionally deferred work
+
+- **Real bulk sending is not wired.** `PublishContent`/`EmailPublisher::publish()` still call `send()` once per `Execution`/`ContentAsset`, unchanged. Looping over a snapshot's payloads, calling `send()` once per recipient, and tracking partial success (some recipients succeed, some fail) at the `Execution` level is real, non-trivial pipeline work — deliberately scoped out per this task's own explicit allowance ("implement the model and payload expansion cleanly... document the exact remaining execution slice. Do not fake successful bulk sending."). This is the next slice.
+- **No suppression enforcement.** `email_recipient_snapshots.status`/`skipped_reason` exist for this but nothing populates or checks them against a bounce/complaint/unsubscribe list — there is no suppression list at all yet (see `docs/architecture/EmailArchitecture.md` §7).
+- **No CSV/bulk import.** `EmailContactSource::Import`/`Api` exist as placeholder values only; no import framework exists in this codebase today.
+- **One audience per campaign, one contact-add-at-a-time UX.** Both are deliberate minimalism per this task's explicit non-goals (no segmentation, no dynamic audiences).
+- **Internationalized email addresses are accepted but not IDN/punycode-normalized** — documented as a known limitation in `EmailContact`'s docblock, not silently assumed correct; Postmark's own non-ASCII domain handling is unverified.
+- **Retention**: `email_recipient_snapshots` rows are immutable and cascade-delete only if their parent `Execution`/`Campaign`/`Company` is deleted — there is no independent retention/expiry policy for them yet, and they contain the same contact PII (email/name) the `email_contacts` table does. This should be included in whatever data-export/deletion story a future legal/compliance pass produces (same note the WordPress/Postmark connect-flow CHANGELOG entries already flagged for `email_recipients`/`email_suppressions`).
+
+
 ## [Feature] Company-facing Postmark connection, verification, test send, and disconnect — 2026-07-15
 
 Production-readiness gap plan, Phase 1A ("Email Production Completion"). `PostmarkEmailProvider`, `PostmarkAnalyticsProvider`, and `PostmarkWebhookHandler` were already real, but no company could ever reach them — no Settings UI, no controller action, no way for `ChannelCredentials.provider_type` to ever become `'postmark'` outside of `DemoSeeder`. This closes that gap using the exact same patterns already shipped for WordPress (`connectWordPress()`) and Meta (`MetaOAuthController`) — no new credential model, no new capability resolver, no rebuilt providers.

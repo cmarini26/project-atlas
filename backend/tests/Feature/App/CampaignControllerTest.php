@@ -7,6 +7,8 @@ use App\Models\Channel;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\Decision;
+use App\Models\EmailAudience;
+use App\Models\EmailContact;
 use App\Models\Execution;
 use App\Models\MarketingChannel;
 use App\Models\ContentAsset;
@@ -133,6 +135,111 @@ class CampaignControllerTest extends TestCase
                 ->where('content_assets.0.channel.marketing_channel.supports_publishing', true)
                 ->where('executions.0.channel.marketing_channel.supports_publishing', true)
             );
+    }
+
+    public function test_email_campaign_may_select_a_company_owned_audience(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $campaign = $this->createCampaign($company);
+        $audience = EmailAudience::create(['company_id' => $company->id, 'name' => 'Newsletter', 'status' => 'active']);
+
+        $this->actingAs($user)
+            ->patch("/app/campaigns/{$campaign->id}/email-audience", ['email_audience_id' => $audience->id])
+            ->assertRedirect();
+
+        $this->assertSame($audience->id, $campaign->fresh()->email_audience_id);
+    }
+
+    public function test_campaign_cannot_select_another_companys_audience(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $campaign = $this->createCampaign($company);
+        $other = Company::withoutGlobalScopes()->create(['name' => 'Other', 'slug' => 'other-co']);
+        $otherAudience = EmailAudience::create(['company_id' => $other->id, 'name' => 'Other Newsletter', 'status' => 'active']);
+
+        $this->actingAs($user)
+            ->patch("/app/campaigns/{$campaign->id}/email-audience", ['email_audience_id' => $otherAudience->id])
+            ->assertNotFound();
+
+        $this->assertNull($campaign->fresh()->email_audience_id);
+    }
+
+    public function test_selecting_no_audience_clears_it(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $audience = EmailAudience::create(['company_id' => $company->id, 'name' => 'Newsletter', 'status' => 'active']);
+        $campaign = Campaign::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'email_audience_id' => $audience->id,
+            'campaign_type' => 'featured_item',
+            'title' => 'Test Campaign',
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs($user)
+            ->patch("/app/campaigns/{$campaign->id}/email-audience", ['email_audience_id' => null])
+            ->assertRedirect();
+
+        $this->assertNull($campaign->fresh()->email_audience_id);
+    }
+
+    public function test_non_email_campaign_behavior_is_unaffected_by_audience_targeting(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $campaign = $this->createCampaign($company);
+
+        $this->actingAs($user)
+            ->get("/app/campaigns/{$campaign->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('email_audience_selector.selected', null)
+                ->where('email_audience_selector.audiences', [])
+            );
+    }
+
+    public function test_empty_audience_cannot_accidentally_begin_real_sending(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $campaign = $this->createCampaign($company);
+        $audience = EmailAudience::create(['company_id' => $company->id, 'name' => 'Empty List', 'status' => 'active']);
+
+        $this->actingAs($user)
+            ->patch("/app/campaigns/{$campaign->id}/email-audience", ['email_audience_id' => $audience->id]);
+
+        $this->actingAs($user)
+            ->get("/app/campaigns/{$campaign->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('email_audience_selector.selected.member_count', 0)
+            );
+
+        // No Execution/send was triggered by merely selecting an empty
+        // audience — targeting a campaign never itself queues a send.
+        $this->assertDatabaseCount('executions', 0);
+    }
+
+    public function test_selected_audience_is_included_safely_in_page_props(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $campaign = $this->createCampaign($company);
+        $audience = EmailAudience::create(['company_id' => $company->id, 'name' => 'Newsletter', 'status' => 'active']);
+        $contact = EmailContact::create([
+            'company_id' => $company->id, 'email' => 'a@example.com', 'normalized_email' => 'a@example.com',
+        ]);
+        $audience->members()->attach($contact->id);
+        $campaign->update(['email_audience_id' => $audience->id]);
+
+        $response = $this->actingAs($user)
+            ->get("/app/campaigns/{$campaign->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('email_audience_selector.selected.name', 'Newsletter')
+                ->where('email_audience_selector.selected.member_count', 1)
+            );
+
+        // No raw contact emails/PII leak into the campaign page props —
+        // only the audience's name and a count.
+        $this->assertStringNotContainsString('a@example.com', $response->getContent() ?: '');
     }
 
     /** @return array{User, Company} */

@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Campaign;
 use App\Models\Company;
 use App\Models\ContentAsset;
+use App\Models\EmailAudience;
 use App\Models\Execution;
 use App\Models\MarketingChannel;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -77,6 +79,26 @@ class CampaignController extends Controller
                 ->latest('snapshotted_at')
                 ->first();
 
+        // Whether Email is genuinely connected for this company — resolved
+        // via the existing capability-truth signal (supports_publishing on
+        // the declared `email` MarketingChannel, kept in sync by
+        // SettingsController::connectEmail()/CheckChannelHealth), the same
+        // linked-marketing-channel shape ChannelCapabilityBadge already
+        // consumes elsewhere on this page. Never hardcoded.
+        $emailMarketingChannel = MarketingChannel::where('company_id', $company->id)
+            ->where('type', 'email')
+            ->first();
+
+        $audiences = EmailAudience::where('company_id', $company->id)
+            ->where('status', 'active')
+            ->withCount('members')
+            ->orderBy('name')
+            ->get();
+
+        $selectedAudience = $campaign->email_audience_id !== null
+            ? EmailAudience::withCount('members')->find($campaign->email_audience_id)
+            : null;
+
         return Inertia::render('App/Campaigns/Show', [
             'campaign' => [
                 'id' => $campaign->id,
@@ -135,6 +157,51 @@ class CampaignController extends Controller
                 'expected_impact' => $campaign->decision->expected_impact,
                 'confidence_score' => $campaign->decision->confidence_score ?? 0,
             ] : null,
+            'email_audience_selector' => [
+                'audiences' => $audiences->map(fn (EmailAudience $a) => [
+                    'id' => $a->id,
+                    'name' => $a->name,
+                    'member_count' => $a->members_count,
+                ])->values()->all(),
+                'selected' => $selectedAudience ? [
+                    'id' => $selectedAudience->id,
+                    'name' => $selectedAudience->name,
+                    'member_count' => $selectedAudience->members_count,
+                ] : null,
+                'linked_marketing_channel' => $emailMarketingChannel ? [
+                    'supports_publishing' => (bool) $emailMarketingChannel->supports_publishing,
+                ] : null,
+            ],
         ]);
+    }
+
+    /**
+     * Assigns (or clears) which audience an Email campaign targets. Kept
+     * generic rather than restricted to a specific campaign_type — this
+     * page's own frontend only shows the control when it's relevant, per
+     * the same "don't build arbitrary boolean segmentation" scope this
+     * feature was asked to stay within.
+     */
+    public function selectEmailAudience(Request $request, Campaign $campaign): RedirectResponse
+    {
+        /** @var Company $company */
+        $company = $request->attributes->get('company');
+
+        abort_if($campaign->company_id !== $company->id, 404);
+
+        $validated = $request->validate([
+            'email_audience_id' => ['nullable', 'string'],
+        ]);
+
+        $audienceId = $validated['email_audience_id'] ?? null;
+
+        if ($audienceId !== null) {
+            $audience = EmailAudience::where('company_id', $company->id)->find($audienceId);
+            abort_if($audience === null, 404);
+        }
+
+        $campaign->update(['email_audience_id' => $audienceId]);
+
+        return back()->with('success', $audienceId !== null ? 'Audience selected.' : 'Audience cleared.');
     }
 }
