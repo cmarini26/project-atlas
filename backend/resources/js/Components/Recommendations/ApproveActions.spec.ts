@@ -70,6 +70,34 @@ describe('ApproveActions', () => {
     wrapper.unmount()
   })
 
+  it('says the send will really happen for a connected channel, never "not yet sent live"', async () => {
+    const connectedAssets: ContentAsset[] = [
+      {
+        id: 'asset-2',
+        type: 'email',
+        body: 'Body text',
+        title: 'Weekly newsletter',
+        status: 'draft',
+        metadata: {},
+        channel: { type: 'email', marketing_channel: { supports_publishing: true } },
+      },
+    ]
+
+    const wrapper = mount(ApproveActions, {
+      props: { recommendationId: 'rec-1', contentAssets: connectedAssets },
+      attachTo: document.body,
+    })
+
+    await wrapper.find('button').trigger('click')
+
+    const dialogText = document.body.textContent ?? ''
+    expect(dialogText).toContain('Connected')
+    expect(dialogText).toContain('will really send to this connected channel')
+    expect(dialogText).not.toContain('not yet sent live')
+
+    wrapper.unmount()
+  })
+
   it('falls back to a generic explanation when no content assets are provided', async () => {
     const wrapper = mount(ApproveActions, {
       props: { recommendationId: 'rec-1' },

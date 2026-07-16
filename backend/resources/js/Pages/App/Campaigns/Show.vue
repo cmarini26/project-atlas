@@ -224,7 +224,7 @@ function formatDate(date: string | null): string {
       <EmptyState
         v-if="executions.length === 0"
         title="No publishing activity"
-        description="Executions appear here as content is scheduled and processed (simulated — not yet sent to a live channel)."
+        description="Executions appear here as content is scheduled and processed — real for connected channels, simulated for the rest."
       >
         <template #icon><ClockIcon class="size-6" /></template>
       </EmptyState>

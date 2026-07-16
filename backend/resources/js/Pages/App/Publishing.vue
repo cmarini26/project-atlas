@@ -61,14 +61,14 @@ function formatDate(date: string | null): string {
   <div class="max-w-3xl">
     <PageHeader
       title="Publishing Queue"
-      description="Atlas doesn't publish to live external channels yet — every entry below is a simulated, internally logged send."
+      description="Entries below reflect what actually happened — real sends for channels marked “Connected,” simulated/logged-only entries for everything else."
       :icon="PaperAirplaneIcon"
     />
 
     <EmptyState
       v-if="executions.data.length === 0"
       title="No publishing activity yet"
-      description="Simulated publishing activity appears here once campaigns are approved and running."
+      description="Publishing activity appears here once campaigns are approved and running — real for connected channels, simulated for the rest."
     >
       <template #icon><PaperAirplaneIcon class="size-6" /></template>
     </EmptyState>

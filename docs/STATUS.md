@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 1238 tests (1235 passing, 3 skipped where the local environment can't support it) + 104 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Milestone 15 Phase 3 — Business Discovery Cutover and Recovery, 16 new PHP tests + 2 new/4 rewritten Vitest tests. |
+| Tests             | ✅ Strong | 1328 tests (1325 passing, 3 skipped where the local environment can't support it) + 175 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Channel Capability Matrix truth-alignment pass (see Current Milestone below). |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,31 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**Production-Readiness Gap Plan, Phase 0/1 — Channel truth alignment + real Email channel ✅ Complete**
+*Completed: 2026-07-16* — see [Channel-Capability-Matrix.md](product/Channel-Capability-Matrix.md), [Channel-Publishing-Reality-Audit.md](reviews/Channel-Publishing-Reality-Audit.md)
+
+Closes out Phase 0 (truth audit + capability matrix) and Phase 1 (real Email path) of `backend/.hermes/plans/2026-07-15_094741-atlas-production-readiness-gap-plan.md`. Several slices shipped across recent sessions without a corresponding STATUS.md entry — this entry backfills them alongside today's doc-truth work so this file stops contradicting current code reality, per the plan's own Task 0.2.
+
+**What shipped (backfilled, previously undocumented here):**
+- **Meta capability truth** — `MarketingPresenceService::markPublishingVerified()`, wired from `MetaOAuthController::callback()`/`revoke()` and the recurring `CheckChannelHealth` job, so the capability badge can finally show "Connected" for a company that has genuinely connected Meta (previously the badge could never show anything but the conservative global default).
+- **Connected-badge wiring** — `PublishingController`, `DashboardController`, and `CampaignController::show()` now all thread real per-company `linked-marketing-channel` data through to `ChannelCapabilityBadge`; previously only the Recommendation approval screen had this.
+- **Real Postmark email channel** — `SettingsController::connectEmail()`/`disconnectEmail()`/`sendEmailTest()`, ping-verified before persisting, mirroring the WordPress connect flow exactly.
+- **Email contacts, audiences, and campaign targeting** — `EmailAudienceService`, `email_contacts`/`email_audiences`/`email_audience_members`/`email_recipient_snapshots` tables, a Settings UX, and a `Campaigns/Show.vue` audience selector.
+- **Real multi-recipient email sending** — `EmailPublisher::publishToAudience()` sends one real Postmark call per recipient, with honest partial-failure handling recorded per-recipient.
+- **A real analytics bug fixed** — `PostmarkAnalyticsProvider::normalize()` was missing the canonical `normalised_reach`/`normalised_engagement` keys `CampaignKpiService::aggregate()` reads to sum cross-channel metrics, so every real Postmark send was silently aggregating as zero reach/engagement.
+- **Send-outcome visibility** — `Campaigns/Show.vue` shows aggregate pending/accepted/failed/skipped counts per campaign, labeled "Accepted by provider" (never "Delivered") since provider acceptance is genuinely all that's tracked per-recipient today.
+
+**What shipped today:**
+- **`docs/product/Channel-Capability-Matrix.md`** (new) — the canonical, per-lifecycle-stage (Observe/Draft/Approve/Execute/Measure/Learn) truth table for all eight `channels.type` values plus Website and the declared-presence-only `MarketingChannelType` cases. Verified directly against registries/controllers/enums, not against design docs.
+- **Two real UI truth bugs found and fixed while writing the matrix**: `ApproveActions.vue`'s per-asset approval line unconditionally said "logged internally, not yet sent live" even when the resolved capability was `'connected'` — a self-contradicting statement at the approval moment. `Publishing.vue`'s page description made the same blanket "nothing is sent to a real platform" claim directly above rows whose own badges could say "Connected." Both, plus `Dashboard.vue`/`Campaigns/Show.vue`'s empty-state copy, now correctly branch on real per-channel/per-company capability instead of asserting one global state. New Vitest coverage locks in the "connected" branch.
+- **`docs/reviews/Channel-Publishing-Reality-Audit.md`** gained a 2026-07-16 addendum closing two of its own previous addendum's "did not do" items and formally deferring to the new matrix as the canonical source going forward.
+
+No product-code changes beyond the two UI-copy fixes above (both `.vue` template/script edits, no controller/service/model changes). 1328 PHP tests (1325 passing, 3 pre-existing Redis skips) + 175 Vitest tests. PHPStan level 8 — 0 errors. Pint clean. `vue-tsc --noEmit` clean (pre-existing `baseUrl` deprecation warning only). `npm run build` clean.
+
+**Remaining truth gaps** (see the matrix's own "Remaining truth gaps" section for full detail): WordPress still can't show "Connected" via the generic badge (no `MarketingChannelType` equivalent); no per-recipient email drill-down view; no Facebook observation connector; Google Business Profile observation remains designed-only; no channel has been verified against a real, live third-party account (Phase 6, not a doc-truth item).
+
+**Previous milestone:**
 
 **Milestone 15 Phase 3 — Business Discovery Cutover and Recovery ✅ Complete**
 *Completed: 2026-07-14* — see [Milestone-15-Phase-3-Review.md](reviews/Milestone-15-Phase-3-Review.md)

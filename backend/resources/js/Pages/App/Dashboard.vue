@@ -214,7 +214,7 @@ function formatDate(date: string | null): string {
         </div>
       </div>
 
-      <EmptyState v-else title="No activity yet" description="Simulated publishing activity appears here once campaigns run — no live channels are connected yet.">
+      <EmptyState v-else title="No activity yet" description="Publishing activity appears here once campaigns run — real for connected channels, simulated for the rest.">
         <template #icon><PaperAirplaneIcon class="size-6" /></template>
       </EmptyState>
     </Card>

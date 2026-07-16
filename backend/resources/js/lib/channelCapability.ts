@@ -1,30 +1,30 @@
 /**
  * What each channel type can actually do today, versus what the UI used to
  * imply ("Publish", "Published", raw enum values like "instagram"). See
- * docs/reviews/Channel-Publishing-Reality-Audit.md for the full audit this
- * was built from, and its 2026-07-15 addendum for what changed since.
+ * docs/product/Channel-Capability-Matrix.md for the canonical, per-lifecycle-
+ * stage source of truth this file must stay in sync with, and
+ * docs/reviews/Channel-Publishing-Reality-Audit.md for how this evolved.
  *
- * `blog` (WordPress) and `facebook`/`instagram` (Meta) each have a real
- * connect flow (SettingsController::connectWordPress(), MetaOAuthController)
- * and a real publisher (WordPressPublisher, MetaChannelPublisher) — these
- * are genuinely live once a company connects them, not simulated. `email`
- * has a real PostmarkEmailProvider implemented, but no product UX exists
- * yet to connect it for a real company (only DemoSeeder sets provider_type
- * 'postmark'), so it stays 'draft_only' below.
+ * `blog` (WordPress), `facebook`/`instagram` (Meta), and `email` (Postmark)
+ * each have a real connect flow with live ping-before-persist verification
+ * (SettingsController::connectWordPress()/connectEmail(), MetaOAuthController)
+ * and a real publisher — these are genuinely live once a company connects
+ * them, not simulated.
  *
  * This map is a *global fallback* used only when no company-specific link
- * data is available (see resolveChannelCapability()). `facebook`/`instagram`
- * are per-company-overridable — a linked MarketingChannel's
+ * data is available (see resolveChannelCapability()). `facebook`/`instagram`/
+ * `email` are per-company-overridable — a linked MarketingChannel's
  * supports_publishing flag (kept in sync with real connect/health state by
- * MetaOAuthController and CheckChannelHealth) always wins over this default.
- * `blog` is NOT overridable this way today: WordPress has no
- * MarketingChannelType equivalent (App\Enums\MarketingChannelType has no
- * Blog/WordPress case), so there is no per-company link path for it, and
- * `blog` here is deliberately left at the conservative 'draft_only' default
- * even though a specific company's WordPress connection may in fact be
- * live — see Settings.vue's own `wordpress_channel.status`, which is the
- * accurate per-company source of truth Publishing.vue/Dashboard.vue/
- * Campaigns/Show.vue don't yet surface (follow-up, not fixed here).
+ * MetaOAuthController/SettingsController::connectEmail() and
+ * CheckChannelHealth) always wins over this default. `blog` is NOT
+ * overridable this way today: WordPress has no MarketingChannelType
+ * equivalent (App\Enums\MarketingChannelType has no Blog/WordPress case), so
+ * there is no per-company link path for it, and `blog` here is deliberately
+ * left at the conservative 'draft_only' default even though a specific
+ * company's WordPress connection may in fact be live — see Settings.vue's
+ * own `wordpress_channel.status`, which is the accurate per-company source
+ * of truth Publishing.vue/Dashboard.vue/Campaigns/Show.vue don't yet surface
+ * for WordPress specifically (follow-up, not fixed here).
  */
 
 export type ChannelCapability = 'connected' | 'draft_only' | 'coming_later' | 'not_configured'

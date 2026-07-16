@@ -33,9 +33,11 @@ const assetTypeLabels: Record<string, string> = {
 
 // Concrete "what will happen" lines shown in the confirmation dialog — one
 // per content asset, naming the content, its destination channel, and that
-// channel's real capability today. No channel truly publishes externally
-// yet (see docs/reviews/Channel-Publishing-Reality-Audit.md), so this must
-// never read as "your content will go live" until that changes.
+// channel's real capability today. See docs/product/Channel-Capability-Matrix.md
+// for the canonical per-channel truth this branches on: a channel with a
+// linked, publishing-verified MarketingChannel (WordPress/Meta/Email, once
+// connected) really sends; every other channel still only logs internally.
+// Must never say "not yet sent live" for a channel that actually is.
 const approvalEffects = computed(() =>
   (props.contentAssets ?? []).map((asset) => {
     const type = assetTypeLabels[asset.type] ?? asset.type.replace(/_/g, ' ')
@@ -50,9 +52,13 @@ const approvalEffects = computed(() =>
     const linkedMarketingChannel = asset.channel?.marketing_channel
       ? { supportsPublishing: asset.channel.marketing_channel.supports_publishing }
       : null
-    const capabilityNote = CAPABILITY_LABELS[resolveChannelCapability(channelType, linkedMarketingChannel)]
+    const capability = resolveChannelCapability(channelType, linkedMarketingChannel)
+    const capabilityNote = CAPABILITY_LABELS[capability]
+    const outcome = capability === 'connected'
+      ? 'will really send to this connected channel'
+      : 'logged internally, not yet sent live'
 
-    return `Queue the ${type}${title} for ${label} — ${capabilityNote}: logged internally, not yet sent live.`
+    return `Queue the ${type}${title} for ${label} — ${capabilityNote}: ${outcome}.`
   }),
 )
 
@@ -158,7 +164,7 @@ function reject(): void {
       </ul>
       <p v-else class="mb-3">Atlas will queue this campaign's content for internal processing. No live channels are connected yet, so nothing is sent externally.</p>
       <p class="text-xs text-[var(--color-text-muted)]">
-        Processing starts right after you approve. You can follow progress on the Publishing page — entries there are currently simulated, not live sends.
+        Processing starts right after you approve. You can follow progress on the Publishing page — each entry there is only real for channels marked "Connected" above; everything else remains simulated and logged internally.
       </p>
     </ConfirmDialog>
   </div>
