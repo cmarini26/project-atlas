@@ -6,6 +6,16 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Docs] Private Beta Go/No-Go Review — 2026-07-16
+
+New `docs/reviews/Private-Beta-Go-No-Go-Review-2026-07-16.md`: a concise review reconciling the 2026-07-10 Production Deployment Audit against everything shipped since, verified directly against current code rather than trusted from prior documents (re-checked `EnsureCompanyMembership`'s tenant-isolation binding, `bootstrap/app.php`'s security-header/proxy wiring, the real queue list against every `onQueue()` call site, `.env.example`'s current defaults, and that every WordPress/Meta/Postmark test in the codebase is HTTP-mocked with zero live-account verification anywhere).
+
+**Decision: NO-GO**, unchanged in substance from every prior assessment — but the *reason* has shifted from "the product isn't ready" to "the product is real in code; what remains is infrastructure/operator work no amount of further coding can close" (a production environment, real backups, a real error-tracking vendor, legal pages, a support runbook). All 8 Critical Blockers from the prior audit are confirmed code-complete; the review's top 5 next tasks are entirely infrastructure/operator-executed, each with an exact verification command.
+
+No code changed — no documentation inaccuracy requiring a code-level correction was found during this pass.
+
+---
+
 ## [Docs] Production Readiness Checklist — 2026-07-16
 
 Production-readiness gap plan, Task N4. New `docs/ops/Production-Readiness-Checklist.md`: a concise, executable go/no-go checklist with Owner/Status columns across all 13 required areas (deployment, production env/secrets, domain/SSL/proxy, queue workers, scheduler, database, backups/restore, monitoring/error tracking, transactional email, log retention, legal pages, support/runbook, post-deploy verification). Deliberately does not restate [Private-Beta-Execution.md](docs/plans/Private-Beta-Execution.md)'s longer procedures or [Production-Topology.md](docs/deployment/Production-Topology.md)'s architecture explanation — both remain canonical for depth; this document links out to them and exists so nothing gets missed in the noise of the longer documents.
