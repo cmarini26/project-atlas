@@ -6,6 +6,27 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Docs] Production environment variable inventory (SCRUM-35) — 2026-07-16
+
+New `docs/deployment/Environment-Variables.md`: the canonical, code-verified inventory of every environment variable Atlas's Laravel app reads — built by grepping every `env()` call in `config/*.php` (plus the one exception read directly in `bootstrap/app.php`), not by copying `.env.example`. Organized into Required (must be a real production value), Optional/tunable (safe default, override only with a reason), Ambiguous/hosting-dependent (no single correct value this doc can give — `TRUSTED_PROXIES`, `SESSION_DOMAIN`, `QUEUE_CONNECTION`'s Redis-switch implication, `AWS_*`), and Present-but-unused (Sanctum, Inertia SSR, Beanstalkd/SQS/Memcached/DynamoDB stubs — each confirmed inert by reading the actual consuming code, not assumed).
+
+### Found and fixed: four undocumented variables with safe defaults
+
+`SESSION_SECURE_COOKIE` (already fixed in a prior session), `DB_QUEUE_RETRY_AFTER` (governs abandoned-job retry timing on the *actual* configured queue driver — `database`, not a hypothetical), `REDIS_CACHE_DB` (the entire mechanism keeping cache isolated from the session/default Redis connection), and `LOG_DAILY_DAYS` (the retention window the launch runbook's own `LOG_STACK=daily` switch depends on) were all real config values with zero mention in `.env.example` — discoverable only by reading `config/*.php` directly. All four now documented in `.env.example` with explanatory comments, each guarded by a new `EnvExampleTest` case so they can't silently disappear again.
+
+`ANTHROPIC_BASE_URL` was found with the same gap but left undocumented deliberately — genuinely speculative (no current need to override), unlike the other four which the launch runbook already implicitly depends on.
+
+### Verified, not assumed
+
+- `grep -rn "Storage::" app/` — zero results, confirming `AWS_*` is genuinely unused stock Laravel config, not a hidden requirement.
+- Read Inertia's `BundleDetector`/`HttpGateway` source directly — confirmed `INERTIA_SSR_ENABLED=true`'s default is structurally inert (no SSR bundle file exists anywhere in the repo, so the bundle-existence guard short-circuits before ever calling out to a non-existent SSR server).
+- Confirmed no Sanctum middleware is registered anywhere despite the `HasApiTokens` trait being present on `User`.
+- `php artisan config:cache`/`config:clear` — every config file parses cleanly.
+
+1343 PHP tests (1340 passing, 3 pre-existing skips), PHPStan clean, Pint clean.
+
+---
+
 ## [Fix] `.env.example` didn't document `SESSION_SECURE_COOKIE` — 2026-07-16
 
 Found while auditing the runbook's in-repo artifacts (`infrastructure/supervisor/atlas-worker.conf`, `infrastructure/cron/atlas-scheduler`, the three `infrastructure/backup/*.sh` scripts, `.env.example`, deployment docs, the error-tracking abstraction) against [Customer-1-Launch-Runbook.md](docs/ops/Customer-1-Launch-Runbook.md)'s expectations. `config/session.php:172` reads `env('SESSION_SECURE_COOKIE')` with no default, but the variable was never mentioned in `.env.example` at all — a real production deploy had no in-repo signal that this needed setting, only the runbook's own Phase 2 template (itself downstream of the same gap `Production-Deployment-Audit.md` already flagged).
