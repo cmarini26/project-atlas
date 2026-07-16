@@ -112,6 +112,36 @@ The badge is now shown wherever a channel type is displayed to a user: the appro
 
 ## Recommended follow-ups (not implemented here)
 
-1. When the first real publisher ships (most likely email via Postmark/Mailgun, since the `EmailProvider` contract and a webhook receiver already exist), promote that channel's capability from "Draft only" to "Connected" in `channelCapability.ts` — this is the one line the whole badge system was designed around.
-2. `LogChannelPublisher::ping()` / `LogEmailProvider::ping()` unconditionally return `reachable: true`. If a Channels health UI is ever built on top of `CheckChannelHealth`, this will falsely report every channel as healthy. Worth a follow-up ticket before that UI ships.
-3. Consider a company-wide banner (e.g. in `AppLayout`) while zero channels are "Connected," so the simulated state is visible everywhere, not only on the pages touched here.
+1. ~~When the first real publisher ships..., promote that channel's capability from "Draft only" to "Connected"~~ — done for Meta (facebook/instagram); see the 2026-07-15 addendum below. Still open for email once a real Postmark connect UX ships (Phase 1 of `backend/.hermes/plans/2026-07-15_094741-atlas-production-readiness-gap-plan.md`).
+2. `LogChannelPublisher::ping()` / `LogEmailProvider::ping()` unconditionally return `reachable: true`. If a Channels health UI is ever built on top of `CheckChannelHealth`, this will falsely report every channel as healthy. Still open — these are only exercised for channel types with no real publisher, so it doesn't affect blog/facebook/instagram/email's now-real ping paths, but is still a landmine for any future all-channels health dashboard.
+3. Consider a company-wide banner (e.g. in `AppLayout`) while zero channels are "Connected," so the simulated state is visible everywhere, not only on the pages touched here. Still open.
+
+---
+
+## Addendum — 2026-07-15: WordPress and Meta are now real; the headline finding above is out of date
+
+Production-readiness gap plan, Task 0.1/0.2 (channel capability truth). Since this audit was written (2026-07-07), real publishers were implemented and wired to real per-company connect flows for **two** of the eight channel types. The headline finding above — "No channel type in Project Atlas currently publishes anything to a real external platform" — **is no longer true.**
+
+### What changed since 2026-07-07
+
+| Channel type | Real connect flow | Real publisher | Notes |
+|---|---|---|---|
+| `blog` (WordPress) | `SettingsController::connectWordPress()` — validates credentials live via `WordPressPublisher::ping()` before ever reporting "connected" (fixed 2026-07-15, see CHANGELOG) | `WordPressPublisher` → real `POST /wp-json/wp/v2/posts` | Real when connected. **Not** reflected in `channelCapability.ts`'s badge system today — WordPress has no `MarketingChannelType` equivalent (no way to declare/link it via Marketing Presence), so there is no per-company override path the badge can use. `blog` stays at the conservative global default (`draft_only`) everywhere the generic badge renders; `Settings.vue`'s own `wordpress_channel.status` is the accurate source of truth for a specific company today. |
+| `facebook`, `instagram` (Meta) | `MetaOAuthController` — a full PKCE OAuth flow; a fake/expired code fails the token exchange itself, so reaching the end of `callback()` is real verification | `MetaChannelPublisher` → real Graph API calls | Real when connected. **Now** reflected in the badge system (fixed 2026-07-15): `MetaOAuthController::callback()`/`revoke()` and the recurring `CheckChannelHealth` job keep the declared `MarketingChannel.supports_publishing` flag in sync with live connection state, so `resolveChannelCapability()` can correctly return `'connected'` for a company that has actually connected Meta, and the corrected global fallback (`not_configured`, not `coming_later`) is honest for a company that hasn't. |
+| `email` | **None.** No Settings UI, no controller action — only `DemoSeeder` sets `provider_type: 'log'`. | `PostmarkEmailProvider` exists and is registered ahead of `LogEmailProvider`, but is never reachable without a real connect flow. | Still simulated in practice — the original audit's classification for email is still accurate. This is exactly Phase 1 of the production-readiness gap plan (`backend/.hermes/plans/2026-07-15_094741-atlas-production-readiness-gap-plan.md`). |
+| `linkedin`, `x`, `sms`, `landing_page` | None | None | Unchanged — still genuinely unreachable, as the original audit found. |
+
+### Corrected capability table (supersedes §"Per-channel-type capability table" above for `blog`/`facebook`/`instagram`)
+
+| Channel type | Real publisher exists | Real per-company connect flow | Badge system reflects it | Classification |
+|---|---|---|---|---|
+| `blog` | ✅ `WordPressPublisher` | ✅ `connectWordPress()`, validated at connect time | ❌ No `MarketingChannelType` equivalent — badge always shows the global `draft_only` default regardless of actual per-company state | **Real, but not company-visible via the generic badge** |
+| `facebook` / `instagram` | ✅ `MetaChannelPublisher` | ✅ `MetaOAuthController`, OAuth itself is the verification | ✅ `supports_publishing` now kept in sync at connect and via `CheckChannelHealth` | **Real and honestly labeled** |
+| `email` | ✅ `PostmarkEmailProvider` (unreachable) | ❌ None | N/A — no way to ever have `provider_type: 'postmark'` for a real company today | **Logs internally only** (unchanged) |
+| `linkedin`, `x`, `sms`, `landing_page` | ❌ | ❌ | N/A | **Not supported** (unchanged) |
+
+### What this addendum deliberately did not do
+
+- **Did not thread `linked-marketing-channel` data through `Publishing.vue`, `Dashboard.vue`, or `Campaigns/Show.vue`.** These three pages render `<ChannelCapabilityBadge :channel-type="..." />` with no `linked-marketing-channel` prop at all, so they always fall back to the global default and can never show `'connected'` for a real, live Meta or WordPress channel — only the Recommendation approval screen (`ChannelMixCard.vue`/`ApproveActions.vue`) currently passes real per-company data. Threading it through the other three pages (new controller props + template changes on each) is a separate, larger slice, not folded into this one.
+- **Did not give WordPress a `MarketingChannelType` equivalent.** Doing so would let `blog` participate in the same per-company override mechanism Meta now uses, but extending the enum, its validation rules, `suggestedDefaults()`, and the onboarding/Marketing-Presence UI is a real product decision (is a WordPress blog "declared" the same way Instagram is?), not a truth-audit fix — left as a follow-up.
+- **Did not change `Execution`/`ContentAsset`/`Campaign` state names or approval-flow copy.** Those were already fixed to non-overclaiming language in the original 2026-07-07 pass and remain correct — this addendum only affects the four-state capability badge and the two doc files that describe it.

@@ -4,7 +4,9 @@ namespace App\Jobs;
 
 use App\Models\ChannelCredentials;
 use App\Models\CompanyMembership;
+use App\Models\MarketingChannel;
 use App\Notifications\ChannelNeedsReauth;
+use App\Services\MarketingPresence\MarketingPresenceService;
 use App\Services\Publishing\ChannelPublisherRegistry;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -27,11 +29,11 @@ class CheckChannelHealth implements ShouldQueue
         $this->onQueue('maintenance');
     }
 
-    public function handle(ChannelPublisherRegistry $registry): void
+    public function handle(ChannelPublisherRegistry $registry, MarketingPresenceService $marketingPresence): void
     {
         ChannelCredentials::withoutGlobalScopes()
             ->where('status', '!=', 'revoked')
-            ->each(function (ChannelCredentials $credentials) use ($registry): void {
+            ->each(function (ChannelCredentials $credentials) use ($registry, $marketingPresence): void {
                 $wasAlreadyError = $credentials->status === 'error';
 
                 try {
@@ -54,6 +56,19 @@ class CheckChannelHealth implements ShouldQueue
                         'channel_type' => $credentials->channel_type,
                         'error' => $e->getMessage(),
                     ]);
+                }
+
+                // Keep the declared channel's capability badge honest as
+                // health changes over time — supports_publishing shouldn't
+                // stay true forever just because a connection once passed
+                // its initial verification (see channelCapability.ts).
+                $declared = MarketingChannel::where('company_id', $credentials->company_id)
+                    ->where('type', $credentials->channel_type)
+                    ->whereNotNull('channel_id')
+                    ->first();
+
+                if ($declared !== null) {
+                    $marketingPresence->markPublishingVerified($declared, $status === 'active');
                 }
 
                 // Notify once on the active→error transition, not on every

@@ -173,6 +173,26 @@ class MarketingPresenceService
     }
 
     /**
+     * Record whether a linked Channel's publishing has been operationally
+     * verified — the "independent, later upgrade" link()'s own docblock
+     * anticipated (Phase 6/12). Callers must only pass true after a real
+     * verification (a successful credential ping, a completed OAuth token
+     * exchange), never just because a Channel was linked — see
+     * MetaOAuthController::callback()/revoke() and CheckChannelHealth for
+     * the two places that call this today (on connect, and to keep this
+     * flag in sync with ongoing health checks rather than freezing it at
+     * whatever it was the moment of connection).
+     */
+    public function markPublishingVerified(MarketingChannel $channel, bool $verified): MarketingChannel
+    {
+        $channel->update(['supports_publishing' => $verified]);
+
+        MarketingPresenceUpdated::dispatch($channel->refresh());
+
+        return $channel;
+    }
+
+    /**
      * Link a declared channel to a real Integration — the observation-source
      * counterpart to link()'s Channel-based (publishing-destination) linkage.
      * Instagram/Google Business connect via an Integration, never a Channel;

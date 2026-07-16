@@ -5,12 +5,15 @@ namespace Tests\Feature\Publishing;
 use App\Domain\Publishing\ValueObjects\ExecutionResult;
 use App\Domain\Publishing\ValueObjects\PingResult;
 use App\Jobs\CheckChannelHealth;
+use App\Models\Channel;
 use App\Models\ChannelCredentials;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\Execution;
+use App\Models\MarketingChannel;
 use App\Models\User;
 use App\Notifications\ChannelNeedsReauth;
+use App\Services\MarketingPresence\MarketingPresenceService;
 use App\Services\Publishing\ChannelPublisherRegistry;
 use App\Services\Publishing\Contracts\ChannelPublisher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -67,7 +70,7 @@ class CheckChannelHealthTest extends TestCase
 
         $this->bindPublisherWithPingResult(reachable: false);
 
-        (new CheckChannelHealth())->handle($this->app->make(ChannelPublisherRegistry::class));
+        (new CheckChannelHealth())->handle($this->app->make(ChannelPublisherRegistry::class), $this->app->make(MarketingPresenceService::class));
 
         Notification::assertSentTo($owner, ChannelNeedsReauth::class);
         $this->assertSame('error', $credentials->fresh()->status);
@@ -84,7 +87,7 @@ class CheckChannelHealthTest extends TestCase
 
         $this->bindPublisherWithPingResult(reachable: false);
 
-        (new CheckChannelHealth())->handle($this->app->make(ChannelPublisherRegistry::class));
+        (new CheckChannelHealth())->handle($this->app->make(ChannelPublisherRegistry::class), $this->app->make(MarketingPresenceService::class));
 
         Notification::assertNothingSent();
     }
@@ -100,9 +103,78 @@ class CheckChannelHealthTest extends TestCase
 
         $this->bindPublisherWithPingResult(reachable: true);
 
-        (new CheckChannelHealth())->handle($this->app->make(ChannelPublisherRegistry::class));
+        (new CheckChannelHealth())->handle($this->app->make(ChannelPublisherRegistry::class), $this->app->make(MarketingPresenceService::class));
 
         Notification::assertNothingSent();
+    }
+
+    public function test_marks_the_linked_declared_channel_as_no_longer_publishing_verified_on_failure(): void
+    {
+        // Keeps the capability badge (channelCapability.ts) honest as health
+        // changes over time, not frozen at whatever it was at connect time.
+        $company = Company::withoutGlobalScopes()->create(['name' => 'Acme', 'slug' => 'acme']);
+        $this->makeCredentials($company, 'active');
+
+        $realChannel = Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'type' => 'facebook', 'name' => 'Acme Page', 'is_active' => true,
+        ]);
+        $declared = MarketingChannel::factory()->create([
+            'company_id' => $company->id,
+            'type' => 'facebook',
+            'channel_id' => $realChannel->id,
+            'is_connected' => true,
+            'supports_publishing' => true,
+        ]);
+
+        $this->bindPublisherWithPingResult(reachable: false);
+
+        (new CheckChannelHealth())->handle($this->app->make(ChannelPublisherRegistry::class), $this->app->make(MarketingPresenceService::class));
+
+        $this->assertFalse($declared->fresh()->supports_publishing);
+    }
+
+    public function test_marks_the_linked_declared_channel_as_publishing_verified_again_on_recovery(): void
+    {
+        $company = Company::withoutGlobalScopes()->create(['name' => 'Acme', 'slug' => 'acme']);
+        $this->makeCredentials($company, 'error');
+
+        $realChannel = Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id, 'type' => 'facebook', 'name' => 'Acme Page', 'is_active' => true,
+        ]);
+        $declared = MarketingChannel::factory()->create([
+            'company_id' => $company->id,
+            'type' => 'facebook',
+            'channel_id' => $realChannel->id,
+            'is_connected' => true,
+            'supports_publishing' => false,
+        ]);
+
+        $this->bindPublisherWithPingResult(reachable: true);
+
+        (new CheckChannelHealth())->handle($this->app->make(ChannelPublisherRegistry::class), $this->app->make(MarketingPresenceService::class));
+
+        $this->assertTrue($declared->fresh()->supports_publishing);
+    }
+
+    public function test_does_not_touch_a_declared_channel_that_was_never_linked(): void
+    {
+        $company = Company::withoutGlobalScopes()->create(['name' => 'Acme', 'slug' => 'acme']);
+        $this->makeCredentials($company, 'active');
+
+        // Declared but never connected — channel_id is null, so this must
+        // not be mistaken for the company's live facebook connection.
+        $declared = MarketingChannel::factory()->create([
+            'company_id' => $company->id,
+            'type' => 'facebook',
+            'channel_id' => null,
+            'supports_publishing' => false,
+        ]);
+
+        $this->bindPublisherWithPingResult(reachable: true);
+
+        (new CheckChannelHealth())->handle($this->app->make(ChannelPublisherRegistry::class), $this->app->make(MarketingPresenceService::class));
+
+        $this->assertFalse($declared->fresh()->supports_publishing);
     }
 
     public function test_does_not_check_revoked_credentials(): void
@@ -116,7 +188,7 @@ class CheckChannelHealthTest extends TestCase
 
         $this->bindPublisherWithPingResult(reachable: false);
 
-        (new CheckChannelHealth())->handle($this->app->make(ChannelPublisherRegistry::class));
+        (new CheckChannelHealth())->handle($this->app->make(ChannelPublisherRegistry::class), $this->app->make(MarketingPresenceService::class));
 
         $this->assertSame('revoked', $credentials->fresh()->status);
         Notification::assertNothingSent();

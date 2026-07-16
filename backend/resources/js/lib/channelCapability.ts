@@ -2,13 +2,29 @@
  * What each channel type can actually do today, versus what the UI used to
  * imply ("Publish", "Published", raw enum values like "instagram"). See
  * docs/reviews/Channel-Publishing-Reality-Audit.md for the full audit this
- * was built from.
+ * was built from, and its 2026-07-15 addendum for what changed since.
  *
- * No channel type currently sends to a real external platform — every
- * "publish" is logged internally (App\Services\Publishing\LogChannelPublisher
- * / LogEmailProvider). 'connected' and 'not_configured' are included so a
- * future real integration (most likely email) slots in by changing one
- * entry in CHANNEL_CAPABILITY, without further UI work.
+ * `blog` (WordPress) and `facebook`/`instagram` (Meta) each have a real
+ * connect flow (SettingsController::connectWordPress(), MetaOAuthController)
+ * and a real publisher (WordPressPublisher, MetaChannelPublisher) — these
+ * are genuinely live once a company connects them, not simulated. `email`
+ * has a real PostmarkEmailProvider implemented, but no product UX exists
+ * yet to connect it for a real company (only DemoSeeder sets provider_type
+ * 'postmark'), so it stays 'draft_only' below.
+ *
+ * This map is a *global fallback* used only when no company-specific link
+ * data is available (see resolveChannelCapability()). `facebook`/`instagram`
+ * are per-company-overridable — a linked MarketingChannel's
+ * supports_publishing flag (kept in sync with real connect/health state by
+ * MetaOAuthController and CheckChannelHealth) always wins over this default.
+ * `blog` is NOT overridable this way today: WordPress has no
+ * MarketingChannelType equivalent (App\Enums\MarketingChannelType has no
+ * Blog/WordPress case), so there is no per-company link path for it, and
+ * `blog` here is deliberately left at the conservative 'draft_only' default
+ * even though a specific company's WordPress connection may in fact be
+ * live — see Settings.vue's own `wordpress_channel.status`, which is the
+ * accurate per-company source of truth Publishing.vue/Dashboard.vue/
+ * Campaigns/Show.vue don't yet surface (follow-up, not fixed here).
  */
 
 export type ChannelCapability = 'connected' | 'draft_only' | 'coming_later' | 'not_configured'
@@ -27,14 +43,17 @@ export const CHANNEL_TYPE_LABELS: Record<string, string> = {
 /**
  * - draft_only: content is drafted and the internal pipeline runs to
  *   completion, but delivery is simulated/logged, not sent to a live channel.
+ * - not_configured: a real connect flow and publisher exist for this type,
+ *   but this fallback path has no company-specific data to say whether
+ *   *this* company has actually connected it (see resolveChannelCapability).
  * - coming_later: no code path lets a company create a channel of this type
  *   yet, even though content-drafting support already exists for it.
  */
 export const CHANNEL_CAPABILITY: Record<string, ChannelCapability> = {
   blog: 'draft_only',
   email: 'draft_only',
-  facebook: 'coming_later',
-  instagram: 'coming_later',
+  facebook: 'not_configured',
+  instagram: 'not_configured',
   linkedin: 'coming_later',
   x: 'coming_later',
   sms: 'coming_later',

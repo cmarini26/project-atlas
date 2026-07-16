@@ -6,6 +6,25 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Fix] Channel capability badges no longer claim Meta is unbuilt, and now reflect real connection state — 2026-07-15
+
+Production-readiness gap plan, Phase 0 (channel capability truth). `resources/js/lib/channelCapability.ts` and `docs/reviews/Channel-Publishing-Reality-Audit.md` still described the 2026-07-07 reality — "no channel type currently sends to a real external platform" — but real `WordPressPublisher` and `MetaChannelPublisher` implementations, with real per-company connect flows (`SettingsController::connectWordPress()`, `MetaOAuthController`), shipped since then. `MarketingPresenceService::link()`'s own docblock had explicitly deferred setting `supports_publishing` to "a later upgrade" — that upgrade had never happened, so the capability badge could never show "Connected" for any company no matter how genuinely they'd connected a real channel.
+
+### Fixed
+
+- New `MarketingPresenceService::markPublishingVerified()` — sets a declared `MarketingChannel`'s `supports_publishing` flag from a real verification result.
+- `MetaOAuthController::callback()` now links the company's declared Facebook/Instagram `MarketingChannel` (if any) to the newly connected real `Channel` and marks it publishing-verified — the OAuth token exchange itself is the verification (a fake/expired code fails before reaching this code). `revoke()` now un-verifies both.
+- `CheckChannelHealth` (the existing 30-minute recurring health-check job) now keeps `supports_publishing` in sync with live ping results going forward, not just at connect time — so the badge can't go stale if a working connection later breaks.
+- `channelCapability.ts`'s global fallback for `facebook`/`instagram` corrected from `'coming_later'` (false — a real connect flow exists) to `'not_configured'`. `blog`/`email` correctly remain `'draft_only'` — email still has no real connect UX, and WordPress has no `MarketingChannelType` equivalent so it structurally can't use the same per-company override path yet (see the audit doc's addendum for why that's a disclosed follow-up, not fixed here).
+- `docs/reviews/Channel-Publishing-Reality-Audit.md` gained a 2026-07-15 addendum superseding its stale headline finding, with a corrected per-channel table.
+
+### Notes
+
+- New tests: `MetaOAuthControllerTest::test_callback_marks_a_declared_facebook_channel_as_publishing_verified`, `test_callback_does_not_fail_when_no_declared_channel_exists_to_link`, `test_revoke_marks_declared_meta_channels_as_no_longer_publishing_verified`; `CheckChannelHealthTest::test_marks_the_linked_declared_channel_as_no_longer_publishing_verified_on_failure`, `test_marks_the_linked_declared_channel_as_publishing_verified_again_on_recovery`, `test_does_not_touch_a_declared_channel_that_was_never_linked`; new `resources/js/lib/channelCapability.spec.ts`.
+- Does not thread real per-company connection data through `Publishing.vue`, `Dashboard.vue`, or `Campaigns/Show.vue` — those three pages render `ChannelCapabilityBadge` without a `linked-marketing-channel` prop at all, so they still can't show "Connected" for a live channel. Only the Recommendation approval screen (`ChannelMixCard.vue`/`ApproveActions.vue`) consumes the per-company signal today. Flagged as a follow-up, not fixed here — the audit doc's addendum has the full explanation.
+- Does not give WordPress a `MarketingChannelType` equivalent, so `blog` still can't participate in the same override mechanism. `Settings.vue`'s own `wordpress_channel.status` remains the accurate per-company source of truth for a specific company's WordPress connection today.
+
+
 ## [Fix] WordPress connect no longer reports "connected" without verifying credentials — 2026-07-15
 
 Production-readiness gap plan, Task 2.1 (`backend/.hermes/plans/2026-07-15_094741-atlas-production-readiness-gap-plan.md`). `SettingsController::connectWordPress()` previously saved any submitted site URL/username/Application Password as `status: 'active'` unconditionally — a typo'd password or an unreachable site still showed as a green "Connected" WordPress channel in Settings, and the falsehood would only surface later, silently, whenever a blog campaign happened to try to publish (or up to 30 minutes later via the existing `CheckChannelHealth` scheduled job).

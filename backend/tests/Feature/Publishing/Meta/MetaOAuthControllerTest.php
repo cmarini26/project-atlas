@@ -6,6 +6,7 @@ use App\Models\Channel;
 use App\Models\ChannelCredentials;
 use App\Models\Company;
 use App\Models\CompanyMembership;
+use App\Models\MarketingChannel;
 use App\Models\User;
 use App\Services\Publishing\MetaOAuthService;
 use GuzzleHttp\Client;
@@ -170,6 +171,79 @@ class MetaOAuthControllerTest extends TestCase
 
         $response->assertSessionHas('error');
         $this->assertDatabaseCount('channel_credentials', 0);
+    }
+
+    public function test_callback_marks_a_declared_facebook_channel_as_publishing_verified(): void
+    {
+        // Production-readiness gap plan, channel capability truth slice:
+        // MarketingPresenceService::link()'s docblock explicitly deferred
+        // supports_publishing to "a later upgrade" — this closes that gap
+        // for the one connect flow (Meta OAuth) that already exists.
+        [$user, $company] = $this->userWithCompany();
+
+        $declared = MarketingChannel::factory()->create([
+            'company_id' => $company->id,
+            'type' => 'facebook',
+        ]);
+
+        $this->bindMockedOAuthService([
+            new Response(200, [], json_encode(['access_token' => 'short-lived'])),
+            new Response(200, [], json_encode(['access_token' => 'long-lived'])),
+            new Response(200, [], json_encode(['data' => [
+                ['id' => 'page-1', 'name' => 'CBB Auctions', 'access_token' => 'page-token-1'],
+            ]])),
+            new Response(200, [], json_encode([])),
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['meta_oauth_state' => 'expected-state', 'meta_oauth_code_verifier' => 'verifier'])
+            ->get('/app/settings/meta/callback?state=expected-state&code=abc');
+
+        $declared->refresh();
+        $this->assertTrue($declared->supports_publishing);
+        $this->assertTrue($declared->is_connected);
+        $this->assertNotNull($declared->channel_id);
+    }
+
+    public function test_callback_does_not_fail_when_no_declared_channel_exists_to_link(): void
+    {
+        [$user] = $this->userWithCompany();
+
+        $this->bindMockedOAuthService([
+            new Response(200, [], json_encode(['access_token' => 'short-lived'])),
+            new Response(200, [], json_encode(['access_token' => 'long-lived'])),
+            new Response(200, [], json_encode(['data' => [
+                ['id' => 'page-1', 'name' => 'CBB Auctions', 'access_token' => 'page-token-1'],
+            ]])),
+            new Response(200, [], json_encode([])),
+        ]);
+
+        $response = $this->actingAs($user)
+            ->withSession(['meta_oauth_state' => 'expected-state', 'meta_oauth_code_verifier' => 'verifier'])
+            ->get('/app/settings/meta/callback?state=expected-state&code=abc');
+
+        $response->assertSessionHas('success');
+    }
+
+    public function test_revoke_marks_declared_meta_channels_as_no_longer_publishing_verified(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+
+        $declaredFacebook = MarketingChannel::factory()->create([
+            'company_id' => $company->id,
+            'type' => 'facebook',
+            'supports_publishing' => true,
+        ]);
+        $declaredInstagram = MarketingChannel::factory()->create([
+            'company_id' => $company->id,
+            'type' => 'instagram',
+            'supports_publishing' => true,
+        ]);
+
+        $this->actingAs($user)->post('/app/settings/meta/revoke');
+
+        $this->assertFalse($declaredFacebook->fresh()->supports_publishing);
+        $this->assertFalse($declaredInstagram->fresh()->supports_publishing);
     }
 
     public function test_revoke_marks_meta_credentials_as_revoked(): void

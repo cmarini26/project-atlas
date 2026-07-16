@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Channel;
 use App\Models\ChannelCredentials;
 use App\Models\Company;
+use App\Models\MarketingChannel;
+use App\Services\MarketingPresence\MarketingPresenceService;
 use App\Services\Publishing\Exceptions\AuthenticationException;
 use App\Services\Publishing\MetaOAuthService;
 use Illuminate\Http\RedirectResponse;
@@ -24,7 +26,10 @@ class MetaOAuthController extends Controller
 
     private const SESSION_VERIFIER_KEY = 'meta_oauth_code_verifier';
 
-    public function __construct(private readonly MetaOAuthService $oauth) {}
+    public function __construct(
+        private readonly MetaOAuthService $oauth,
+        private readonly MarketingPresenceService $marketingPresence,
+    ) {}
 
     public function redirect(Request $request): RedirectResponse
     {
@@ -78,7 +83,7 @@ class MetaOAuthController extends Controller
         // later, not a blocker for the OAuth plumbing itself.
         $page = $pages[0];
 
-        Channel::updateOrCreate(
+        $facebookChannel = Channel::updateOrCreate(
             ['company_id' => $company->id, 'type' => 'facebook'],
             ['name' => $page['name'], 'is_active' => true],
         );
@@ -97,6 +102,13 @@ class MetaOAuthController extends Controller
             ],
         );
 
+        // The OAuth token exchange above already is the verification — a
+        // fake/expired code would have thrown before reaching this line —
+        // so it's safe to mark the declared channel (if any) as genuinely
+        // publishing-capable now, closing the gap MarketingPresenceService
+        // ::link()'s docblock flagged as a deferred "Phase 6/12" upgrade.
+        $this->linkAndVerifyPublishing($company, $facebookChannel, 'facebook');
+
         try {
             $instagramId = $this->oauth->fetchInstagramBusinessAccountId($page['id'], $page['access_token']);
         } catch (AuthenticationException $e) {
@@ -105,7 +117,7 @@ class MetaOAuthController extends Controller
         }
 
         if ($instagramId !== null) {
-            Channel::updateOrCreate(
+            $instagramChannel = Channel::updateOrCreate(
                 ['company_id' => $company->id, 'type' => 'instagram'],
                 ['name' => $page['name'], 'is_active' => true],
             );
@@ -119,15 +131,44 @@ class MetaOAuthController extends Controller
                     'expires_at' => null,
                 ],
             );
+
+            $this->linkAndVerifyPublishing($company, $instagramChannel, 'instagram');
         }
 
         return redirect()->route('app.settings')->with('success', "Connected to {$page['name']} on Facebook.");
+    }
+
+    /**
+     * Link the company's declared MarketingChannel (if any) for this type to
+     * the real Channel just connected, and mark it publishing-verified. A
+     * company that never declared this channel type (e.g. via onboarding or
+     * /app/settings/marketing-presence) has nothing to link — that's fine,
+     * the real Channel/ChannelCredentials above are the source of truth for
+     * actual publishing either way; this only affects the capability badge
+     * shown for a *declared* channel.
+     */
+    private function linkAndVerifyPublishing(Company $company, Channel $realChannel, string $marketingChannelType): void
+    {
+        $declared = MarketingChannel::where('company_id', $company->id)
+            ->where('type', $marketingChannelType)
+            ->first();
+
+        if ($declared === null) {
+            return;
+        }
+
+        $this->marketingPresence->link($declared, $realChannel);
+        $this->marketingPresence->markPublishingVerified($declared, true);
     }
 
     public function revoke(Request $request): RedirectResponse
     {
         /** @var Company $company */
         $company = $request->attributes->get('company');
+
+        MarketingChannel::where('company_id', $company->id)
+            ->whereIn('type', ['facebook', 'instagram'])
+            ->each(fn (MarketingChannel $declared) => $this->marketingPresence->markPublishingVerified($declared, false));
 
         ChannelCredentials::withoutGlobalScopes()
             ->where('company_id', $company->id)
