@@ -6,6 +6,28 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Fix] Queue worker Supervisor config would never have processed a production job (SCRUM-41) — 2026-07-16
+
+While documenting queue worker processes for SCRUM-41, found that `infrastructure/supervisor/atlas-worker.conf`'s every command (`queue:work high`, `queue:work ai`, etc.) passed the queue name as `queue:work`'s **first positional argument — which is a connection name, not a queue name.** No job in this codebase ever calls `onConnection()` (only `onQueue()`), so every job actually dispatches onto whatever `QUEUE_CONNECTION` resolves to (`database`, per `.env.example`). `config/queue.php` separately defines four `redis`-driver connections happening to share the same names (`high`/`ai`/`observations`/`maintenance`) — a currently-unreferenced routing path. `queue:work high` therefore told the worker to listen on an empty Redis connection, never the Postgres `jobs` table every real job actually lands in. **As shipped, this Supervisor config would never have processed a single queued job in production** — including every scheduler-dispatched job (`ExpireOpportunities`, `PublishScheduledContent`, `CheckChannelHealth`, `PruneRawMetrics`, `ApplyLearnings`, `SendFeedbackDigest`), since `Schedule::job(...)` dispatches through the same queue system, not inline.
+
+Proven live, not just reasoned about: dispatched a real job the way every real job dispatches (`onQueue('high')` only), ran `queue:work high --once` (the shipped form) and confirmed it never touched the job, then ran `queue:work --queue=high --once` (the corrected form) against the same job and confirmed it processed it.
+
+### Fixed
+
+- Every command in `infrastructure/supervisor/atlas-worker.conf` now uses `--queue=<name>` with no connection argument.
+
+### Docs
+
+- New `docs/deployment/Queue-Workers.md` (SCRUM-41): the full queue/job/retry inventory (all 17 jobs' `$tries`/`$backoff`/`$timeout`, verified directly from each job class), the recommended 5-process-group Supervisor layout, and why multiple specialized pools (not one shared pool) is the correct design — `config/queue.php`'s own comment already says so, this document verifies and explains it.
+
+### Tests added
+
+- New `QueueWorkerConfigTest` (2): parses `atlas-worker.conf` and fails if any `command=` line ever passes a bare queue name as a connection argument again; a real dispatch-and-consume test proving a job routed via `onQueue()` alone is only reachable by the corrected worker form. New `App\Jobs\Testing\QueueRoutingProbeJob` (test-only, inert) supports the second test.
+
+1345 PHP tests (1342 passing, 3 pre-existing skips), PHPStan clean, Pint clean.
+
+---
+
 ## [Docs] Production environment variable inventory (SCRUM-35) — 2026-07-16
 
 New `docs/deployment/Environment-Variables.md`: the canonical, code-verified inventory of every environment variable Atlas's Laravel app reads — built by grepping every `env()` call in `config/*.php` (plus the one exception read directly in `bootstrap/app.php`), not by copying `.env.example`. Organized into Required (must be a real production value), Optional/tunable (safe default, override only with a reason), Ambiguous/hosting-dependent (no single correct value this doc can give — `TRUSTED_PROXIES`, `SESSION_DOMAIN`, `QUEUE_CONNECTION`'s Redis-switch implication, `AWS_*`), and Present-but-unused (Sanctum, Inertia SSR, Beanstalkd/SQS/Memcached/DynamoDB stubs — each confirmed inert by reading the actual consuming code, not assumed).
