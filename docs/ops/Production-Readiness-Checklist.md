@@ -61,7 +61,7 @@
 | Item | Owner | Status | Notes |
 |---|---|---|---|
 | Cron entry installed and running `php artisan schedule:run` every minute | | ⬜ | ✅ Code-complete: [`infrastructure/cron/atlas-scheduler`](../../infrastructure/cron/atlas-scheduler) is the artifact to install — verify by the last-run timestamp of a scheduled command, not by reading `routes/console.php` |
-| All 6 scheduled jobs have `->withoutOverlapping()` (and `->onOneServer()` where not already `ShouldBeUnique`) | | ✅ | Code-complete, Blocker 4 |
+| All 7 scheduled entries have `->withoutOverlapping()` (and `->onOneServer()` where not already `ShouldBeUnique`) | | ✅ | Code-complete, Blocker 4 — see [Scheduler-Operations.md](../deployment/Scheduler-Operations.md) (SCRUM-46) for the full task inventory and queue-dependency analysis |
 | Recurring integration sync (`atlas:sync-due-integrations`) has fired at least once on schedule with the expected effect | | ⬜ | |
 | Opportunity expiration has fired at least once on schedule | | ⬜ | |
 

@@ -6,6 +6,26 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Docs] Scheduler operations guide (SCRUM-46) — 2026-07-16
+
+New `docs/deployment/Scheduler-Operations.md`: the full inventory of Atlas's 7 scheduled entries (confirmed live via `php artisan schedule:list`, not counted by hand), what each does, and — the core of this ticket — precisely how each depends on queue workers.
+
+### The key finding: all 7 tasks are queue-dependent, including the one that looks like it isn't
+
+6 of the 7 are `Schedule::job(...)` — directly queued, an obvious dependency. The 7th, `atlas:sync-due-integrations`, is `Schedule::command(...)` and runs synchronously in the scheduler process — but its entire body of work is dispatching `SyncIntegration` onto the `observations` queue. If that worker is down, this command reports `"Dispatched N due integration sync(s)"` every 15 minutes, looks completely healthy in every log, and nothing about any company's Business Brain ever actually updates. Documented as the single easiest scheduler failure mode to miss, precisely because the scheduled command itself never fails.
+
+Also traced and documented three second-order queue dependencies not obvious from `routes/console.php` alone: `PublishScheduledContent` (maintenance) dispatches `PublishContent` onto `high`; `CheckChannelHealth` and `SendFeedbackDigest`'s owner/digest notifications both implement `ShouldQueue` with no explicit queue, landing on `default` — confirmed by reading both notification classes directly, not assumed.
+
+### Verified, not assumed
+
+- Read `Illuminate\Console\Scheduling\CacheSchedulingMutex` source directly — confirmed `withoutOverlapping()`/`onOneServer()` locks use a real Redis lock with a **3600-second TTL**, not an indefinite hold; corrected an early draft's "forever" claim before it shipped.
+- Confirmed via grep that no heartbeat/dead-man's-switch monitoring (`pingBefore`/`pingOnSuccess`/Healthchecks.io/Cronitor) exists anywhere — flagged as a real, relatively cheap gap.
+- Confirmed `schedule:list` reports exactly 7 entries — found and fixed a stale "6 scheduled jobs" count in `docs/ops/Production-Readiness-Checklist.md` and `docs/reviews/Private-Beta-Go-No-Go-Review-2026-07-16.md` (both live/current-state documents, not historical narrative — left the genuinely historical dated audit entries in `STATUS.md`/`Critical-Production-Blockers.md`/`Production-Deployment-Audit.md` untouched, since those correctly describe state at the time they were written).
+
+No application code changed — documentation only.
+
+---
+
 ## [Docs] First repeatable deployment runbook (SCRUM-47) — 2026-07-16
 
 New `docs/deployment/Deployment-Runbook.md`: the procedure to run for **every** deploy of Atlas, distinct from `docs/ops/Customer-1-Launch-Runbook.md`'s one-time "get to Customer 1" checklist (accounts, legal pages, ownership, first-week cadence). Every environment variable named is the exact set from SCRUM-35's `Environment-Variables.md`; every queue worker command is the exact, bug-fixed form from SCRUM-41's `Queue-Workers.md` — grounded in this sprint's own findings, not generic Laravel deployment advice.
