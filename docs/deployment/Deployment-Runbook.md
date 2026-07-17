@@ -67,6 +67,8 @@ php artisan up
 
 `--secret` lets you (and only you, via `https://<domain>/<secret>`) bypass maintenance mode to smoke-test before reopening to everyone.
 
+**Before using maintenance mode, read [Configuration-Sanity-Check.md](Configuration-Sanity-Check.md) §2.3 and §2.4.** Two things are easy to get wrong here: (1) Laravel's built-in `/up` deliberately bypasses maintenance mode while Atlas's own `/api/health` correctly returns 503 — if uptime monitoring is pointed at `/api/health`, expect a false "site is down" alert during this window unless the monitor is paused first; (2) `APP_MAINTENANCE_DRIVER=file` (the current default) only takes effect on the single server that ran the command — fine for Atlas's current single-server topology, not fine the moment a second app server exists.
+
 ### Verification — §3
 
 - [ ] `php artisan migrate:status` shows no `Pending` rows.

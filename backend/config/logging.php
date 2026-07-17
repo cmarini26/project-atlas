@@ -127,10 +127,22 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        // Always rotates (daily), independent of LOG_STACK/LOG_CHANNEL's
+        // choice — this channel holds send-attempt content for real
+        // external providers (WordPress/Meta/Postmark), so it must never be
+        // allowed to grow unbounded regardless of what the main app log is
+        // configured to do. Shares LOG_DAILY_DAYS' retention window and
+        // LOG_LEVEL's verbosity with the main 'daily' channel rather than
+        // introducing separate env vars for the same underlying concern.
+        // See docs/deployment/Environment-Variables.md and
+        // docs/plans/Private-Beta-Execution.md's Log Retention checklist,
+        // which already assumed this channel was covered by rotation.
         'publishing' => [
-            'driver' => 'single',
+            'driver' => 'daily',
             'path' => storage_path('logs/publishing.log'),
-            'level' => 'debug',
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => env('LOG_DAILY_DAYS', 14),
+            'replace_placeholders' => true,
         ],
 
     ],

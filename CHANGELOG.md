@@ -6,6 +6,32 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Fix] Production configuration sanity check (SCRUM-37) — publishing log never rotated; a fourth health endpoint was undocumented — 2026-07-16
+
+Cross-checked Sprint 1's own artifacts (Environment-Variables.md/SCRUM-35, Queue-Workers.md/SCRUM-41, Scheduler-Operations.md/SCRUM-46, Deployment-Runbook.md/SCRUM-47) against each other and against real, live-inspected `config/*.php`/`bootstrap/app.php` — not a re-audit from scratch, a drift check.
+
+### Fixed
+
+- **The `publishing` log channel (`storage/logs/publishing.log` — every WordPress/Meta/Postmark send attempt) used the `single` driver (never rotates) and a hardcoded `debug` level, independent of whatever `LOG_STACK`/`LOG_LEVEL` production is configured with.** Not a new discovery — `Production-Deployment-Audit.md` (2026-07-10) flagged the hardcoded level, and `Private-Beta-Execution.md`'s Log Retention checklist already *assumed* this channel was covered by rotation — but nothing had actually fixed it, and none of Sprint 1's newer docs caught the fix was still outstanding. Switching `LOG_STACK` to `daily` in production rotated the main app log but left `publishing.log` growing forever. Now `config/logging.php`'s `publishing` channel always rotates daily (independent of `LOG_STACK`) sharing `LOG_DAILY_DAYS`'/`LOG_LEVEL`'s existing values rather than inventing new env vars for the same concern.
+
+### Found and documented (not a code bug — a Sprint 1 documentation gap)
+
+- **A fourth health-related endpoint, Laravel's built-in `GET /up`, was never mentioned in any Sprint 1 document.** Proven live: `/up` returns 200 during `php artisan down` (deliberately bypasses maintenance mode, by Laravel design); Atlas's own `/api/health` correctly returns 503. Both behaviors are individually correct — the gap is that no doc told an operator which one to point uptime monitoring at, so pointing continuous alerting at `/api/health` means every deliberate maintenance window fires a false "site is down" alert unless the monitor is paused first. New `docs/deployment/Configuration-Sanity-Check.md` §2.3 documents this; `Deployment-Runbook.md` §3 now cross-references it at the exact point maintenance mode is used. Left as an open decision for whoever configures the real monitor — not resolved here.
+- **`APP_MAINTENANCE_DRIVER=file` is single-server only** (`storage_path('framework/down')`, confirmed via Laravel's `FileBasedMaintenanceMode` source) — fine for Atlas's current topology, a real gap the moment a second app server exists. Documented alongside the `/up` finding.
+
+### New
+
+- `docs/deployment/Configuration-Sanity-Check.md` — a runnable, 13-item pre-deploy config checklist (real `artisan`/`grep` commands with expected output) plus this audit's findings, split into confirmed-consistent / fixed / documented-gap / hosting-dependent.
+
+### Tests
+
+- New `LoggingConfigTest` (2) guards the publishing channel's rotation/retention/level configuration.
+- Fixed `SettingsControllerTest::test_credentials_never_appear_in_the_publishing_log`, which hardcoded the old non-rotating filename (`publishing.log`) — now reads the real, date-suffixed file the `daily` driver actually writes.
+
+1347 PHP tests (1344 passing, 3 pre-existing skips), PHPStan clean, Pint clean.
+
+---
+
 ## [Docs] Scheduler operations guide (SCRUM-46) — 2026-07-16
 
 New `docs/deployment/Scheduler-Operations.md`: the full inventory of Atlas's 7 scheduled entries (confirmed live via `php artisan schedule:list`, not counted by hand), what each does, and — the core of this ticket — precisely how each depends on queue workers.

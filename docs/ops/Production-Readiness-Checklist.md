@@ -117,7 +117,7 @@
 |---|---|---|---|
 | Log rotation configured — a fixed retention window, not "grows forever until disk fills" | | ⬜ | |
 | Retention window is long enough to debug an issue reported a few days late, short enough not to fill disk | | ⬜ | |
-| The dedicated `storage/logs/publishing.log` channel is included in the rotation policy | | ⬜ | Easy to forget since it's a separate channel from the main app log |
+| The dedicated `storage/logs/publishing.log` channel is included in the rotation policy | | 🟡 | ✅ Code-complete (SCRUM-37): the channel now always rotates daily, independent of `LOG_STACK` — previously hardcoded to the non-rotating `single` driver. Still ⬜ operationally until a real production deploy confirms it. See [Configuration-Sanity-Check.md](../deployment/Configuration-Sanity-Check.md) §2.2. |
 
 ## 11. Legal pages
 

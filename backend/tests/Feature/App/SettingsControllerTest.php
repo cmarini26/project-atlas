@@ -615,7 +615,10 @@ class SettingsControllerTest extends TestCase
 
     public function test_credentials_never_appear_in_the_publishing_log(): void
     {
-        $logPath = storage_path('logs/publishing.log');
+        // SCRUM-37: the 'publishing' channel now rotates daily (config/logging.php)
+        // so it can't grow unbounded like the old 'single' driver did — the
+        // real file Monolog writes to is date-suffixed, not the bare name.
+        $logPath = storage_path('logs/publishing-'.now()->format('Y-m-d').'.log');
         $before = is_file($logPath) ? filesize($logPath) : 0;
 
         [$user, $company] = $this->userWithCompany();
