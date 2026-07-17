@@ -6,6 +6,24 @@ Format: each entry identifies what changed, which files/paths are affected, and 
 
 ---
 
+## [Docs] First repeatable deployment runbook (SCRUM-47) — 2026-07-16
+
+New `docs/deployment/Deployment-Runbook.md`: the procedure to run for **every** deploy of Atlas, distinct from `docs/ops/Customer-1-Launch-Runbook.md`'s one-time "get to Customer 1" checklist (accounts, legal pages, ownership, first-week cadence). Every environment variable named is the exact set from SCRUM-35's `Environment-Variables.md`; every queue worker command is the exact, bug-fixed form from SCRUM-41's `Queue-Workers.md` — grounded in this sprint's own findings, not generic Laravel deployment advice.
+
+Covers pre-deploy prerequisites, build/install, migrations (with a maintenance-mode note for destructive migrations and a named caution about one specific migration's lossy `down()`), cache/config commands (`php artisan optimize`, confirmed to expand to exactly `config:cache`+`event:cache`+`route:cache`+`view:cache` by reading `OptimizeCommand`'s source), queue worker restart, scheduler verification, a full post-deploy checklist, and rollback/failure-handling.
+
+### A missing step found while writing this: queue workers were never restarted after a deploy
+
+Confirmed via Laravel's own `RestartCommand` source that `queue:restart` only writes a timestamp to cache for running workers to check between jobs — a deploy that skips this step leaves already-running workers executing the *previous* commit's code indefinitely (workers don't hot-reload). Neither `Customer-1-Launch-Runbook.md` nor any other doc previously called this out as a per-deploy step. Now Deployment-Runbook.md §5, with its own verification checklist (recent worker uptime, not just "restart command exited 0").
+
+### Updated
+
+- `docs/ops/Customer-1-Launch-Runbook.md` Phases 3–5 now defer to the new runbook for the repeatable steps themselves (avoiding duplication) rather than restating build/migrate/cache/queue commands inline; Phase 4 now explicitly calls out the SCRUM-41 Supervisor bug fix.
+
+No application code changed — documentation only, verified against real `artisan list`/`route:list`/`schedule:list` output and Laravel's own command source rather than assumed.
+
+---
+
 ## [Fix] Queue worker Supervisor config would never have processed a production job (SCRUM-41) — 2026-07-16
 
 While documenting queue worker processes for SCRUM-41, found that `infrastructure/supervisor/atlas-worker.conf`'s every command (`queue:work high`, `queue:work ai`, etc.) passed the queue name as `queue:work`'s **first positional argument — which is a connection name, not a queue name.** No job in this codebase ever calls `onConnection()` (only `onQueue()`), so every job actually dispatches onto whatever `QUEUE_CONNECTION` resolves to (`database`, per `.env.example`). `config/queue.php` separately defines four `redis`-driver connections happening to share the same names (`high`/`ai`/`observations`/`maintenance`) — a currently-unreferenced routing path. `queue:work high` therefore told the worker to listen on an empty Redis connection, never the Postgres `jobs` table every real job actually lands in. **As shipped, this Supervisor config would never have processed a single queued job in production** — including every scheduler-dispatched job (`ExpireOpportunities`, `PublishScheduledContent`, `CheckChannelHealth`, `PruneRawMetrics`, `ApplyLearnings`, `SendFeedbackDigest`), since `Schedule::job(...)` dispatches through the same queue system, not inline.

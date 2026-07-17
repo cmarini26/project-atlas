@@ -7,6 +7,9 @@
 - [Private-Beta-Execution.md](../plans/Private-Beta-Execution.md) — the detailed verification procedure and the canonical §4 Go/No-Go gate.
 - [Production-Topology.md](../deployment/Production-Topology.md) — the architecture this runbook provisions (reverse proxy → app server → {database, Redis, queue workers, scheduler}).
 - [Backup-and-Recovery.md](../operations/Backup-and-Recovery.md) — full backup strategy behind Phase 6.
+- [Environment-Variables.md](../deployment/Environment-Variables.md) (SCRUM-35) — the canonical, code-verified env var inventory Phase 2 below summarizes.
+- [Queue-Workers.md](../deployment/Queue-Workers.md) (SCRUM-41) — the full queue/job/retry model and a critical Supervisor-config bug found and fixed there; Phase 4 below depends on it.
+- [Deployment-Runbook.md](../deployment/Deployment-Runbook.md) (SCRUM-47) — the **repeatable** deploy procedure (build/migrate/cache/queue-restart/verify/rollback) for every deploy *after* this one — Phases 3–5 below are this document's first-time application of it.
 
 **How to use this:** work top to bottom, in order — later phases assume earlier ones are real and verified, not "should work." Do not skip a verification checklist because the step before it "looked fine." Fill in an owner and a completion date for each phase as you go.
 
@@ -141,21 +144,15 @@ META_REDIRECT_URI=
 
 ## Phase 3 — Deploy the application
 
-1. Clone/pull the repository to the server at the deploy path (matching `infrastructure/supervisor/atlas-worker.conf`'s assumed path, `/var/www/atlas/backend`, or update that file to match your real path).
-2. `composer install --no-dev --optimize-autoloader`
-3. `npm install --ignore-scripts && npm run build`
-4. `php artisan migrate --force`
-5. `php artisan config:cache && php artisan route:cache && php artisan event:cache`
-6. Restart PHP-FPM.
-7. Create the first superadmin account (needed for Phase 7's `FailedJobResource` Filament panel and any admin-only visibility): `php artisan tinker --execute="\App\Models\User::where('email','<your-real-admin-email>')->update(['is_superadmin' => true]);"` — the user must already exist (register normally first, then run this).
+1. Clone the repository to the server at the deploy path (matching `infrastructure/supervisor/atlas-worker.conf`'s assumed path, `/var/www/atlas/backend`, or update that file to match your real path) — this is the one first-time-only step; every subsequent deploy starts from an existing checkout.
+2. Run [Deployment-Runbook.md](../deployment/Deployment-Runbook.md) §2 (build/install), §3 (migrations), and §4 (cache/config) in full — this is the first real execution of that repeatable procedure, and every deploy after this one follows the same document.
+3. Create the first superadmin account (needed for Phase 7's `FailedJobResource` Filament panel and any admin-only visibility): `php artisan tinker --execute="\App\Models\User::where('email','<your-real-admin-email>')->update(['is_superadmin' => true]);"` — the user must already exist (register normally first, then run this). One-time only; not part of the repeatable deploy procedure.
 
 ### Verification checklist — Phase 3
 
-- [ ] `curl https://<domain>/api/health` returns `{"status":"ok",...}`.
-- [ ] `curl https://<domain>/api/ready` returns `{"status":"ok","checks":{"database":{"status":"ok"},"cache":{"status":"ok"},"queue":{"status":"ok"}}}` with HTTP 200 (503 means database/cache/queue connectivity is broken — do not proceed until this is 200).
-- [ ] `curl https://<domain>/api/live` returns `{"status":"ok"}`.
+- [ ] [Deployment-Runbook.md](../deployment/Deployment-Runbook.md) §2/§3/§4's own verification checklists are all green.
 - [ ] Visiting `https://<domain>/admin` shows the Filament login page, and your superadmin account can log in.
-- [ ] **A second, independent deploy has been performed** (re-run steps 2–6 with no changes) — proves the process is repeatable, not a one-time fluke.
+- [ ] **A second, independent deploy has been performed** (re-run Deployment-Runbook.md's steps with no changes) — proves the process is repeatable, not a one-time fluke. This is the literal thing SCRUM-47 exists to make possible.
 
 ---
 
@@ -166,7 +163,9 @@ META_REDIRECT_URI=
 3. Create the log directory it expects: `mkdir -p /var/log/atlas && chown www-data:www-data /var/log/atlas`.
 4. `supervisorctl reread && supervisorctl update && supervisorctl start all`.
 
-This installs workers for exactly the 5 real queues the code dispatches to: `high` (`PublishContent`), `ai` (`ProcessObservation`), `default` (`CreateRecommendation`), `observations` (`RetrieveExecutionMetrics`), `maintenance` (`CheckChannelHealth`).
+**A critical bug in this exact file was found and fixed under SCRUM-41**: every command previously passed the queue name as `queue:work`'s connection argument instead of via `--queue=`, which would have meant these workers never processed a single job. If you're looking at a checked-out copy older than that fix, pull latest before installing — see [Queue-Workers.md](../deployment/Queue-Workers.md) for the full story and the exact, corrected worker layout (5 process groups, one per queue, not one shared pool).
+
+On every deploy *after* this first install, workers are restarted via `php artisan queue:restart` — [Deployment-Runbook.md](../deployment/Deployment-Runbook.md) §5, not a Supervisor reinstall.
 
 ### Verification checklist — Phase 4
 
@@ -182,10 +181,13 @@ This installs workers for exactly the 5 real queues the code dispatches to: `hig
 1. Copy the entry from [`infrastructure/cron/atlas-scheduler`](../../infrastructure/cron/atlas-scheduler) into the deploy user's crontab (`crontab -e` as the user matching Supervisor's `user=www-data`), or drop it into `/etc/cron.d/` per the file's own comment block.
 2. Confirm the path inside the entry matches your real deploy path.
 
+This is a one-time install, per server — see [Deployment-Runbook.md](../deployment/Deployment-Runbook.md) §6 for why a routine deploy doesn't need to touch this again.
+
 ### Verification checklist — Phase 5
 
 - [ ] Wait at least 2 minutes, then confirm `schedule:run` actually fired — check `storage/logs/laravel.log` for scheduler activity, or add a temporary log line to confirm, then remove it.
-- [ ] The recurring integration sync (`atlas:sync-due-integrations` or equivalent) has fired at least once on schedule and produced its expected effect (check a real or test company's `Integration.last_run_at`).
+- [ ] `php artisan schedule:list` shows all 7 scheduled entries.
+- [ ] The recurring integration sync (`atlas:sync-due-integrations`) has fired at least once on schedule and produced its expected effect (check a real or test company's `Integration.last_run_at`).
 - [ ] Opportunity expiration has fired at least once on schedule.
 - [ ] Confirm this is installed on **exactly one** server if you ever run more than one app instance — a duplicated cron entry across servers would double-fire every scheduled job (not a concern for a single-server Customer 1 launch, but verify now if that's not your topology).
 
