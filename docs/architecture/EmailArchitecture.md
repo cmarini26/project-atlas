@@ -1,6 +1,6 @@
 # Email Architecture — Path to Production
 
-**Status:** Architecture proposal for Phase 1 of `backend/.hermes/plans/2026-07-15_094741-atlas-production-readiness-gap-plan.md`. **Partially implemented as of 2026-07-16 — see addendum below.**
+**Status:** Architecture proposal for Phase 1 of `backend/.hermes/plans/2026-07-15_094741-atlas-production-readiness-gap-plan.md`. **Partially implemented as of 2026-07-20 — see addenda below.**
 **Scope:** Design only. This document does not change any code.
 
 ---
@@ -14,7 +14,23 @@
 - `EmailPublisher::publish()` now genuinely resolves a snapshot (created once at `ExecutionService::queueForCampaign()` time, never re-derived from live audience membership afterward) and calls `EmailProvider::send()` once per pending recipient — exactly §6's plan, now real. `EmailPayload`/`EmailProvider` were **not** changed, contrary to §6's speculation that `EmailPayload` might need "one real change" — the existing single-recipient shape turned out to be sufficient as-is.
 - Partial-failure handling matches §6's original description almost exactly: a batch partially failing is not a full `Execution` failure; per-recipient outcomes live in `email_recipient_snapshots`, not just `Execution.result`.
 
-**Still exactly as designed and still not built:** the suppression list (§7), unsubscribe links, additional providers, and provider-native batch-send optimization (Postmark's `POST /email/batch`) — sending is still strictly one HTTP call per recipient today, by design, not as a stopgap.
+**Still exactly as designed and still not built:** the suppression list (§7), unsubscribe links, provider-native batch-send optimization (Postmark's `POST /email/batch`), and non-Postmark analytics/webhook coverage — sending is still strictly one HTTP call per recipient today, by design, not as a stopgap.
+
+---
+
+## Addendum — 2026-07-20: SendGrid is now the second real email provider
+
+Since the 2026-07-16 addendum, the “additional providers” bucket is no longer entirely future tense:
+
+- `App\Services\Publishing\Email\SendGridEmailProvider` now exists and is registered in `PublisherServiceProvider` alongside `PostmarkEmailProvider`.
+- `SettingsController::connectEmail()` and `EmailChannelService` are now **provider-aware**: a company can submit `provider_type: 'postmark'` or `provider_type: 'sendgrid'` through Settings, and the selected provider is ping-validated before Atlas reports the email channel as connected.
+- The customer-facing Settings UI is no longer Postmark-only; it exposes provider selection and persists the same `from_email`/`from_name` channel config regardless of provider.
+
+What remains true from the original design:
+
+- The abstraction shape was still correct. SendGrid fit the existing `EmailProvider` contract without requiring orchestration changes.
+- Postmark remains the only email provider with a real analytics + learning loop in code today. SendGrid currently broadens **sending**, not the Measure/Learn side.
+- Suppression lists, unsubscribe flow, sender-domain verification UX, and provider-native batch optimization are still not built.
 
 ---
 
@@ -36,7 +52,7 @@ Project Atlas already has a **real, working Postmark email provider** — not a 
 1. No product UX or controller action exists to let a real company connect a real email provider. `ChannelCredentials` rows with `provider_type: 'postmark'` are only ever created by `DemoSeeder`.
 2. `App\Domain\Publishing\ValueObjects\EmailPayload` supports exactly **one recipient** (`toEmail`/`toName`, singular) — there is no recipient list, audience, or subscriber model at all. A "campaign" today can send to one address.
 3. Postmark's `SubscriptionChange` webhook event is already *counted* (`ProcessAnalyticsWebhookEvent` increments a `webhook_unsubscribes` counter on the metric row) but nothing *suppresses future sends* to that address — there is no unsubscribe/bounce suppression list anywhere in the schema.
-4. Only one provider (Postmark) is implemented; the interface is real but has one real implementation.
+4. Two providers are now implemented (`postmark`, `sendgrid`), but Postmark remains the only one with a real analytics path in code today.
 5. No domain/sender verification UX (SPF/DKIM guidance, sender identity confirmation) exists.
 
 This document is written against that reality. Where a section describes something that already exists, it says so and scopes the work to *extending* it, not replacing it — per the constraint to avoid premature abstraction and favor the existing channel architecture.
@@ -79,7 +95,7 @@ Note on scope: the task's brief listed Resend/SES/SMTP as the initial set with P
 |---|---|
 | **Amazon SES** | Real value (cheapest at scale) but AWS IAM key handling + SES sandbox-to-production approval is its own workstream, not a drop-in `EmailProvider` implementation. |
 | **Mailgun** | Materially similar to Resend/Postmark; adds provider count without adding a new *kind* of integration. Good "provider #4" once the abstraction has proven itself twice. |
-| **SendGrid** | Same reasoning as Mailgun — real demand exists, but no new architectural shape to prove. |
+| **SendGrid** | **Implemented 2026-07-20.** Remains a send-only provider in the current codebase (no SendGrid-specific analytics/webhook path yet), but no longer belongs in Future as a hypothetical provider. |
 | **Google Workspace / Microsoft 365 via OAuth "send as"** | Real business value (send from the owner's actual business email, no separate ESP signup) but requires an OAuth flow (like Meta's), Gmail/Graph API sending scopes, and materially different rate limits/deliverability behavior. Worth its own design pass once API-key providers are proven. |
 
 ## 4. Provider abstraction

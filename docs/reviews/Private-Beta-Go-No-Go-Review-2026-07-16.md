@@ -4,7 +4,7 @@
 **Method:** every claim below was checked against current code in this session (grep/read the actual file, or run the actual test/command) — not copied from an earlier document without re-verification. Where a prior document's finding still holds, it's cited; where it's now stale, that's called out explicitly.
 **Related documents:** [STATUS.md](../STATUS.md), [Private-Beta-Execution.md](../plans/Private-Beta-Execution.md) (canonical Go/No-Go gate — §4), [Production-Topology.md](../deployment/Production-Topology.md), [Critical-Production-Blockers.md](../plans/Critical-Production-Blockers.md), [Channel-Publishing-Reality-Audit.md](Channel-Publishing-Reality-Audit.md), [Channel-Capability-Matrix.md](../product/Channel-Capability-Matrix.md), [Production-Readiness-Checklist.md](../ops/Production-Readiness-Checklist.md), `backend/.hermes/plans/2026-07-15_094741-atlas-production-readiness-gap-plan.md`.
 
-**A note on standards used throughout this review:** a real per-company connect flow with live ping-before-persist verification, tested only against **Guzzle `MockHandler`** HTTP mocks, is real, tested *code* — it is **not** production validation. Every WordPress/Meta/Postmark test in this codebase today is HTTP-mocked. Zero of the three real providers has ever been exercised against a live external account. This distinction is load-bearing throughout this review and is not relaxed anywhere below.
+**A note on standards used throughout this review:** a real per-company connect flow with live ping-before-persist verification, tested only against **Guzzle `MockHandler`** HTTP mocks, is real, tested *code* — it is **not** production validation. Every WordPress/Meta/Postmark test in this codebase today is HTTP-mocked. **As of the 2026-07-20 local connector slice, the same remains true for SendGrid and Twilio**: both are real in code, neither has been exercised against a live external account here. This distinction is load-bearing throughout this review and is not relaxed anywhere below.
 
 ---
 
@@ -30,7 +30,7 @@ Verified directly this session, not assumed from prior docs:
 | Error-tracking abstraction wired, `failed_jobs` has real operator visibility | `ErrorTracker`/`NullErrorTracker` in `withExceptions()->reportable()`; `FailedJobResource` Filament panel (`/admin/failed-jobs`) with Retry/Discard |
 | Postmark mailer fully wired in code, with a fail-loud misconfiguration guard | `symfony/postmark-mailer` installed; `ProductionMailerGuard` refuses delivery + logs critically if `APP_ENV=production` and `MAIL_MAILER` is still `log`/`array` |
 | Backup/verify/restore tooling exists and round-trips real data in a local drill | `infrastructure/backup/*.sh`; `tests/Feature/Backup/BackupRestoreDrillTest.php` — a real drill against disposable scratch PostgreSQL databases, run on every test suite execution |
-| WordPress, Meta, and Postmark are real, connect-validated publishers **in code** | Live ping-before-persist on connect (`connectWordPress()`, `connectEmail()`, Meta OAuth token exchange); real multi-recipient email sending with honest per-recipient outcome tracking; capability badges correctly distinguish connected/simulated/manual-action-required/not-configured |
+| WordPress, Meta, Postmark, SendGrid, and Twilio are real, connect-validated publishers/providers **in code** | Live ping-before-persist on connect (`connectWordPress()`, provider-aware `connectEmail()`, `connectSms()`, Meta OAuth token exchange); real multi-recipient email sending with honest per-recipient outcome tracking; real single-destination SMS publishing; capability truth is current in the matrix/docs even where generic badge coverage still lags for `blog`/`sms` |
 | Full test suite is green | 1340 PHP tests (1337 passing, 3 pre-existing environment-limited skips), 187 Vitest tests, PHPStan level 8 clean, Pint clean, `npm run build` clean — verified by running each directly this session |
 
 ---
@@ -43,7 +43,7 @@ Verified directly this session, not assumed from prior docs:
 | `APP_ENV=production`/`APP_DEBUG=false` in real use | No real `.env` exists — only `backend/.env` (local dev, `APP_ENV=local`, `APP_URL=https://atlas.test`) | Read directly this session |
 | A real error-tracking vendor reporting anywhere | Deliberately deferred — `ERROR_TRACKING_DRIVER=null` in `.env.example`, no Sentry/equivalent package in `composer.json` | `grep ERROR_TRACKING_DRIVER .env.example` |
 | Real backups running against a real database | No production database exists | Same root cause as "no production deployment" |
-| Any WordPress/Meta/Postmark send verified against a real account | Every test is HTTP-mocked (`MockHandler`) | Direct grep confirms `MockHandler`/`Mockery::mock` in every provider-level test file this session |
+| Any WordPress/Meta/Postmark/SendGrid/Twilio send verified against a real account | Every test is HTTP-mocked (`MockHandler`) | Direct grep confirms `MockHandler`/`Mockery::mock` in every provider-level test file this session |
 | Legal pages (privacy policy, terms of service) | Don't exist anywhere in the codebase | `find` for privacy/terms returns nothing |
 | An operational runbook | Doesn't exist as a document | `find`/`grep -rl runbook docs/` returns only *mentions of the need for one*, no runbook itself |
 | Session cookie forced-secure + post-reset session invalidation | Genuinely unaddressed since the 2026-07-10 audit — not part of the 8 Critical Blockers, only "High Priority" | `grep SESSION_SECURE_COOKIE .env.example` → nothing; `grep -r logoutOtherDevices app/` → nothing |
@@ -61,7 +61,7 @@ The 2026-07-10 audit's 8 Critical Blockers are **all code-complete** (per [Criti
 | 3 | HTTPS/security headers | ✅ Real, confirmed | A real reverse proxy to actually terminate TLS |
 | 4 | Scheduler hardening | ✅ Real, confirmed | Installing the cron artifact on a real server |
 | 5 | Error tracking | 🟡 Abstraction only — no real vendor | `composer require` a vendor SDK, implement one class, set a real DSN |
-| 6 | Transactional email | 🟡 Code wired, no live credentials/domain | Real Postmark API key, SPF/DKIM on a real sending domain, a real test send to a real inbox |
+| 6 | Transactional email | 🟡 Code wired, no live credentials/domain | Real Postmark **or SendGrid** credentials, sender verification/SPF/DKIM on a real sending domain, a real test send to a real inbox |
 | 7 | Production environment | 🟡 `TRUSTED_PROXIES` mechanism only | **Entirely operator work**: choose a host, register a domain, provision a server+DB+Redis, deploy |
 | 8 | Backups | 🟡 Scripts + local drill only | **Entirely operator work**: schedule real backups, perform one real restore against production |
 
@@ -96,9 +96,20 @@ Both are Go/No-Go gate items in [Private-Beta-Execution.md](../plans/Private-Bet
 ## What this review deliberately did not re-litigate
 
 - **High Priority items 2–8** from the 2026-07-10 audit (session invalidation on password reset, Redis auth, file storage, single AI provider, deploy automation) remain open and are real, but none block Customer 1 per the Go/No-Go gate's own scope — they're tracked in [Production-Deployment-Audit.md](Production-Deployment-Audit.md) and don't need restating here.
-- **Channel-by-channel execution/measurement/learning depth** — already the canonical subject of [Channel-Capability-Matrix.md](../product/Channel-Capability-Matrix.md); this review only needed the one fact that matrix already establishes (three channels are real in code, zero are production-validated).
+- **Channel-by-channel execution/measurement/learning depth** — already the canonical subject of [Channel-Capability-Matrix.md](../product/Channel-Capability-Matrix.md); this review only needs the matrix's current fact pattern: **five** channel types are real in code (`blog`, `email`, `facebook`, `instagram`, `sms`), and **zero** are production-validated.
 - **Product quality / recommendation usefulness** — out of scope for an infrastructure go/no-go; tracked separately via [Private-Beta-Execution.md](../plans/Private-Beta-Execution.md) §2's onboarding run-through and Beta-Success-Metrics.
 
 ## Documentation correction made in this review
 
 `Production-Deployment-Audit.md`'s closing note already correctly flags itself as needing re-verification once infrastructure exists — no correction needed there. No other documentation inaccuracy was found during this pass; all cross-references checked (STATUS.md, Private-Beta-Execution.md, Production-Topology.md, Critical-Production-Blockers.md, gap plan) were internally consistent with current code as of this session.
+
+---
+
+## Addendum — 2026-07-20: connector surface widened, Go/No-Go did not
+
+Since this review was written, the local worktree added two material connector improvements:
+
+1. **SendGrid is now a second real email provider** under the existing email-provider architecture.
+2. **Twilio now has a real Settings connect/test flow and a real single-destination SMS publisher in code.**
+
+These changes improve Atlas's channel breadth and make the current docs/status more accurate, but they **do not change this review's conclusion**. The No-Go decision remains driven by infrastructure, live provider validation, legal pages, and operator readiness — not by the absence of one more publisher class.

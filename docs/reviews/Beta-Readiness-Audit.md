@@ -20,12 +20,17 @@ This is not an enterprise readiness audit. It is not a SOC 2 gap analysis. It do
 
 The Atlas backend pipeline is architecturally sound. The domain model, AI abstraction, decision engine, approval workflow, and learning engine are all well-designed and thoroughly tested (579/581 tests passing, PHPStan level 8, 0 errors). The customer-facing frontend is polished and covers the full product loop.
 
-However, the platform has **7 critical blockers** that prevent any paying customer from being onboarded safely. The most severe is that the multi-tenancy middleware binding does not exist — meaning a customer could, under certain conditions, see another company's data. Several others are infrastructure absences: no production server, no real email delivery, no monitoring, and no backups.
+However, the platform described in this original 2026-06-27 audit is now materially ahead of the state captured here. Many of the code-side blockers identified below have since been closed, and Atlas now has real outbound execution paths in code for WordPress/blog, provider-aware email, Meta, and a narrow Twilio SMS path. **The remaining blockers are now primarily infrastructure/operator/legal readiness and live provider validation, not missing core product code.**
 
-None of these blockers are architectural problems. They are provisioning and configuration work. A focused 3–4 week sprint resolves all critical blockers. The platform is not broken — it is not deployed.
+None of that changes the conclusion of this historical audit: the platform was not beta-ready on 2026-06-27. But as a current-state document, this audit is now **superseded** by newer operational reviews.
 
-**Beta Readiness Score: 31 / 100**
-**Go / No-Go: NO-GO**
+**Beta Readiness Score (historical, 2026-06-27 only): 31 / 100**
+**Go / No-Go (historical, 2026-06-27 only): NO-GO**
+
+**Current-truth pointer:** for today's state, prefer:
+- [STATUS.md](../STATUS.md)
+- [Private-Beta-Go-No-Go-Review-2026-07-16.md](Private-Beta-Go-No-Go-Review-2026-07-16.md)
+- [Channel-Capability-Matrix.md](../product/Channel-Capability-Matrix.md)
 
 ---
 
@@ -55,7 +60,7 @@ None of these blockers are architectural problems. They are provisioning and con
 **Description:**
 The core Atlas loop (Observe → Understand → Decide → Recommend → Prepare → Approve → Execute → Measure → Learn) is fully implemented in the backend. The AI pipeline produces real output via `AnthropicProvider`. The customer dashboard covers every page in the product. The approval workflow is wired and tested.
 
-Publishing is currently log-based only (`LogChannelPublisher`, `LogEmailProvider`). Content is approved and marked as executed, but nothing actually reaches an Instagram account or email list. Phases 6–8 of the ROADMAP exist in implementation, but real provider integrations (Meta OAuth, Postmark, Mailchimp) are not implemented.
+Publishing was log-based only at the time of this audit (`LogChannelPublisher`, `LogEmailProvider`). Content was approved and marked as executed, but nothing actually reached an Instagram account or email list. This is now historical context, not current product truth.
 
 **Business impact:**
 The first beta customers will onboard, receive recommendations, and be able to approve them — but nothing will be published. The approval is real; the publishing is not. This is a significant gap in the product value proposition, but it can be framed honestly in beta communications ("You'll see exactly what Atlas wants to publish before we connect your channels") and is not a safety issue.
@@ -63,10 +68,10 @@ The first beta customers will onboard, receive recommendations, and be able to a
 **Technical impact:**
 `Execution` records are created in `queued` status and stay there. `LogChannelPublisher` fires and writes to `storage/logs/publishing.log`. No platform APIs are called. The loop feels complete to the user but produces no external output.
 
-**Recommendation:**
-Before beta launch, implement at minimum one real publishing channel (email via Postmark is the safest — no OAuth complexity, no content policy risk) so beta customers see real output. Frame social publishing as "coming soon" in the beta onboarding.
+**Historical recommendation (since overtaken):**
+Before beta launch, implement at minimum one real publishing channel. That recommendation has since been surpassed in code: Atlas now has real execution paths for WordPress/blog, provider-aware email (`postmark`, `sendgrid`), Meta, and a narrow Twilio SMS path. The remaining work is live production verification and operator readiness, not the absence of a publisher class.
 
-**Estimated effort:** 3–5 days (Postmark email only)
+**Historical effort estimate:** superseded by later implementation work.
 
 ---
 
@@ -158,13 +163,13 @@ If two companies' requests are processed concurrently by the same queue worker, 
 **Technical impact:**
 The `CompanyScope` implementation must be verified to read from the correct per-request binding, not a process-level singleton. If the scope is a no-op when no company is bound (documented as "safe in CLI/tests"), then requests without a resolved company would return unscoped results.
 
-**Recommendation:**
-1. Audit `CompanyScope` to confirm it reads from the request, not a process-level singleton
-2. If singleton: implement `ResolveCurrentCompany` middleware immediately and wire it to all `/app/*` routes
-3. Add a test that creates two companies, makes a request as Company A, and asserts that Company B's data is not returned
-4. Add PostgreSQL RLS as defense-in-depth (can be deferred post-beta, but document the deferral)
+**Recommendation (historical, now partly closed):**
+1. Verify the app-layer tenancy binding remains correct on live deploys
+2. Keep the isolation tests active and expand them only where later code changes justify it
+3. Treat PostgreSQL RLS as defense-in-depth, not the current gating fix
+4. Use newer go/no-go docs for current beta risk, not this section's original implementation plan
 
-**Estimated effort:** 2–3 days (middleware + isolation test)
+**Historical effort estimate:** superseded by later production-readiness work.
 
 ---
 
@@ -186,12 +191,12 @@ A scope misconfiguration or middleware ordering issue could expose one customer'
 **Technical impact:**
 The existing feature tests do verify cross-company 404 behavior at the controller level. The gaps are: (a) no test at the service layer, (b) no test at the queue worker level (cross-company queries in background jobs), and (c) no database-level enforcement.
 
-**Recommendation:**
-1. Resolve Finding 5 (middleware binding) first
-2. Add cross-company isolation tests at the service layer (not just controller 404 tests)
-3. Implement PostgreSQL RLS on the five most sensitive tables (`recommendations`, `decisions`, `facts`, `knowledge_entries`, `approvals`) as a beta blocker; defer full RLS to post-beta
+**Recommendation (historical, now partly overtaken):**
+1. Keep live multi-company verification as a beta gate
+2. Expand service/job-level isolation tests only where new behavior warrants it
+3. Treat PostgreSQL RLS as a worthwhile later hardening layer rather than the current gating fix
 
-**Estimated effort:** 3 days (service-layer tests + partial RLS)
+**Historical effort estimate:** superseded by later production-readiness work.
 
 ---
 
