@@ -131,7 +131,11 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
     Route::post('/settings/email/revoke', [SettingsController::class, 'disconnectEmail'])->name('settings.email.revoke');
     Route::post('/settings/email/test', [SettingsController::class, 'sendEmailTest'])->name('settings.email.test');
 
-    // Email audiences/contacts — the minimal recipient model for
+    Route::post('/settings/sms/connect', [SettingsController::class, 'connectSms'])->name('settings.sms.connect');
+    Route::post('/settings/sms/revoke', [SettingsController::class, 'disconnectSms'])->name('settings.sms.revoke');
+    Route::post('/settings/sms/test', [SettingsController::class, 'sendSmsTest'])->name('settings.sms.test');
+
+    // Email Audience Settings (owner/admin only)
     // multi-recipient Email campaigns (Phase 1A).
     Route::get('/settings/email/audiences', [EmailAudienceController::class, 'index'])->name('settings.email.audiences.index');
     Route::post('/settings/email/audiences', [EmailAudienceController::class, 'store'])->name('settings.email.audiences.store');
