@@ -80,12 +80,17 @@ export interface DecisionDetail {
 }
 
 // ContentAsset as returned by controllers (uses 'type' not 'asset_type')
+export interface ContentAssetMedia {
+    url: string
+}
+
 export interface ContentAsset {
     id: string
     type: string
     body: string
     title: string | null
     status: string
+    media: ContentAssetMedia[] | null
     metadata: Record<string, unknown>
     channel?: { type: string; marketing_channel?: { supports_publishing: boolean } | null } | null
 }

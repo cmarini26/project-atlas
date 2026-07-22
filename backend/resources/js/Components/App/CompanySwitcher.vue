@@ -39,7 +39,7 @@ function switchTo(companyId: string): void {
   <div ref="root" class="relative min-w-0">
     <button
       type="button"
-      class="flex items-center gap-1 max-w-32 text-xs font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors duration-[var(--duration-fast)]"
+      class="flex items-center gap-1 max-w-32 text-xs font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors duration-[var(--duration-fast)]"
       :aria-expanded="open"
       aria-haspopup="menu"
       aria-label="Switch company"

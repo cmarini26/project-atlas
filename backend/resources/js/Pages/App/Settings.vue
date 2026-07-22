@@ -58,6 +58,14 @@ interface EmailChannel {
   last_used_at: string | null
 }
 
+interface SmsChannel {
+  provider_type: string
+  from_number: string
+  to_number: string
+  status: string
+  last_used_at: string | null
+}
+
 const props = defineProps<{
   company: CompanyData
   integrations: Integration[]
@@ -66,6 +74,7 @@ const props = defineProps<{
   meta_channels: MetaChannel[]
   wordpress_channel: WordPressChannel | null
   email_channel: EmailChannel | null
+  sms_channel: SmsChannel | null
 }>()
 
 const metaChannelLabels: Record<string, string> = {
@@ -94,10 +103,16 @@ function revokeWordPress(): void {
 }
 
 const emailForm = useForm({
+  provider_type: 'postmark',
   api_token: '',
   from_email: '',
   from_name: '',
 })
+
+const emailProviderLabels: Record<string, string> = {
+  postmark: 'Postmark',
+  sendgrid: 'SendGrid',
+}
 
 function connectEmail(): void {
   emailForm.post('/app/settings/email/connect', {
@@ -115,6 +130,32 @@ const emailTestForm = useForm({
 
 function sendEmailTest(): void {
   emailTestForm.post('/app/settings/email/test', { preserveScroll: true })
+}
+
+const smsForm = useForm({
+  provider_type: 'twilio',
+  account_sid: '',
+  auth_token: '',
+  from_number: '',
+  to_number: '',
+})
+
+function connectSms(): void {
+  smsForm.post('/app/settings/sms/connect', {
+    onSuccess: () => smsForm.reset('account_sid', 'auth_token'),
+  })
+}
+
+function revokeSms(): void {
+  router.post('/app/settings/sms/revoke', {}, { preserveScroll: true })
+}
+
+const smsTestForm = useForm({
+  to_number: '',
+})
+
+function sendSmsTest(): void {
+  smsTestForm.post('/app/settings/sms/test', { preserveScroll: true })
 }
 
 const form = useForm({
@@ -419,7 +460,7 @@ function retakeTour(): void {
       </form>
     </div>
 
-    <!-- Email (Postmark) -->
+    <!-- Email -->
     <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5 mb-6">
       <div class="flex items-center justify-between gap-3 mb-4">
         <h2 class="text-sm font-semibold text-[var(--color-text-primary)]">Email</h2>
@@ -435,7 +476,7 @@ function retakeTour(): void {
         <div class="flex items-start gap-3">
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-0.5">
-              <p class="text-sm font-medium text-[var(--color-text-primary)]">Postmark</p>
+              <p class="text-sm font-medium text-[var(--color-text-primary)]">{{ emailProviderLabels[email_channel.provider_type] ?? email_channel.provider_type }}</p>
               <Badge :variant="email_channel.status === 'active' ? 'success' : 'muted'">Email</Badge>
             </div>
             <p class="text-xs text-[var(--color-text-muted)]">Sending as {{ email_channel.from_name ? `${email_channel.from_name} <${email_channel.from_email}>` : email_channel.from_email }}</p>
@@ -478,12 +519,22 @@ function retakeTour(): void {
 
       <form v-else class="space-y-3" @submit.prevent="connectEmail">
         <p class="text-xs text-[var(--color-text-muted)]">
-          Connect Postmark so Atlas can send real campaign emails. Create a
-          <a href="https://postmarkapp.com/support/article/1008-what-are-server-api-tokens" target="_blank" rel="noopener noreferrer" class="text-[var(--color-text-link)] hover:underline">Server API Token</a>
-          from your Postmark server's API Tokens tab.
+          Connect Postmark or SendGrid so Atlas can send real campaign emails. Atlas stores one active email provider per company today.
         </p>
         <div>
-          <label for="email-api-token" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Server API token</label>
+          <label for="email-provider" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Provider</label>
+          <select
+            id="email-provider"
+            v-model="emailForm.provider_type"
+            class="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)] transition-colors duration-[var(--duration-fast)]"
+          >
+            <option value="postmark">Postmark</option>
+            <option value="sendgrid">SendGrid</option>
+          </select>
+          <p v-if="emailForm.errors.provider_type" class="mt-1 text-xs text-rose-600">{{ emailForm.errors.provider_type }}</p>
+        </div>
+        <div>
+          <label for="email-api-token" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">API token</label>
           <input
             id="email-api-token"
             v-model="emailForm.api_token"
@@ -497,6 +548,11 @@ function retakeTour(): void {
             ]"
           />
           <p v-if="emailForm.errors.api_token" class="mt-1 text-xs text-rose-600">{{ emailForm.errors.api_token }}</p>
+          <p class="mt-1 text-xs text-[var(--color-text-muted)]">
+            {{ emailForm.provider_type === 'sendgrid'
+              ? 'Use a SendGrid API key with Mail Send access.'
+              : 'Use a Postmark Server API Token from your server settings.' }}
+          </p>
         </div>
         <div>
           <label for="email-from-email" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">From email</label>
@@ -509,7 +565,7 @@ function retakeTour(): void {
             class="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)] transition-colors duration-[var(--duration-fast)]"
           />
           <p v-if="emailForm.errors.from_email" class="mt-1 text-xs text-rose-600">{{ emailForm.errors.from_email }}</p>
-          <p class="mt-1 text-xs text-[var(--color-text-muted)]">Must be a Sender Signature or domain verified in Postmark.</p>
+          <p class="mt-1 text-xs text-[var(--color-text-muted)]">Must be verified with the selected provider before real sends will succeed.</p>
         </div>
         <div>
           <label for="email-from-name" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">From name <span class="normal-case text-[var(--color-text-placeholder)]">(optional)</span></label>
@@ -525,7 +581,123 @@ function retakeTour(): void {
           :disabled="emailForm.processing"
           class="py-2 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
         >
-          {{ emailForm.processing ? 'Connecting…' : 'Connect Postmark' }}
+          {{ emailForm.processing ? 'Connecting…' : `Connect ${emailProviderLabels[emailForm.provider_type] ?? 'provider'}` }}
+        </button>
+      </form>
+    </div>
+
+    <!-- SMS -->
+    <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5 mb-6">
+      <h2 class="text-sm font-semibold text-[var(--color-text-primary)] mb-4">SMS</h2>
+
+      <div v-if="sms_channel" class="space-y-4">
+        <div class="flex items-start gap-3">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-0.5">
+              <p class="text-sm font-medium text-[var(--color-text-primary)]">Twilio</p>
+              <Badge :variant="sms_channel.status === 'active' ? 'success' : 'muted'">SMS</Badge>
+            </div>
+            <p class="text-xs text-[var(--color-text-muted)]">Sending from {{ sms_channel.from_number }}</p>
+            <p v-if="sms_channel.to_number" class="text-xs text-[var(--color-text-muted)] mt-1">Default campaign destination: {{ sms_channel.to_number }}</p>
+            <p class="text-xs text-[var(--color-text-muted)] mt-1">Status: {{ sms_channel.status }}</p>
+            <p v-if="sms_channel.last_used_at" class="text-xs text-[var(--color-text-muted)] mt-1">Last verified: {{ formatDate(sms_channel.last_used_at) }}</p>
+            <button
+              type="button"
+              class="mt-3 py-1.5 px-3 text-xs font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)] transition-colors duration-[var(--duration-fast)]"
+              @click="revokeSms"
+            >
+              Disconnect
+            </button>
+          </div>
+        </div>
+
+        <div class="pt-4 border-t border-[var(--color-border)]">
+          <p class="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Send a test SMS</p>
+          <form class="flex items-start gap-2" @submit.prevent="sendSmsTest">
+            <div class="flex-1">
+              <input
+                id="sms-test-to"
+                v-model="smsTestForm.to_number"
+                type="text"
+                placeholder="+15551234567"
+                required
+                class="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)] transition-colors duration-[var(--duration-fast)]"
+              />
+              <p v-if="smsTestForm.errors.to_number" class="mt-1 text-xs text-rose-600">{{ smsTestForm.errors.to_number }}</p>
+            </div>
+            <button
+              type="submit"
+              :disabled="smsTestForm.processing"
+              class="shrink-0 py-2 px-3 text-xs font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+            >
+              {{ smsTestForm.processing ? 'Sending…' : 'Send test' }}
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <form v-else class="space-y-3" @submit.prevent="connectSms">
+        <p class="text-xs text-[var(--color-text-muted)]">
+          Connect Twilio so Atlas can verify and test an SMS sending line for your business.
+        </p>
+        <div>
+          <label for="sms-account-sid" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Twilio Account SID</label>
+          <input
+            id="sms-account-sid"
+            v-model="smsForm.account_sid"
+            type="password"
+            required
+            :class="[
+              'w-full px-3 py-2 text-sm rounded-lg border bg-white text-[var(--color-text-primary)] transition-colors duration-[var(--duration-fast)]',
+              smsForm.errors.account_sid
+                ? 'border-rose-300 focus:outline-none focus:ring-1 focus:ring-rose-400'
+                : 'border-[var(--color-border)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)]',
+            ]"
+          />
+          <p v-if="smsForm.errors.account_sid" class="mt-1 text-xs text-rose-600">{{ smsForm.errors.account_sid }}</p>
+        </div>
+        <div>
+          <label for="sms-auth-token" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Auth token</label>
+          <input
+            id="sms-auth-token"
+            v-model="smsForm.auth_token"
+            type="password"
+            required
+            class="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)] transition-colors duration-[var(--duration-fast)]"
+          />
+          <p v-if="smsForm.errors.auth_token" class="mt-1 text-xs text-rose-600">{{ smsForm.errors.auth_token }}</p>
+        </div>
+        <div>
+          <label for="sms-from-number" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Sending number</label>
+          <input
+            id="sms-from-number"
+            v-model="smsForm.from_number"
+            type="text"
+            placeholder="+155****4567"
+            required
+            class="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)] transition-colors duration-[var(--duration-fast)]"
+          />
+          <p v-if="smsForm.errors.from_number" class="mt-1 text-xs text-rose-600">{{ smsForm.errors.from_number }}</p>
+          <p class="mt-1 text-xs text-[var(--color-text-muted)]">Use an E.164-formatted Twilio number, like +155****4567.</p>
+        </div>
+        <div>
+          <label for="sms-to-number" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Default campaign destination <span class="normal-case text-[var(--color-text-placeholder)]">(optional)</span></label>
+          <input
+            id="sms-to-number"
+            v-model="smsForm.to_number"
+            type="text"
+            placeholder="+155****4567"
+            class="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)] transition-colors duration-[var(--duration-fast)]"
+          />
+          <p v-if="smsForm.errors.to_number" class="mt-1 text-xs text-rose-600">{{ smsForm.errors.to_number }}</p>
+          <p class="mt-1 text-xs text-[var(--color-text-muted)]">If set, approved SMS campaign assets will publish to this number through Twilio.</p>
+        </div>
+        <button
+          type="submit"
+          :disabled="smsForm.processing"
+          class="py-2 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+        >
+          {{ smsForm.processing ? 'Connecting…' : 'Connect Twilio' }}
         </button>
       </form>
     </div>

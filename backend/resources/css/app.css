@@ -10,48 +10,52 @@
     --font-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas,
         'DejaVu Sans Mono', monospace;
 
-    /* ── Surfaces (warm neutrals, tinted toward the accent hue) ── */
-    --color-surface: #f7f6f4;
-    --color-surface-elevated: #ffffff;
-    --color-surface-subtle: #efeeea;
-    --color-surface-overlay: #1b1a2e;
+    /* ── Surfaces (neutral workbench, not a one-hue wash) ── */
+    --color-surface: #f8f6f1;
+    --color-surface-elevated: #fffdfa;
+    --color-surface-subtle: #efe9de;
+    --color-surface-panel: #f4efe6;
+    --color-surface-nav: #f1ece3;
+    --color-surface-nav-muted: #e4dccf;
+    --color-surface-overlay: #d8d0c3;
 
     /* ── Borders ──────────────────────────────────────────────── */
-    --color-border: #e5e2dc;
-    --color-border-strong: #d3cec4;
-    --color-border-focus: #6d5ce8;
+    --color-border: #e3ddd1;
+    --color-border-strong: #d2c9ba;
+    --color-border-focus: #2563eb;
 
-    /* ── Text (violet-tinted near-blacks) ─────────────────────── */
-    --color-text-primary: #18161f;
-    --color-text-secondary: #433f4d;
-    --color-text-muted: #736d7a;
-    --color-text-placeholder: #a29da8;
-    --color-text-disabled: #d3cec4;
-    --color-text-inverse: #f7f6f4;
-    --color-text-link: #5641d6;
+    /* ── Text (ink first, readable in dense workflows) ─────────── */
+    --color-text-primary: #181713;
+    --color-text-secondary: #4d473f;
+    --color-text-muted: #7a7469;
+    --color-text-placeholder: #a3998b;
+    --color-text-disabled: #c8c0b3;
+    --color-text-inverse: #181713;
+    --color-text-link: #1d4ed8;
 
-    /* ── Accent — "Signal" blue-violet (replaces stock indigo) ─── */
-    --color-accent-50: #f1f0fe;
-    --color-accent-100: #e3e1fc;
-    --color-accent-200: #c7c3f9;
-    --color-accent-400: #8b7ff2;
-    --color-accent-500: #6d5ce8;
-    --color-accent-600: #5641d6;
-    --color-accent-700: #4531ad;
-    --color-accent-900: #241a5c;
+    /* ── Accent — clear operational blue, supported by domain hues ─ */
+    --color-accent-50: #eef3ff;
+    --color-accent-100: #dce7ff;
+    --color-accent-200: #bfd2ff;
+    --color-accent-400: #688fff;
+    --color-accent-500: #3159d6;
+    --color-accent-600: #2747ad;
+    --color-accent-700: #213d92;
+    --color-accent-900: #182b65;
 
     /* ── Secondary accents (domain-concept color coding) ─────────── */
-    --color-coral-500: #fb7185;
-    --color-coral-600: #e11d48;
-    --color-amber-500: #f59e0b;
-    --color-teal-500: #14b8a6;
+    --color-coral-500: #e11d48;
+    --color-coral-600: #be123c;
+    --color-amber-500: #d97706;
+    --color-teal-500: #0f766e;
+    --color-forest-500: #15803d;
 
     /* ── Gradients — reserved for 2-3 "moment" locations only,
        never on cards/buttons/badges in daily app use ─────────── */
     --gradient-accent: linear-gradient(135deg, var(--color-accent-500), var(--color-accent-700));
     --gradient-hero: radial-gradient(
         120% 120% at 15% -10%,
-        color-mix(in oklch, var(--color-accent-500) 22%, white) 0%,
+        color-mix(in oklch, var(--color-accent-500) 16%, white) 0%,
         var(--color-surface) 55%,
         var(--color-surface) 100%
     );
@@ -143,18 +147,26 @@
     --space-section: 2rem; /* 32px — gap between major page sections */
 
     /* ── Radius — 4 sanctioned values ─────────────────────────── */
-    --radius-sm: 0.5rem; /* 8px — inputs, buttons, small chips */
-    --radius-md: 0.875rem; /* 14px — cards, panels */
-    --radius-lg: 1.25rem; /* 20px — modals, onboarding panels, hero containers */
+    --radius-sm: 0.375rem; /* 6px — inputs, buttons, small chips */
+    --radius-md: 0.5rem; /* 8px — cards, panels */
+    --radius-lg: 0.75rem; /* 12px — modals, onboarding panels */
     --radius-full: 999px; /* avatars, pills, badges */
 
     /* ── Shadows — elevation via shadow, borders reserved for nested
        content; only the one highlighted card per screen gets --shadow-accent ── */
     --shadow-xs: 0 1px 2px 0 rgb(24 22 31 / 0.03);
-    --shadow-card: 0 1px 2px 0 rgb(24 22 31 / 0.04), 0 1px 1px 0 rgb(24 22 31 / 0.03);
-    --shadow-raised: 0 4px 12px -2px rgb(24 22 31 / 0.08), 0 2px 4px -2px rgb(24 22 31 / 0.04);
-    --shadow-modal: 0 16px 40px -8px rgb(24 22 31 / 0.18), 0 4px 12px -4px rgb(24 22 31 / 0.08);
-    --shadow-accent: 0 4px 16px -4px rgb(109 92 232 / 0.25);
+    --shadow-card: 0 1px 2px 0 rgb(24 23 19 / 0.04), 0 12px 28px -24px rgb(24 23 19 / 0.24);
+    --shadow-raised: 0 14px 34px -20px rgb(24 23 19 / 0.24), 0 6px 14px -10px rgb(24 23 19 / 0.14);
+    --shadow-modal: 0 18px 48px -20px rgb(24 23 19 / 0.22), 0 8px 18px -12px rgb(24 23 19 / 0.16);
+    --shadow-accent: 0 12px 28px -20px rgb(49 89 214 / 0.34);
+}
+
+body {
+    min-height: 100vh;
+    color: var(--color-text-primary);
+    background:
+        linear-gradient(180deg, color-mix(in oklch, var(--color-surface-panel) 72%, white) 0%, var(--color-surface) 38%),
+        var(--color-surface);
 }
 
 /* Skeleton pulse animation */
