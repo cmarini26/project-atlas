@@ -109,6 +109,37 @@ class RecommendationControllerTest extends TestCase
             );
     }
 
+    public function test_show_includes_content_asset_media(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+
+        $channel = Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'blog',
+            'name' => 'Blog',
+            'is_active' => true,
+        ]);
+
+        $rec = $this->pendingRecommendation($company);
+
+        ContentAsset::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_id' => $rec->campaign_id,
+            'channel_id' => $channel->id,
+            'type' => 'blog_post',
+            'title' => 'Rare finds this week',
+            'body' => 'Body copy',
+            'media' => [['url' => 'https://example.com/hero.jpg']],
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs($user)
+            ->get("/app/recommendations/{$rec->id}")
+            ->assertInertia(fn ($page) => $page
+                ->where('content_assets.0.media.0.url', 'https://example.com/hero.jpg')
+            );
+    }
+
     public function test_show_includes_channel_mix_with_a_supporting_channel(): void
     {
         [$user, $company] = $this->userWithCompany();
@@ -209,6 +240,95 @@ class RecommendationControllerTest extends TestCase
             'id' => $rec->id,
             'status' => 'approved',
         ]);
+    }
+
+    public function test_owner_can_update_selected_channels_while_recommendation_is_pending(): void
+    {
+        [$user, $company] = $this->userWithCompany('owner');
+
+        $firstChannel = Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'email',
+            'name' => 'Email',
+            'is_active' => true,
+        ]);
+        $secondChannel = Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'blog',
+            'name' => 'Blog',
+            'is_active' => true,
+        ]);
+
+        $rec = $this->pendingRecommendation($company, [$firstChannel->id, $secondChannel->id]);
+
+        $firstAsset = ContentAsset::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_id' => $rec->campaign_id,
+            'channel_id' => $firstChannel->id,
+            'type' => 'email',
+            'body' => 'Email body',
+            'status' => 'draft',
+        ]);
+        $secondAsset = ContentAsset::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_id' => $rec->campaign_id,
+            'channel_id' => $secondChannel->id,
+            'type' => 'blog_post',
+            'body' => 'Blog body',
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs($user)
+            ->patch("/app/recommendations/{$rec->id}/channels", ['selected_content_asset_ids' => [$secondAsset->id]])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('content_assets', ['id' => $firstAsset->id, 'status' => 'archived']);
+        $this->assertDatabaseHas('content_assets', ['id' => $secondAsset->id, 'status' => 'draft']);
+        $this->assertSame([$secondChannel->id], Decision::withoutGlobalScopes()->findOrFail($rec->decision_id)->channel_ids);
+    }
+
+    public function test_approve_only_approves_selected_channels(): void
+    {
+        [$user, $company] = $this->userWithCompany('owner');
+
+        $firstChannel = Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'email',
+            'name' => 'Email',
+            'is_active' => true,
+        ]);
+        $secondChannel = Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'blog',
+            'name' => 'Blog',
+            'is_active' => true,
+        ]);
+
+        $rec = $this->pendingRecommendation($company, [$firstChannel->id, $secondChannel->id]);
+
+        $firstAsset = ContentAsset::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_id' => $rec->campaign_id,
+            'channel_id' => $firstChannel->id,
+            'type' => 'email',
+            'body' => 'Email body',
+            'status' => 'draft',
+        ]);
+        $secondAsset = ContentAsset::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_id' => $rec->campaign_id,
+            'channel_id' => $secondChannel->id,
+            'type' => 'blog_post',
+            'body' => 'Blog body',
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs($user)
+            ->post("/app/recommendations/{$rec->id}/approve", ['selected_content_asset_ids' => [$secondAsset->id]])
+            ->assertRedirect('/app/recommendations');
+
+        $this->assertDatabaseHas('content_assets', ['id' => $firstAsset->id, 'status' => 'archived']);
+        $this->assertDatabaseHas('content_assets', ['id' => $secondAsset->id, 'status' => 'approved']);
     }
 
     public function test_admin_can_approve_recommendation(): void

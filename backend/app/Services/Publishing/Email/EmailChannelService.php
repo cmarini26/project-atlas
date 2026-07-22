@@ -31,15 +31,14 @@ class EmailChannelService
     ) {}
 
     /**
-     * Connect (or reconnect/rotate) the company's Postmark server. Postmark's
-     * Server API Token is the only credential its API requires —
-     * PostmarkEmailProvider/PostmarkAnalyticsProvider both read it as a bare
-     * string from ChannelCredentials.credentials (not a JSON blob, unlike
-     * WordPress/Meta), so it's stored that way here too. Pings Postmark with
-     * the submitted token *before* ever persisting `status: 'active'` —
-     * never assume success, decide the stored status from a real result.
+     * Connect (or reconnect/rotate) the company's email provider. Current
+     * real providers are Postmark and SendGrid; both use a single API token,
+     * so ChannelCredentials.credentials stays a bare encrypted string here
+     * rather than a JSON blob. Pings the selected provider before ever
+     * persisting `status: 'active'` — never assume success, decide the stored
+     * status from a real result.
      */
-    public function connect(Company $company, string $apiToken, string $fromEmail, ?string $fromName): PingResult
+    public function connect(Company $company, string $providerType, string $apiToken, string $fromEmail, ?string $fromName): PingResult
     {
         $candidateCredentials = new ChannelCredentials([
             'company_id' => $company->id,
@@ -47,7 +46,7 @@ class EmailChannelService
             'credentials' => $apiToken,
         ]);
 
-        $ping = $this->emailProviders->for('postmark')->ping($candidateCredentials);
+        $ping = $this->emailProviders->for($providerType)->ping($candidateCredentials);
 
         $emailChannel = Channel::withoutGlobalScopes()->updateOrCreate(
             ['company_id' => $company->id, 'type' => 'email'],
@@ -64,7 +63,7 @@ class EmailChannelService
         ChannelCredentials::withoutGlobalScopes()->updateOrCreate(
             ['company_id' => $company->id, 'channel_type' => 'email'],
             [
-                'provider_type' => 'postmark',
+                'provider_type' => $providerType,
                 'credentials' => $candidateCredentials->credentials,
                 'status' => $ping->reachable ? 'active' : 'error',
                 'expires_at' => null,

@@ -317,6 +317,7 @@ class SettingsControllerTest extends TestCase
 
         $this->actingAs($user)
             ->post('/app/settings/email/connect', [
+                'provider_type' => 'postmark',
                 'api_token' => 'server-token-abc123',
                 'from_email' => 'hello@cbb-auctions.example',
                 'from_name' => 'CBB Auctions',
@@ -342,6 +343,7 @@ class SettingsControllerTest extends TestCase
 
         $this->actingAs($user)
             ->post('/app/settings/email/connect', [
+                'provider_type' => 'postmark',
                 'api_token' => 'wrong-token',
                 'from_email' => 'hello@cbb-auctions.example',
             ])
@@ -370,6 +372,7 @@ class SettingsControllerTest extends TestCase
         $this->bindEmailProvider(pingResult: new PingResult(reachable: true));
 
         $this->actingAs($user)->post('/app/settings/email/connect', [
+            'provider_type' => 'postmark',
             'api_token' => 'server-token-abc123',
             'from_email' => 'hello@cbb-auctions.example',
         ]);
@@ -395,6 +398,7 @@ class SettingsControllerTest extends TestCase
         $this->bindEmailProvider(pingResult: new PingResult(reachable: true));
 
         $this->actingAs($user)->post('/app/settings/email/connect', [
+            'provider_type' => 'postmark',
             'api_token' => 'old-token',
             'from_email' => 'hello@cbb-auctions.example',
         ]);
@@ -402,6 +406,7 @@ class SettingsControllerTest extends TestCase
         $this->bindEmailProvider(pingResult: new PingResult(reachable: true));
 
         $this->actingAs($user)->post('/app/settings/email/connect', [
+            'provider_type' => 'postmark',
             'api_token' => 'new-token',
             'from_email' => 'hello@cbb-auctions.example',
         ]);
@@ -421,6 +426,7 @@ class SettingsControllerTest extends TestCase
         $this->bindEmailProvider(pingResult: new PingResult(reachable: true));
 
         $this->actingAs($userA)->post('/app/settings/email/connect', [
+            'provider_type' => 'postmark',
             'api_token' => 'company-a-token',
             'from_email' => 'hello@company-a.example',
         ]);
@@ -441,6 +447,7 @@ class SettingsControllerTest extends TestCase
         ]);
 
         $this->actingAs($user)->post('/app/settings/email/connect', [
+            'provider_type' => 'postmark',
             'api_token' => 'server-token-abc123',
             'from_email' => 'hello@cbb-auctions.example',
         ]);
@@ -458,6 +465,7 @@ class SettingsControllerTest extends TestCase
 
         $this->actingAs($user)
             ->post('/app/settings/email/connect', [
+                'provider_type' => 'postmark',
                 'api_token' => 'server-token-abc123',
                 'from_email' => 'hello@cbb-auctions.example',
             ])
@@ -644,16 +652,17 @@ class SettingsControllerTest extends TestCase
 
     /**
      * Binds a fresh EmailProviderRegistry containing a single mocked
-     * EmailProvider (supports() → 'postmark' only), mirroring the pattern
-     * CheckChannelHealthTest already uses for ChannelPublisherRegistry.
+     * EmailProvider, mirroring the pattern CheckChannelHealthTest already uses
+     * for ChannelPublisherRegistry.
      */
     private function bindEmailProvider(
+        string $providerType = 'postmark',
         ?PingResult $pingResult = null,
         ?string $sendMessageId = null,
         ?PublishingException $sendException = null,
     ): EmailProvider {
         $provider = Mockery::mock(EmailProvider::class);
-        $provider->shouldReceive('supports')->with('postmark')->andReturn(true)->byDefault();
+        $provider->shouldReceive('supports')->with($providerType)->andReturn(true)->byDefault();
 
         if ($pingResult !== null) {
             $provider->shouldReceive('ping')->andReturn($pingResult);

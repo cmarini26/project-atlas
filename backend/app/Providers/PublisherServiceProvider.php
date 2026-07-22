@@ -7,12 +7,16 @@ use App\Services\Publishing\ChannelRendererRegistry;
 use App\Services\Publishing\Email\EmailProviderRegistry;
 use App\Services\Publishing\Email\LogEmailProvider;
 use App\Services\Publishing\Email\PostmarkEmailProvider;
+use App\Services\Publishing\Email\SendGridEmailProvider;
+use App\Services\Publishing\Sms\SmsProviderRegistry;
+use App\Services\Publishing\Sms\TwilioSmsProvider;
 use App\Services\Publishing\EmailPublisher;
 use App\Services\Publishing\EmailRenderer;
 use App\Services\Publishing\GenericRenderer;
 use App\Services\Publishing\LogChannelPublisher;
 use App\Services\Publishing\MetaChannelPublisher;
 use App\Services\Publishing\MetaRenderer;
+use App\Services\Publishing\SmsPublisher;
 use App\Services\Publishing\WordPressPublisher;
 use App\Services\Publishing\WordPressRenderer;
 use Illuminate\Support\ServiceProvider;
@@ -24,6 +28,7 @@ class PublisherServiceProvider extends ServiceProvider
         $this->app->singleton(ChannelRendererRegistry::class, fn () => new ChannelRendererRegistry());
         $this->app->singleton(ChannelPublisherRegistry::class, fn () => new ChannelPublisherRegistry());
         $this->app->singleton(EmailProviderRegistry::class, fn () => new EmailProviderRegistry());
+        $this->app->singleton(SmsProviderRegistry::class, fn () => new SmsProviderRegistry());
     }
 
     public function boot(): void
@@ -42,12 +47,17 @@ class PublisherServiceProvider extends ServiceProvider
         // vs 'log'), but matches this file's established priority-order
         // convention for registries where the first match wins.
         $emailProviderRegistry->register($this->app->make(PostmarkEmailProvider::class));
+        $emailProviderRegistry->register($this->app->make(SendGridEmailProvider::class));
         $emailProviderRegistry->register($this->app->make(LogEmailProvider::class));
+
+        $smsProviderRegistry = $this->app->make(SmsProviderRegistry::class);
+        $smsProviderRegistry->register($this->app->make(TwilioSmsProvider::class));
 
         $publisherRegistry = $this->app->make(ChannelPublisherRegistry::class);
         // EmailPublisher and MetaChannelPublisher are registered first — take
         // priority over LogChannelPublisher for their respective channels.
         $publisherRegistry->register($this->app->make(EmailPublisher::class));
+        $publisherRegistry->register($this->app->make(SmsPublisher::class));
         $publisherRegistry->register($this->app->make(MetaChannelPublisher::class));
         $publisherRegistry->register($this->app->make(WordPressPublisher::class));
         $publisherRegistry->register($this->app->make(LogChannelPublisher::class));

@@ -88,6 +88,7 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
     // Recommendation workflow
     Route::get('/recommendations', [RecommendationController::class, 'index'])->name('recommendations.index');
     Route::get('/recommendations/{recommendation}', [RecommendationController::class, 'show'])->name('recommendations.show');
+    Route::patch('/recommendations/{recommendation}/channels', [RecommendationController::class, 'selectChannels'])->name('recommendations.channels.select');
     Route::post('/recommendations/{recommendation}/approve', [RecommendationController::class, 'approve'])->name('recommendations.approve');
     Route::post('/recommendations/{recommendation}/approve-edit', [RecommendationController::class, 'approveEdit'])->name('recommendations.approve-edit');
     Route::post('/recommendations/{recommendation}/reject', [RecommendationController::class, 'reject'])->name('recommendations.reject');
@@ -95,6 +96,7 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
     // Campaigns
     Route::get('/campaigns', [CampaignController::class, 'index'])->name('campaigns.index');
     Route::get('/campaigns/{campaign}', [CampaignController::class, 'show'])->name('campaigns.show');
+    Route::patch('/campaigns/{campaign}/channels', [CampaignController::class, 'selectChannels'])->name('campaigns.channels.select');
     Route::patch('/campaigns/{campaign}/email-audience', [CampaignController::class, 'selectEmailAudience'])->name('campaigns.email-audience.select');
 
     // Publishing

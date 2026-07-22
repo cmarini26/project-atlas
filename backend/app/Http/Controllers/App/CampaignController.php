@@ -10,6 +10,7 @@ use App\Models\EmailAudience;
 use App\Models\EmailRecipientSnapshot;
 use App\Models\Execution;
 use App\Models\MarketingChannel;
+use App\Services\Campaign\CampaignChannelSelectionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -17,6 +18,10 @@ use Inertia\Response;
 
 class CampaignController extends Controller
 {
+    public function __construct(
+        private readonly CampaignChannelSelectionService $channelSelection,
+    ) {}
+
     public function index(Request $request): Response
     {
         /** @var Company $company */
@@ -123,6 +128,9 @@ class CampaignController extends Controller
             'total' => (int) $recipientOutcomeCounts->sum(),
         ];
 
+        $canEditChannelSelection = in_array($campaign->status, ['draft', 'approved'], true)
+            && $executions->isEmpty();
+
         return Inertia::render('App/Campaigns/Show', [
             'campaign' => [
                 'id' => $campaign->id,
@@ -133,6 +141,12 @@ class CampaignController extends Controller
                 'completed_at' => $campaign->completed_at?->toIso8601String(),
                 'blueprint' => $campaign->blueprint,
             ],
+            'selected_content_asset_ids' => $contentAssets
+                ->filter(fn (ContentAsset $asset): bool => $asset->status !== 'archived')
+                ->pluck('id')
+                ->values()
+                ->all(),
+            'can_edit_channel_selection' => $canEditChannelSelection,
             'content_assets' => $contentAssets->map(function (ContentAsset $a) use ($linkedMarketingChannelsByChannelId) {
                 $linked = $a->channel !== null ? $linkedMarketingChannelsByChannelId->get($a->channel->id) : null;
 
@@ -142,6 +156,7 @@ class CampaignController extends Controller
                     'body' => $a->body,
                     'title' => $a->title,
                     'status' => $a->status,
+                    'media' => $a->media,
                     'metadata' => $a->metadata ?? [],
                     'channel' => $a->channel ? [
                         'type' => $a->channel->type,
@@ -228,5 +243,46 @@ class CampaignController extends Controller
         $campaign->update(['email_audience_id' => $audienceId]);
 
         return back()->with('success', $audienceId !== null ? 'Audience selected.' : 'Audience cleared.');
+    }
+
+    public function selectChannels(Request $request, Campaign $campaign): RedirectResponse
+    {
+        /** @var Company $company */
+        $company = $request->attributes->get('company');
+
+        abort_if($campaign->company_id !== $company->id, 404);
+        abort_if(! in_array($campaign->status, ['draft', 'approved'], true), 403, 'Channels can only be changed before publishing starts.');
+        abort_if(Execution::withoutGlobalScopes()->where('campaign_id', $campaign->id)->exists(), 403, 'Channels can only be changed before executions are queued.');
+
+        $selectedContentAssetIds = $this->selectedContentAssetIdsFromRequest($request, $campaign);
+        $this->channelSelection->sync($campaign, $selectedContentAssetIds);
+
+        return back()->with('success', 'Campaign channels updated.');
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function selectedContentAssetIdsFromRequest(Request $request, Campaign $campaign): array
+    {
+        $validated = $request->validate([
+            'selected_content_asset_ids' => ['required', 'array', 'min:1'],
+            'selected_content_asset_ids.*' => ['string'],
+        ]);
+
+        $selected = collect($validated['selected_content_asset_ids'])
+            ->map(fn (mixed $id): string => (string) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $validAssetIds = ContentAsset::withoutGlobalScopes()
+            ->where('campaign_id', $campaign->id)
+            ->pluck('id')
+            ->all();
+
+        abort_if(array_diff($selected, $validAssetIds) !== [], 404);
+
+        return $selected;
     }
 }

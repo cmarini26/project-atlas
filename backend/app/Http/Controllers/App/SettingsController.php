@@ -14,6 +14,7 @@ use App\Models\MarketingChannel;
 use App\Services\MarketingPresence\MarketingPresenceService;
 use App\Services\Observatory\IntegrationService;
 use App\Services\Publishing\Email\EmailChannelService;
+use App\Services\Publishing\Sms\SmsChannelService;
 use App\Services\Publishing\WordPressPublisher;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,6 +29,7 @@ class SettingsController extends Controller
         private readonly MarketingPresenceService $marketingPresence,
         private readonly WordPressPublisher $wordPressPublisher,
         private readonly EmailChannelService $emailChannelService,
+        private readonly SmsChannelService $smsChannelService,
     ) {}
 
     public function index(Request $request): Response
@@ -104,6 +106,20 @@ class SettingsController extends Controller
         /** @var array<string, mixed> $emailChannelConfig */
         $emailChannelConfig = $emailChannel->config ?? [];
 
+        $smsChannel = Channel::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->where('type', 'sms')
+            ->first();
+
+        $smsCredentials = $smsChannel === null ? null : ChannelCredentials::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->where('channel_type', 'sms')
+            ->where('status', '!=', 'revoked')
+            ->first();
+
+        /** @var array<string, mixed> $smsChannelConfig */
+        $smsChannelConfig = $smsChannel->config ?? [];
+
         return Inertia::render('App/Settings', [
             'company' => [
                 'id' => $company->id,
@@ -137,6 +153,13 @@ class SettingsController extends Controller
                 'from_name' => (string) ($emailChannelConfig['from_name'] ?? ''),
                 'status' => $emailCredentials->status,
                 'last_used_at' => $emailCredentials->last_used_at !== null ? (string) $emailCredentials->last_used_at : null,
+            ],
+            'sms_channel' => $smsCredentials === null ? null : [
+                'provider_type' => $smsCredentials->provider_type,
+                'from_number' => (string) ($smsChannelConfig['from_number'] ?? ''),
+                'to_number' => (string) ($smsChannelConfig['to_number'] ?? ''),
+                'status' => $smsCredentials->status,
+                'last_used_at' => $smsCredentials->last_used_at !== null ? (string) $smsCredentials->last_used_at : null,
             ],
         ]);
     }
@@ -294,11 +317,10 @@ class SettingsController extends Controller
     }
 
     /**
-     * Connect (or reconnect/rotate) the company's Postmark server for real
-     * email sending. Business logic (ping-before-persist, Channel/
-     * ChannelCredentials upsert, capability sync) lives in
-     * EmailChannelService — this action only validates input and translates
-     * the result into a response.
+     * Connect (or reconnect/rotate) the company's real email provider.
+     * Business logic (ping-before-persist, Channel/ChannelCredentials upsert,
+     * capability sync) lives in EmailChannelService — this action only
+     * validates input and translates the result into a response.
      */
     public function connectEmail(Request $request): RedirectResponse
     {
@@ -306,6 +328,7 @@ class SettingsController extends Controller
         $company = $request->attributes->get('company');
 
         $validated = $request->validate([
+            'provider_type' => ['required', 'in:postmark,sendgrid'],
             'api_token' => ['required', 'string', 'max:500'],
             'from_email' => ['required', 'email', 'max:255'],
             'from_name' => ['nullable', 'string', 'max:255'],
@@ -313,16 +336,21 @@ class SettingsController extends Controller
 
         $ping = $this->emailChannelService->connect(
             $company,
+            $validated['provider_type'],
             $validated['api_token'],
             $validated['from_email'],
             $validated['from_name'] ?? null,
         );
 
         if (! $ping->reachable) {
-            return back()->withErrors(['api_token' => "Couldn't connect to Postmark with that token: {$ping->error}"]);
+            $label = $validated['provider_type'] === 'sendgrid' ? 'SendGrid' : 'Postmark';
+
+            return back()->withErrors(['api_token' => "Couldn't connect to {$label} with that token: {$ping->error}"]);
         }
 
-        return back()->with('success', 'Postmark connected.');
+        $label = $validated['provider_type'] === 'sendgrid' ? 'SendGrid' : 'Postmark';
+
+        return back()->with('success', "{$label} connected.");
     }
 
     public function disconnectEmail(Request $request): RedirectResponse
@@ -351,6 +379,61 @@ class SettingsController extends Controller
         ]);
 
         $result = $this->emailChannelService->sendTest($company, $validated['to_email']);
+
+        return $result->success
+            ? back()->with('success', $result->message)
+            : back()->with('error', $result->message);
+    }
+
+    public function connectSms(Request $request): RedirectResponse
+    {
+        /** @var Company $company */
+        $company = $request->attributes->get('company');
+
+        $validated = $request->validate([
+            'provider_type' => ['required', 'in:twilio'],
+            'account_sid' => ['required', 'string', 'max:255'],
+            'auth_token' => ['required', 'string', 'max:255'],
+            'from_number' => ['required', 'string', 'max:40'],
+            'to_number' => ['nullable', 'string', 'max:40'],
+        ]);
+
+        $ping = $this->smsChannelService->connect(
+            $company,
+            $validated['provider_type'],
+            $validated['account_sid'],
+            $validated['auth_token'],
+            $validated['from_number'],
+            $validated['to_number'] ?? null,
+        );
+
+        if (! $ping->reachable) {
+            return back()->withErrors(['account_sid' => "Couldn't connect to Twilio with those credentials: {$ping->error}"]);
+        }
+
+        return back()->with('success', 'Twilio connected.');
+    }
+
+    public function disconnectSms(Request $request): RedirectResponse
+    {
+        /** @var Company $company */
+        $company = $request->attributes->get('company');
+
+        $this->smsChannelService->disconnect($company);
+
+        return back()->with('success', 'Twilio disconnected.');
+    }
+
+    public function sendSmsTest(Request $request): RedirectResponse
+    {
+        /** @var Company $company */
+        $company = $request->attributes->get('company');
+
+        $validated = $request->validate([
+            'to_number' => ['required', 'string', 'max:40'],
+        ]);
+
+        $result = $this->smsChannelService->sendTest($company, $validated['to_number']);
 
         return $result->success
             ? back()->with('success', $result->message)

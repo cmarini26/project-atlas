@@ -11,22 +11,34 @@ use App\Models\Decision;
 use App\Models\Learning;
 use App\Models\Recommendation;
 use App\Models\User;
+use App\Services\Campaign\CampaignChannelSelectionService;
 use App\Services\Learning\EditPatternDetector;
 use InvalidArgumentException;
 
 class ApprovalService
 {
     public function __construct(
+        private readonly CampaignChannelSelectionService $channelSelection,
         private readonly EditPatternDetector $editPatternDetector,
     ) {}
 
-    public function approve(Recommendation $recommendation, User $user, ?string $notes = null): Approval
+    /**
+     * @param  list<string>|null  $selectedContentAssetIds
+     */
+    public function approve(
+        Recommendation $recommendation,
+        User $user,
+        ?string $notes = null,
+        ?array $selectedContentAssetIds = null,
+    ): Approval
     {
         if ($recommendation->status !== 'pending') {
             throw new InvalidArgumentException(
                 "Cannot approve recommendation with status: {$recommendation->status}"
             );
         }
+
+        $this->syncSelectedAssets($recommendation, $selectedContentAssetIds);
 
         $approval = Approval::create([
             'company_id' => $recommendation->company_id,
@@ -84,18 +96,22 @@ class ApprovalService
 
     /**
      * @param  array<string, mixed>  $edits
+     * @param  list<string>|null  $selectedContentAssetIds
      */
     public function editAndApprove(
         Recommendation $recommendation,
         User $user,
         array $edits,
         ?string $notes = null,
+        ?array $selectedContentAssetIds = null,
     ): Approval {
         if ($recommendation->status !== 'pending') {
             throw new InvalidArgumentException(
                 "Cannot approve recommendation with status: {$recommendation->status}"
             );
         }
+
+        $this->syncSelectedAssets($recommendation, $selectedContentAssetIds);
 
         $approval = Approval::create([
             'company_id' => $recommendation->company_id,
@@ -243,6 +259,24 @@ class ApprovalService
             ->where('campaign_id', $campaign->id)
             ->where('status', 'draft')
             ->update(['status' => 'approved']);
+    }
+
+    /**
+     * @param  list<string>|null  $selectedContentAssetIds
+     */
+    private function syncSelectedAssets(Recommendation $recommendation, ?array $selectedContentAssetIds): void
+    {
+        if ($selectedContentAssetIds === null || $recommendation->campaign_id === null) {
+            return;
+        }
+
+        $campaign = Campaign::withoutGlobalScopes()->find($recommendation->campaign_id);
+
+        if ($campaign === null) {
+            return;
+        }
+
+        $this->channelSelection->sync($campaign, $selectedContentAssetIds);
     }
 
     private function rejectLinkedCampaign(Recommendation $recommendation): void

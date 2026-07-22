@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\App;
 
 use App\Http\Controllers\Controller;
+use App\Models\Campaign;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\ContentAsset;
 use App\Models\MarketingChannel;
 use App\Models\Recommendation;
 use App\Models\User;
+use App\Services\Campaign\CampaignChannelSelectionService;
 use App\Services\Recommendation\ApprovalService;
 use App\Services\Recommendation\ChannelMixPresenter;
 use Illuminate\Http\RedirectResponse;
@@ -20,6 +22,7 @@ class RecommendationController extends Controller
 {
     public function __construct(
         private readonly ApprovalService $approvalService,
+        private readonly CampaignChannelSelectionService $channelSelection,
         private readonly ChannelMixPresenter $channelMixPresenter,
     ) {}
 
@@ -82,6 +85,11 @@ class RecommendationController extends Controller
                 'status' => $recommendation->campaign->status,
             ] : null,
             'channel_mix' => $this->channelMixPresenter->present($company, $recommendation->decision),
+            'selected_content_asset_ids' => $contentAssets
+                ->filter(fn (ContentAsset $asset): bool => $asset->status !== 'archived')
+                ->pluck('id')
+                ->values()
+                ->all(),
             'content_assets' => $contentAssets->map(function (ContentAsset $a) use ($linkedMarketingChannelsByChannelId) {
                 $linked = $a->channel !== null ? $linkedMarketingChannelsByChannelId->get($a->channel->id) : null;
 
@@ -91,6 +99,7 @@ class RecommendationController extends Controller
                     'body' => $a->body,
                     'title' => $a->title,
                     'status' => $a->status,
+                    'media' => $a->media,
                     'metadata' => $a->metadata ?? [],
                     'channel' => $a->channel ? [
                         'type' => $a->channel->type,
@@ -116,13 +125,17 @@ class RecommendationController extends Controller
         $user = $request->user();
         abort_unless($user instanceof User, 401);
 
-        $this->approvalService->approve($recommendation, $user, $request->input('notes'));
+        $selectedContentAssetIds = $this->selectedContentAssetIdsFromRequest($request, $recommendation, false);
 
-        // No channel truly publishes externally yet — see
-        // docs/reviews/Channel-Publishing-Reality-Audit.md. Keep this message
-        // honest until a real channel integration ships.
+        $this->approvalService->approve(
+            $recommendation,
+            $user,
+            $request->input('notes'),
+            $selectedContentAssetIds,
+        );
+
         return redirect()->route('app.recommendations.index')
-            ->with('success', 'Approved. Atlas will process this campaign — publishing is currently simulated until a live channel is connected.');
+            ->with('success', 'Approved. Atlas will process your selected channels — connected ones send for real, everything else remains simulated.');
     }
 
     public function approveEdit(Request $request, Recommendation $recommendation): RedirectResponse
@@ -143,6 +156,11 @@ class RecommendationController extends Controller
         $asset = ContentAsset::where('id', $validated['content_asset_id'])
             ->where('company_id', $company->id)
             ->firstOrFail();
+
+        $selectedContentAssetIds = $this->selectedContentAssetIdsFromRequest($request, $recommendation, true);
+        if ($selectedContentAssetIds !== null && ! in_array($asset->id, $selectedContentAssetIds, true)) {
+            $selectedContentAssetIds[] = $asset->id;
+        }
 
         $edits = [
             'content_asset_id' => $asset->id,
@@ -167,7 +185,8 @@ class RecommendationController extends Controller
             $recommendation,
             $editUser,
             $edits,
-            $validated['notes'] ?? null
+            $validated['notes'] ?? null,
+            $selectedContentAssetIds,
         );
 
         return redirect()->route('app.recommendations.index')
@@ -193,6 +212,26 @@ class RecommendationController extends Controller
             ->with('success', 'Got it. Atlas will keep watching and surface a new recommendation soon.');
     }
 
+    public function selectChannels(Request $request, Recommendation $recommendation): RedirectResponse
+    {
+        /** @var Company $company */
+        $company = $request->attributes->get('company');
+
+        abort_if($recommendation->company_id !== $company->id, 404);
+        $this->requireApprovalRole($request, $company);
+        abort_if($recommendation->campaign_id === null, 404);
+        abort_if($recommendation->status !== 'pending', 403, 'Channels can only be changed while a recommendation is pending.');
+
+        $campaign = Campaign::withoutGlobalScopes()->find($recommendation->campaign_id);
+        abort_if($campaign === null, 404);
+
+        $selectedContentAssetIds = $this->selectedContentAssetIdsFromRequest($request, $recommendation, true) ?? [];
+
+        $this->channelSelection->sync($campaign, $selectedContentAssetIds);
+
+        return back()->with('success', 'Delivery channels updated.');
+    }
+
     /** @return array<string, mixed> */
     private function formatRecommendation(Recommendation $r): array
     {
@@ -208,6 +247,45 @@ class RecommendationController extends Controller
                 'confidence_score' => $r->decision->confidence_score ?? 0,
             ] : null,
         ];
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    private function selectedContentAssetIdsFromRequest(
+        Request $request,
+        Recommendation $recommendation,
+        bool $required,
+    ): ?array {
+        $rules = [
+            'selected_content_asset_ids' => [$required ? 'required' : 'nullable', 'array', 'min:1'],
+            'selected_content_asset_ids.*' => ['string'],
+        ];
+
+        $validated = $request->validate($rules);
+
+        if (! array_key_exists('selected_content_asset_ids', $validated)) {
+            return null;
+        }
+
+        $selected = collect($validated['selected_content_asset_ids'] ?? [])
+            ->map(fn (mixed $id): string => (string) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($recommendation->campaign_id === null) {
+            return $selected;
+        }
+
+        $validAssetIds = ContentAsset::withoutGlobalScopes()
+            ->where('campaign_id', $recommendation->campaign_id)
+            ->pluck('id')
+            ->all();
+
+        abort_if(array_diff($selected, $validAssetIds) !== [], 404);
+
+        return $selected;
     }
 
     private function requireApprovalRole(Request $request, Company $company): void

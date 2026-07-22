@@ -34,7 +34,7 @@ class EmailChannelServiceTest extends TestCase
         $company = $this->makeCompany();
         $this->bindEmailProvider(pingResult: new PingResult(reachable: true));
 
-        $ping = $this->service->connect($company, 'server-token', 'hello@example.com', 'Example Co');
+        $ping = $this->service->connect($company, 'postmark', 'server-token', 'hello@example.com', 'Example Co');
 
         $this->assertTrue($ping->reachable);
         $this->assertDatabaseHas('channels', ['company_id' => $company->id, 'type' => 'email']);
@@ -44,12 +44,28 @@ class EmailChannelServiceTest extends TestCase
         ]);
     }
 
+    public function test_connect_can_store_sendgrid_as_the_active_provider(): void
+    {
+        $company = $this->makeCompany();
+        $this->bindEmailProvider(providerType: 'sendgrid', pingResult: new PingResult(reachable: true));
+
+        $ping = $this->service->connect($company, 'sendgrid', 'sg-token', 'hello@example.com', 'Example Co');
+
+        $this->assertTrue($ping->reachable);
+        $this->assertDatabaseHas('channel_credentials', [
+            'company_id' => $company->id,
+            'channel_type' => 'email',
+            'provider_type' => 'sendgrid',
+            'status' => 'active',
+        ]);
+    }
+
     public function test_connect_persists_error_status_when_unreachable(): void
     {
         $company = $this->makeCompany();
         $this->bindEmailProvider(pingResult: new PingResult(reachable: false, error: 'Invalid token'));
 
-        $ping = $this->service->connect($company, 'bad-token', 'hello@example.com', null);
+        $ping = $this->service->connect($company, 'postmark', 'bad-token', 'hello@example.com', null);
 
         $this->assertFalse($ping->reachable);
         $this->assertSame('Invalid token', $ping->error);
@@ -68,7 +84,7 @@ class EmailChannelServiceTest extends TestCase
         ]);
         $this->bindEmailProvider(pingResult: new PingResult(reachable: true));
 
-        $this->service->connect($company, 'server-token', 'hello@example.com', null);
+        $this->service->connect($company, 'postmark', 'server-token', 'hello@example.com', null);
 
         $this->assertDatabaseHas('marketing_channels', [
             'company_id' => $company->id, 'type' => 'email', 'supports_publishing' => true,
@@ -179,12 +195,13 @@ class EmailChannelServiceTest extends TestCase
     }
 
     private function bindEmailProvider(
+        string $providerType = 'postmark',
         ?PingResult $pingResult = null,
         ?string $sendMessageId = null,
         ?PublishingException $sendException = null,
     ): void {
         $provider = Mockery::mock(EmailProvider::class);
-        $provider->shouldReceive('supports')->with('postmark')->andReturn(true)->byDefault();
+        $provider->shouldReceive('supports')->with($providerType)->andReturn(true)->byDefault();
 
         if ($pingResult !== null) {
             $provider->shouldReceive('ping')->andReturn($pingResult);
