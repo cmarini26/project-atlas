@@ -98,7 +98,13 @@ Note on "Approve": every channel type passes through the same generic, content-a
 ### `website` (observation-only)
 
 - **Observe:** Real. `WebsiteConnector`/`WebPageCrawler` crawl a company's site (up to `crawler.max_pages` pages), extracting body text and up to 5 representative images per page.
+- **Additional store-observation path:** Atlas now also supports **Shopify observation as a manual integration type**, separate from the generic website crawl. `SettingsController::connectShopify()` persists a real `shopify` `Integration` only after `ShopifyConnectionService` successfully pings the Shopify Admin API, and `ShopifyConnector` then syncs live store metadata plus a product snapshot into the standard Observation pipeline. This is observation/import only — not a publishing destination.
 - **Draft / Approve / Execute / Measure / Learn:** N/A. Website has no `Channel` publishing equivalent — it exists purely as an observation source (`MarketingChannelType::Website`, `hasChannelEquivalent(): false`) that feeds Facts/Knowledge into recommendation reasoning. It is never itself a destination a campaign publishes to.
+
+### Audience-source integrations that are not publishing channels
+
+- **Mailchimp** now exists as a **real audience-sync integration**, but not as a `channels.type` publishing destination. `SettingsController::connectMailchimp()` persists a real `mailchimp` `Integration` only after `MailchimpConnectionService` successfully validates the audience, and `MailchimpConnector` imports Mailchimp audience members into Atlas `email_audiences` / `email_contacts` for use by the existing Atlas email execution path.
+- **Truth boundary:** Mailchimp is therefore real for **recipient import/sync**, but still **not** a Mailchimp-native send / measure / learn channel in this matrix. Outbound email remains the provider-backed `email` channel described above.
 
 ### Declared-presence-only types with zero pipeline participation
 

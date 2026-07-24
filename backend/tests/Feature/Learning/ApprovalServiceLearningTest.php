@@ -5,6 +5,7 @@ namespace Tests\Feature\Learning;
 use App\Models\Learning;
 use App\Models\Recommendation;
 use App\Models\User;
+use App\Services\Campaign\CampaignChannelSelectionService;
 use App\Services\Learning\EditPatternDetector;
 use App\Services\Recommendation\ApprovalService;
 
@@ -15,7 +16,7 @@ class ApprovalServiceLearningTest extends LearningTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new ApprovalService(new EditPatternDetector());
+        $this->service = new ApprovalService(new CampaignChannelSelectionService(), new EditPatternDetector());
     }
 
     private function makeRecommendation(): Recommendation

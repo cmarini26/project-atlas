@@ -7,6 +7,8 @@ use App\Models\Integration;
 use App\Services\Observatory\Connectors\ConnectorRegistry;
 use App\Services\Observatory\Connectors\Exceptions\UnsupportedIntegrationException;
 use App\Services\Observatory\Connectors\Instagram\InstagramConnector;
+use App\Services\Observatory\Connectors\Mailchimp\MailchimpConnector;
+use App\Services\Observatory\Connectors\Shopify\ShopifyConnector;
 use App\Services\Observatory\Connectors\Website\WebsiteConnector;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -55,6 +57,48 @@ class ConnectorRegistryTest extends TestCase
         $connector = $registry->resolve($integration);
 
         $this->assertInstanceOf(InstagramConnector::class, $connector);
+    }
+
+    public function test_resolves_shopify_connector_for_shopify_type(): void
+    {
+        $company = Company::withoutGlobalScopes()->create([
+            'name' => 'Test Co',
+            'slug' => 'test-co',
+        ]);
+
+        $integration = Integration::withoutGlobalScopes()->make([
+            'company_id' => $company->id,
+            'type' => 'shopify',
+            'name' => 'Shopify',
+            'config' => ['shop_domain' => 'acme.myshopify.com', 'admin_api_token' => 'token'],
+            'status' => 'active',
+        ]);
+
+        $registry = $this->app->make(ConnectorRegistry::class);
+        $connector = $registry->resolve($integration);
+
+        $this->assertInstanceOf(ShopifyConnector::class, $connector);
+    }
+
+    public function test_resolves_mailchimp_connector_for_mailchimp_type(): void
+    {
+        $company = Company::withoutGlobalScopes()->create([
+            'name' => 'Test Co',
+            'slug' => 'test-co',
+        ]);
+
+        $integration = Integration::withoutGlobalScopes()->make([
+            'company_id' => $company->id,
+            'type' => 'mailchimp',
+            'name' => 'Mailchimp',
+            'config' => ['server_prefix' => 'us14', 'api_key' => 'key', 'audience_id' => 'abc'],
+            'status' => 'active',
+        ]);
+
+        $registry = $this->app->make(ConnectorRegistry::class);
+        $connector = $registry->resolve($integration);
+
+        $this->assertInstanceOf(MailchimpConnector::class, $connector);
     }
 
     public function test_throws_for_unsupported_integration_type(): void

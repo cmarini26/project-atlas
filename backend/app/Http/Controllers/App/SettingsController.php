@@ -13,6 +13,8 @@ use App\Models\Integration;
 use App\Models\MarketingChannel;
 use App\Services\MarketingPresence\MarketingPresenceService;
 use App\Services\Observatory\IntegrationService;
+use App\Services\Observatory\MailchimpConnectionService;
+use App\Services\Observatory\ShopifyConnectionService;
 use App\Services\Publishing\Email\EmailChannelService;
 use App\Services\Publishing\Sms\SmsChannelService;
 use App\Services\Publishing\WordPressPublisher;
@@ -30,6 +32,8 @@ class SettingsController extends Controller
         private readonly WordPressPublisher $wordPressPublisher,
         private readonly EmailChannelService $emailChannelService,
         private readonly SmsChannelService $smsChannelService,
+        private readonly ShopifyConnectionService $shopifyConnectionService,
+        private readonly MailchimpConnectionService $mailchimpConnectionService,
     ) {}
 
     public function index(Request $request): Response
@@ -189,6 +193,101 @@ class SettingsController extends Controller
         SyncIntegration::dispatch($integration);
 
         return back()->with('success', 'Sync started. Check back in a few minutes.');
+    }
+
+    /**
+     * Connect (or reconnect) the company's Shopify store for observation.
+     * This is a real Shopify Admin API connection used to enrich Atlas's
+     * understanding of a commerce business before beta.
+     */
+    public function connectShopify(Request $request): RedirectResponse
+    {
+        /** @var Company $company */
+        $company = $request->attributes->get('company');
+
+        $validated = $request->validate([
+            'shop_domain' => ['required', 'string', 'max:255'],
+            'admin_api_token' => ['required', 'string', 'max:255'],
+        ]);
+
+        $ping = $this->shopifyConnectionService->connect(
+            $company,
+            $validated['shop_domain'],
+            $validated['admin_api_token'],
+        );
+
+        if (! $ping->reachable) {
+            return back()->withErrors(['admin_api_token' => "Couldn't connect to Shopify with those credentials: {$ping->error}"]);
+        }
+
+        $integration = Integration::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->where('type', 'shopify')
+            ->first();
+
+        if ($integration !== null) {
+            SyncIntegration::dispatch($integration);
+        }
+
+        return back()->with('success', 'Shopify connected. Syncing your store now.');
+    }
+
+    public function disconnectShopify(Request $request): RedirectResponse
+    {
+        /** @var Company $company */
+        $company = $request->attributes->get('company');
+
+        $this->shopifyConnectionService->disconnect($company);
+
+        return back()->with('success', 'Shopify disconnected.');
+    }
+
+    /**
+     * Connect (or reconnect) the company's Mailchimp audience for email
+     * audience sync into Atlas.
+     */
+    public function connectMailchimp(Request $request): RedirectResponse
+    {
+        /** @var Company $company */
+        $company = $request->attributes->get('company');
+
+        $validated = $request->validate([
+            'server_prefix' => ['required', 'string', 'max:50'],
+            'api_key' => ['required', 'string', 'max:255'],
+            'audience_id' => ['required', 'string', 'max:255'],
+        ]);
+
+        $ping = $this->mailchimpConnectionService->connect(
+            $company,
+            $validated['server_prefix'],
+            $validated['api_key'],
+            $validated['audience_id'],
+        );
+
+        if (! $ping->reachable) {
+            return back()->withErrors(['api_key' => "Couldn't connect to Mailchimp with those credentials: {$ping->error}"]);
+        }
+
+        $integration = Integration::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->where('type', 'mailchimp')
+            ->first();
+
+        if ($integration !== null) {
+            SyncIntegration::dispatch($integration);
+        }
+
+        return back()->with('success', 'Mailchimp connected. Syncing your audience now.');
+    }
+
+    public function disconnectMailchimp(Request $request): RedirectResponse
+    {
+        /** @var Company $company */
+        $company = $request->attributes->get('company');
+
+        $this->mailchimpConnectionService->disconnect($company);
+
+        return back()->with('success', 'Mailchimp disconnected.');
     }
 
     /**

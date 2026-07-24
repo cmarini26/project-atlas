@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Badge from '@/Components/UI/Badge.vue'
@@ -197,6 +197,40 @@ function formatDate(date: string | null): string {
 const instagramForm = useForm({
   access_token: '',
 })
+
+const shopifyForm = useForm({
+  shop_domain: '',
+  admin_api_token: '',
+})
+
+function connectShopify(): void {
+  shopifyForm.post('/app/settings/integrations/shopify', {
+    onSuccess: () => shopifyForm.reset('admin_api_token'),
+  })
+}
+
+function revokeShopify(): void {
+  router.post('/app/settings/integrations/shopify/revoke', {}, { preserveScroll: true })
+}
+
+const mailchimpForm = useForm({
+  server_prefix: '',
+  api_key: '',
+  audience_id: '',
+})
+
+function connectMailchimp(): void {
+  mailchimpForm.post('/app/settings/integrations/mailchimp', {
+    onSuccess: () => mailchimpForm.reset('api_key'),
+  })
+}
+
+function revokeMailchimp(): void {
+  router.post('/app/settings/integrations/mailchimp/revoke', {}, { preserveScroll: true })
+}
+
+const shopifyIntegration = computed(() => props.integrations.find((integration) => integration.type === 'shopify') ?? null)
+const mailchimpIntegration = computed(() => props.integrations.find((integration) => integration.type === 'mailchimp') ?? null)
 
 function connectInstagram(): void {
   instagramForm.post('/app/settings/integrations/instagram', {
@@ -698,6 +732,161 @@ function retakeTour(): void {
           class="py-2 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
         >
           {{ smsForm.processing ? 'Connecting…' : 'Connect Twilio' }}
+        </button>
+      </form>
+    </div>
+
+    <!-- Shopify -->
+    <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5 mb-6">
+      <h2 class="text-sm font-semibold text-[var(--color-text-primary)] mb-4">Shopify</h2>
+
+      <div v-if="shopifyIntegration" class="space-y-4">
+        <div class="flex items-start gap-3">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-0.5">
+              <p class="text-sm font-medium text-[var(--color-text-primary)]">{{ shopifyIntegration.name ?? 'Shopify' }}</p>
+              <Badge :variant="integrationStatusVariants[shopifyIntegration.status] ?? 'muted'">{{ shopifyIntegration.status }}</Badge>
+            </div>
+            <p class="text-xs text-[var(--color-text-muted)]">Atlas will sync store and product context from this Shopify shop.</p>
+            <p class="text-xs text-[var(--color-text-muted)] mt-1">Last synced: {{ formatDate(shopifyIntegration.last_run_at) }}</p>
+            <p v-if="shopifyIntegration.last_error" class="text-xs text-rose-600 mt-1">{{ shopifyIntegration.last_error }}</p>
+            <div class="mt-3 flex items-center gap-2">
+              <button
+                type="button"
+                class="py-1.5 px-3 text-xs font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)] transition-colors duration-[var(--duration-fast)]"
+                @click="revokeShopify"
+              >
+                Disconnect
+              </button>
+              <button
+                type="button"
+                :disabled="syncingId === shopifyIntegration.id"
+                class="py-1.5 px-3 text-xs font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+                @click="sync(shopifyIntegration)"
+              >
+                {{ syncingId === shopifyIntegration.id ? 'Syncing…' : 'Sync now' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <form v-else class="space-y-3" @submit.prevent="connectShopify">
+        <p class="text-xs text-[var(--color-text-muted)]">
+          Connect the beta tester's Shopify store so Atlas can pull live store and product context before recommendations are generated.
+        </p>
+        <div>
+          <label for="shopify-domain" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Shop domain</label>
+          <input
+            id="shopify-domain"
+            v-model="shopifyForm.shop_domain"
+            type="text"
+            placeholder="your-store.myshopify.com"
+            required
+            class="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)] transition-colors duration-[var(--duration-fast)]"
+          />
+          <p v-if="shopifyForm.errors.shop_domain" class="mt-1 text-xs text-rose-600">{{ shopifyForm.errors.shop_domain }}</p>
+        </div>
+        <div>
+          <label for="shopify-token" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Admin API token</label>
+          <input
+            id="shopify-token"
+            v-model="shopifyForm.admin_api_token"
+            type="password"
+            required
+            class="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)] transition-colors duration-[var(--duration-fast)]"
+          />
+          <p v-if="shopifyForm.errors.admin_api_token" class="mt-1 text-xs text-rose-600">{{ shopifyForm.errors.admin_api_token }}</p>
+        </div>
+        <button
+          type="submit"
+          :disabled="shopifyForm.processing"
+          class="py-2 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+        >
+          {{ shopifyForm.processing ? 'Connecting…' : 'Connect Shopify' }}
+        </button>
+      </form>
+    </div>
+
+    <!-- Mailchimp -->
+    <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5 mb-6">
+      <h2 class="text-sm font-semibold text-[var(--color-text-primary)] mb-4">Mailchimp</h2>
+
+      <div v-if="mailchimpIntegration" class="space-y-4">
+        <div class="flex items-start gap-3">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-0.5">
+              <p class="text-sm font-medium text-[var(--color-text-primary)]">{{ mailchimpIntegration.name ?? 'Mailchimp' }}</p>
+              <Badge :variant="integrationStatusVariants[mailchimpIntegration.status] ?? 'muted'">{{ mailchimpIntegration.status }}</Badge>
+            </div>
+            <p class="text-xs text-[var(--color-text-muted)]">Atlas will sync this Mailchimp audience into Atlas Email Audiences for campaign targeting.</p>
+            <p class="text-xs text-[var(--color-text-muted)] mt-1">Last synced: {{ formatDate(mailchimpIntegration.last_run_at) }}</p>
+            <p v-if="mailchimpIntegration.last_error" class="text-xs text-rose-600 mt-1">{{ mailchimpIntegration.last_error }}</p>
+            <div class="mt-3 flex items-center gap-2">
+              <button
+                type="button"
+                class="py-1.5 px-3 text-xs font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)] transition-colors duration-[var(--duration-fast)]"
+                @click="revokeMailchimp"
+              >
+                Disconnect
+              </button>
+              <button
+                type="button"
+                :disabled="syncingId === mailchimpIntegration.id"
+                class="py-1.5 px-3 text-xs font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+                @click="sync(mailchimpIntegration)"
+              >
+                {{ syncingId === mailchimpIntegration.id ? 'Syncing…' : 'Sync now' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <form v-else class="space-y-3" @submit.prevent="connectMailchimp">
+        <p class="text-xs text-[var(--color-text-muted)]">
+          Connect the beta tester's Mailchimp audience so Atlas can import real recipients before beta campaigns are prepared.
+        </p>
+        <div>
+          <label for="mailchimp-server-prefix" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Server prefix</label>
+          <input
+            id="mailchimp-server-prefix"
+            v-model="mailchimpForm.server_prefix"
+            type="text"
+            placeholder="us14"
+            required
+            class="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)] transition-colors duration-[var(--duration-fast)]"
+          />
+          <p v-if="mailchimpForm.errors.server_prefix" class="mt-1 text-xs text-rose-600">{{ mailchimpForm.errors.server_prefix }}</p>
+        </div>
+        <div>
+          <label for="mailchimp-api-key" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">API key</label>
+          <input
+            id="mailchimp-api-key"
+            v-model="mailchimpForm.api_key"
+            type="password"
+            required
+            class="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)] transition-colors duration-[var(--duration-fast)]"
+          />
+          <p v-if="mailchimpForm.errors.api_key" class="mt-1 text-xs text-rose-600">{{ mailchimpForm.errors.api_key }}</p>
+        </div>
+        <div>
+          <label for="mailchimp-audience-id" class="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5">Audience ID</label>
+          <input
+            id="mailchimp-audience-id"
+            v-model="mailchimpForm.audience_id"
+            type="text"
+            required
+            class="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)] transition-colors duration-[var(--duration-fast)]"
+          />
+          <p v-if="mailchimpForm.errors.audience_id" class="mt-1 text-xs text-rose-600">{{ mailchimpForm.errors.audience_id }}</p>
+        </div>
+        <button
+          type="submit"
+          :disabled="mailchimpForm.processing"
+          class="py-2 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+        >
+          {{ mailchimpForm.processing ? 'Connecting…' : 'Connect Mailchimp' }}
         </button>
       </form>
     </div>

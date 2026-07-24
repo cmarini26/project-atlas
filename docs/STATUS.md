@@ -34,27 +34,28 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
-**Production-Readiness Gap Plan — SendGrid + Twilio connector slice ✅ Implemented locally, pending broader release/docs sweep**
-*Completed locally: 2026-07-20*
+**Production-Readiness Gap Plan — Shopify observation + Mailchimp audience-sync connectors ✅ Implemented locally, pending live-account validation**
+*Completed locally: 2026-07-23*
 
-Since the 2026-07-16 status update, Atlas's publishing surface has broadened in the local worktree in two concrete ways:
+Atlas now has a real, customer-reachable connector path for the first beta tester's actual stack — **Shopify for website/store context** and **Mailchimp for email audience sync** — instead of only the earlier WordPress + provider-native email path.
 
-- **SendGrid is now a real second email provider** under the existing email-provider architecture, not a parallel one-off integration. `SendGridEmailProvider` is registered in `PublisherServiceProvider`, `EmailChannelService`/`SettingsController` now accept provider-aware email connection payloads, and `Settings.vue` exposes provider selection (`postmark` or `sendgrid`) instead of a Postmark-only flow.
-- **Twilio now has a real SMS connect + test + publish path.** `SmsChannelService` and `TwilioSmsProvider` create and validate a company-scoped `sms` Channel plus `ChannelCredentials` row from Settings, expose a test-SMS action, and `SmsPublisher` is now registered ahead of `LogChannelPublisher`, so an approved SMS `ContentAsset` can send through Twilio to the connected channel's configured destination number.
-- **Scope note:** this is *not* a full SMS audience/list system yet. The new SMS path is real, but intentionally narrow: one connected sending number + one default destination number per company/channel. There is no multi-recipient SMS audience model, no per-recipient SMS analytics, and no SMS-specific learning loop yet.
+- **Shopify observation is now a real integration type.** `SettingsController` exposes a Shopify connect/disconnect flow, `ShopifyConnectionService` pings the real Shopify Admin API before persisting, `ShopifyConnector` is registered in `ConnectorServiceProvider`, and a connected Shopify integration can now sync live store + product context into Atlas's Observation pipeline.
+- **Mailchimp audience sync is now a real integration type.** `SettingsController` exposes a Mailchimp connect/disconnect flow, `MailchimpConnectionService` validates the audience before persisting, and `MailchimpConnector` now imports Mailchimp audience members into Atlas `email_audiences` / `email_contacts` so Atlas can target real recipients using the existing email campaign path.
+- **Scope note:** this is intentionally the narrowest honest beta slice. Shopify is an **observation/import connector**, not a publishing destination. Mailchimp is an **audience-sync connector**, not a Mailchimp-native send/analytics provider. Atlas can now observe the beta tester's Shopify store and pull their Mailchimp audience into Atlas, but outbound email execution still runs through Atlas's real provider-backed email channel layer (Postmark / SendGrid), not through Mailchimp campaign sending.
 
-**Verification completed for this slice (targeted, not full-suite):**
+**Verification completed for this slice:**
 
-- `php artisan test tests/Feature/Publishing/Email/EmailChannelServiceTest.php tests/Feature/App/SettingsControllerTest.php tests/Feature/App/SettingsConnectorProvidersTest.php` → **55 passed, 242 assertions**
-- `php artisan test tests/Feature/Publishing/Sms/SmsChannelServiceTest.php tests/Feature/Publishing/Sms/SmsPublisherTest.php tests/Feature/App/SettingsConnectorProvidersTest.php tests/Feature/Publishing/PublishingPipelineTest.php` → **12 passed, 43 assertions**
-- `npm run build` → passed after the Settings/Twilio UI changes
+- `php artisan test --filter='(SettingsControllerTest|ConnectorRegistryTest|ShopifyConnectorTest|MailchimpConnectorTest)'` → **56 passed, 245 assertions**
+- `php artisan migrate:fresh --env=testing --force` → passed with the new integration-type migration ordering intact
+- `php artisan test` → **1366 passed, 3 skipped, 3 deprecated**
+- `npm run build` → passed after the Settings UI changes
 
-**Why this matters:** Atlas's canonical "real in code" channel set has widened again. Email is no longer just "Postmark or nothing" — it is now a provider-aware email channel with two real send providers (`postmark`, `sendgrid`), and SMS is no longer purely theoretical/simulated in the matrix. This does **not** change the private-beta go/no-go outcome by itself, because the remaining blockers are still production infrastructure, legal/support readiness, and live third-party-account verification.
+**Why this matters:** the first beta tester is no longer blocked purely by an unsupported Shopify + Mailchimp stack at the code level. Atlas now has a real path to ingest the tester's store context and recipient audience. The remaining honesty boundary is still **live third-party account validation** plus the existing infrastructure / deployment / operations blockers.
 
 **Previous milestone:**
 
-**Production-Readiness Gap Plan — Production Readiness Checklist + WordPress/UI hardening ✅ Complete**
-*Completed: 2026-07-16* — see [Production-Readiness-Checklist.md](ops/Production-Readiness-Checklist.md)
+**Production-Readiness Gap Plan — SendGrid + Twilio connector slice ✅ Implemented locally, pending broader release/docs sweep**
+*Completed locally: 2026-07-20*
 
 Backfills two more code-side slices shipped since the Phase 0/1 entry below without a STATUS.md entry, plus today's operational-readiness doc work:
 

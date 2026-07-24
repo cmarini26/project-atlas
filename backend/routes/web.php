@@ -114,6 +114,10 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
     Route::patch('/settings', [SettingsController::class, 'update'])->name('settings.update');
     Route::post('/settings/integrations/{integration}/sync', [SettingsController::class, 'syncIntegration'])->name('settings.integrations.sync');
     Route::post('/settings/integrations/instagram', [SettingsController::class, 'connectInstagram'])->name('settings.integrations.instagram.connect');
+    Route::post('/settings/integrations/shopify', [SettingsController::class, 'connectShopify'])->name('settings.integrations.shopify.connect');
+    Route::post('/settings/integrations/shopify/revoke', [SettingsController::class, 'disconnectShopify'])->name('settings.integrations.shopify.revoke');
+    Route::post('/settings/integrations/mailchimp', [SettingsController::class, 'connectMailchimp'])->name('settings.integrations.mailchimp.connect');
+    Route::post('/settings/integrations/mailchimp/revoke', [SettingsController::class, 'disconnectMailchimp'])->name('settings.integrations.mailchimp.revoke');
 
     // Meta publishing OAuth (Instagram/Facebook) — distinct from the
     // Instagram *observation* integration above, which uses a manually
