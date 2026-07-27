@@ -110,8 +110,8 @@ function logout(): void {
     <!-- Mobile top bar -->
     <div class="lg:hidden flex items-center justify-between px-4 h-14 bg-[var(--color-surface-nav)] border-b border-[var(--color-border)] shadow-[var(--shadow-card)]">
       <div class="flex items-center gap-2">
-        <span class="size-7 rounded-[var(--radius-sm)] bg-[var(--color-accent-50)] text-[var(--color-accent-700)] grid place-items-center text-sm font-bold border border-[var(--color-accent-200)]">A</span>
-        <span class="font-semibold text-[var(--color-text-primary)]">Atlas</span>
+        <span class="size-7 rounded-[var(--radius-sm)] bg-[var(--color-accent-50)] text-[var(--color-accent-700)] grid place-items-center text-sm font-bold border border-[var(--color-accent-200)]">C</span>
+        <span class="font-semibold text-[var(--color-text-primary)]">The Clear Move</span>
       </div>
       <button
         class="p-2 rounded-[var(--radius-sm)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)] transition-colors duration-[var(--duration-fast)]"
@@ -143,9 +143,9 @@ function logout(): void {
       <!-- Logo -->
       <div class="border-b border-[var(--color-border)] shrink-0 px-4 py-4">
         <div class="flex items-center gap-3">
-          <span class="size-9 rounded-[var(--radius-sm)] bg-[var(--color-accent-50)] text-[var(--color-accent-700)] grid place-items-center text-base font-bold border border-[var(--color-accent-200)] shadow-[var(--shadow-xs)]">A</span>
+          <span class="size-9 rounded-[var(--radius-sm)] bg-[var(--color-accent-50)] text-[var(--color-accent-700)] grid place-items-center text-base font-bold border border-[var(--color-accent-200)] shadow-[var(--shadow-xs)]">C</span>
           <div class="min-w-0">
-            <span class="block font-semibold text-lg text-[var(--color-text-primary)] tracking-tight leading-none">Atlas</span>
+            <span class="block font-semibold text-lg text-[var(--color-text-primary)] tracking-tight leading-none">The Clear Move</span>
             <span class="block text-[0.6875rem] font-medium uppercase tracking-[0.18em] text-[var(--color-text-muted)] whitespace-nowrap">Marketing OS</span>
           </div>
         </div>

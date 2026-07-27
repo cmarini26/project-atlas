@@ -42,7 +42,7 @@ watch(isMenuOpen, async (open) => {
   >
     <nav aria-label="Main navigation" class="mx-auto max-w-[1280px] px-4 sm:px-8 h-16 flex items-center justify-between">
       <Link href="/" class="text-heading-2 font-semibold text-[var(--color-text-primary)] tracking-tight">
-        Atlas
+        The Clear Move
       </Link>
 
       <ul class="hidden lg:flex items-center gap-8">
@@ -86,7 +86,7 @@ watch(isMenuOpen, async (open) => {
     aria-label="Main navigation"
   >
     <div class="flex items-center justify-between h-16 px-4 sm:px-8">
-      <span class="text-heading-2 font-semibold text-[var(--color-text-primary)]">Atlas</span>
+      <span class="text-heading-2 font-semibold text-[var(--color-text-primary)]">The Clear Move</span>
       <button
         type="button"
         class="inline-flex items-center justify-center size-10 rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)]"

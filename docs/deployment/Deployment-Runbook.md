@@ -14,7 +14,7 @@ Verify these exist and are reachable **before** starting — this runbook deploy
 - [ ] A real, non-`.env.example` `.env` file already exists at the deploy path, `chmod 600`, matching [Environment-Variables.md](Environment-Variables.md)'s Required section (§1 below is a quick-reference, not a replacement for that document).
 - [ ] `psql`/`redis-cli` from the app server can reach the real production database/Redis — confirmed reachable, not assumed.
 - [ ] [`infrastructure/supervisor/atlas-worker.conf`](../../infrastructure/supervisor/atlas-worker.conf) and [`infrastructure/cron/atlas-scheduler`](../../infrastructure/cron/atlas-scheduler) are already installed from a prior deploy (first-deploy-only setup — see §6/§7 below if this is genuinely the first deploy ever).
-- [ ] You know which git ref (branch/tag/commit SHA) you're deploying, and it has already passed `.github/workflows/ci.yml` (Pint → PHPStan → PHPUnit) on `main`. **This repo has no CD/deploy automation today** — there is no pipeline that does this for you; see §9.
+- [ ] You know which git ref (branch/tag/commit SHA) you're deploying. Normal production deployments are automated by `.github/workflows/deploy-production.yml` after `.github/workflows/ci.yml` succeeds on `main`; see §9 for setup and manual-dispatch details.
 
 ## 1. Required environment/config assumptions (quick reference)
 
@@ -92,7 +92,7 @@ php artisan view:cache
 Then reload PHP-FPM so already-running workers/web processes pick up the new cached config:
 
 ```bash
-sudo systemctl reload php8.3-fpm   # exact unit name is hosting-dependent — see §9
+sudo systemctl reload php8.3-fpm   # exact unit name is hosting-dependent — see §10
 ```
 
 ### Verification — §4
@@ -142,7 +142,7 @@ Run every item below, in order, before considering the deploy complete:
 
 ## 8. Rollback / failure-handling
 
-**No automated rollback pipeline exists** (see §9) — every rollback below is a manual, deliberate action.
+**No automated rollback pipeline exists** (see §9) — deployments are automated, but every rollback below remains a manual, deliberate action.
 
 ### Application code rollback
 
@@ -168,11 +168,43 @@ php artisan migrate:rollback   # reverses the most recently-run batch only
 3. Do not run `queue:restart` until the code is in a known-good state — restarting workers into a broken deploy just makes broken code run faster.
 4. Once fixed (either forward-fixed or rolled back), re-run §3–§7 in full before `php artisan up`.
 
-## 9. Remaining blockers to a truly repeatable deploy
+## 9. GitHub Actions production deployment
+
+`.github/workflows/deploy-production.yml` deploys the exact commit that passed CI after a successful `CI` workflow run on `main`. It can also be started manually with **Actions → Deploy Production → Run workflow**, supplying a branch, tag, or commit SHA.
+
+The workflow:
+
+1. installs locked production Composer dependencies and builds locked frontend dependencies;
+2. packages the release and transfers it over host-key-verified SSH;
+3. puts Laravel into maintenance mode;
+4. synchronizes code while preserving the production `.env`, runtime storage, and public storage link;
+5. runs migrations, rebuilds Laravel caches, reloads PHP-FPM, and gracefully restarts queue workers;
+6. restores normal service and verifies `/api/live`, `/api/ready`, and `/api/health`.
+
+Create a protected GitHub Environment named `production`, optionally requiring approval, and add these repository or environment secrets:
+
+| Secret | Value |
+|---|---|
+| `PRODUCTION_SSH_HOST` | EC2 hostname or Elastic IP |
+| `PRODUCTION_SSH_USER` | SSH login user (`ubuntu` for the current server) |
+| `PRODUCTION_SSH_KEY` | Private key whose public key is authorized on the server |
+| `PRODUCTION_KNOWN_HOSTS` | Complete trusted `known_hosts` line for the production host |
+
+Generate the host-key value from a trusted machine and compare its fingerprint with the server before saving it:
+
+```bash
+ssh-keyscan -H <production-host>
+```
+
+The SSH user must retain passwordless `sudo` for the commands used by `infrastructure/deploy/deploy-production.sh`. The current deployment expects `/var/www/atlas`, `www-data`, the `deploy` group owner, Supervisor's `atlas-worker-*` programs, and the `php8.5-fpm` systemd service.
+
+Manual dispatch bypasses the CI-success trigger and should be reserved for deliberate redeploys or incident recovery. Protecting the `production` Environment with required reviewers provides the approval gate for both automatic and manual runs.
+
+## 10. Remaining blockers to a mature deployment platform
 
 Called out explicitly, per this ticket's own request — these are real gaps, not resolved by this document:
 
-- **No deploy automation exists at all.** `.github/workflows/ci.yml` is test-only (Pint → PHPStan → PHPUnit); there is no Dockerfile, `Envoy.blade.php`, or CD workflow anywhere in the repo. Every step in this runbook is a manual SSH session today. This is Blocker 7's own documented, still-open scope (see [Critical-Production-Blockers.md](../plans/Critical-Production-Blockers.md)) — a real follow-on project, not something this document can complete by writing more steps.
+- **No automated rollback exists.** The production workflow deliberately stops on a failed migration or health check and brings Laravel out of maintenance mode, but it does not reverse database migrations or guess which prior application revision is schema-compatible. Use §8 to choose and deploy a known-good SHA deliberately.
 - **The exact PHP-FPM reload command (§4) is hosting-dependent** — `systemctl reload php8.3-fpm` assumes systemd and a specific PHP version unit name; a managed platform (e.g. Forge) has its own equivalent. This document can't give a single correct command independent of the hosting choice made in [Customer-1-Launch-Runbook.md](../ops/Customer-1-Launch-Runbook.md) Phase 1.
 - **No zero-downtime/blue-green deploy story.** `php artisan down` (§3/§8) is a real maintenance window, however brief — there is currently no mechanism to deploy a new release alongside the old one and cut over without one. Acceptable at Customer-1 scale; worth revisiting before a public, self-serve launch.
 - **`queue:restart` relies on Supervisor's `autorestart=true` to actually bring workers back** — confirmed configured in `atlas-worker.conf`, but if Supervisor itself isn't running (rare, but possible after a server-level incident), `queue:restart` alone does nothing observable; §5's verification checklist is what actually catches this, not the restart command's own exit code (it always reports success — it only sets a cache flag workers check on their next loop).

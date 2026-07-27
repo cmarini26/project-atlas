@@ -5,6 +5,7 @@ import { useProductTour } from '@/composables/useProductTour'
 const { state, steps, nextStep, prevStep, completeTour } = useProductTour()
 
 const targetRect = ref<DOMRect | null>(null)
+const card = ref<HTMLDivElement | null>(null)
 let resizeTimer: ReturnType<typeof setTimeout> | null = null
 
 const currentStep = computed(() => steps[state.currentStepIndex] ?? null)
@@ -37,6 +38,7 @@ watch(
 )
 
 onMounted(() => {
+  measureTarget()
   window.addEventListener('resize', onReposition)
   window.addEventListener('scroll', onReposition, true)
 })
@@ -48,10 +50,33 @@ onBeforeUnmount(() => {
 })
 
 const cardStyle = computed(() => {
-  if (!targetRect.value) return { top: '1rem', left: '1rem' }
+  const viewportMargin = 16
+  const targetGap = 12
+  const viewportWidth = window.innerWidth
+  const viewportHeight = window.innerHeight
+  const cardWidth = Math.min(320, viewportWidth - viewportMargin * 2)
+  const cardHeight = Math.min(
+    card.value?.getBoundingClientRect().height || 208,
+    viewportHeight - viewportMargin * 2,
+  )
 
-  const top = targetRect.value.bottom + window.scrollY + 12
-  const left = Math.max(16, targetRect.value.left + window.scrollX)
+  if (!targetRect.value) {
+    return { top: `${viewportMargin}px`, left: `${viewportMargin}px` }
+  }
+
+  const availableBelow = viewportHeight - targetRect.value.bottom - targetGap - viewportMargin
+  const availableAbove = targetRect.value.top - targetGap - viewportMargin
+  const preferredTop = availableBelow >= cardHeight || availableBelow >= availableAbove
+    ? targetRect.value.bottom + targetGap
+    : targetRect.value.top - targetGap - cardHeight
+  const top = Math.min(
+    Math.max(viewportMargin, preferredTop),
+    Math.max(viewportMargin, viewportHeight - viewportMargin - cardHeight),
+  )
+  const left = Math.min(
+    Math.max(viewportMargin, targetRect.value.left),
+    Math.max(viewportMargin, viewportWidth - viewportMargin - cardWidth),
+  )
 
   return { top: `${top}px`, left: `${left}px` }
 })
@@ -63,7 +88,8 @@ const cardStyle = computed(() => {
       <div class="absolute inset-0 bg-[var(--color-surface-overlay)] opacity-40" aria-hidden="true" />
 
       <div
-        class="absolute w-full max-w-xs bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl shadow-lg p-5"
+        ref="card"
+        class="absolute w-[calc(100%-2rem)] max-w-xs max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl shadow-lg p-5"
         :style="cardStyle"
       >
         <p class="text-xs text-[var(--color-text-muted)] mb-2">{{ state.currentStepIndex + 1 }} of {{ steps.length }}</p>

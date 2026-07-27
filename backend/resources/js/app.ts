@@ -3,7 +3,7 @@ import { createInertiaApp } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 
 createInertiaApp({
-    title: (title) => (title ? `${title} — Atlas` : 'Atlas'),
+    title: (title) => (title ? `${title} — The Clear Move` : 'The Clear Move'),
     resolve: (name) =>
         resolvePageComponent(`./Pages/${name}.vue`, import.meta.glob('./Pages/**/*.vue')),
     setup({ el, App, props, plugin }) {

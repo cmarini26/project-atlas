@@ -20,10 +20,10 @@ import MarketingFooter from '@/Components/Marketing/MarketingFooter.vue'
 
 <template>
   <Head>
-    <title>Atlas — AI Marketing for Independent Businesses</title>
+    <title>The Clear Move — AI Marketing for Independent Businesses</title>
     <meta
       name="description"
-      content="Atlas connects to your business, builds a living model of what you sell, and recommends the right campaign at the right moment — with a full explanation of why. You approve it. Atlas handles the rest."
+      content="The Clear Move connects to your business, builds a living model of what you sell, and recommends the right campaign at the right moment — with a full explanation of why. You approve it. The Clear Move handles the rest."
     />
   </Head>
 
