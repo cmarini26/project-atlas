@@ -86,7 +86,7 @@ curl --fail --silent --show-error --retry 5 --retry-delay 3 \
     "${APP_URL}/api/ready" >/dev/null
 
 for worker in high ai default observations maintenance; do
-    supervisorctl status "atlas-worker-${worker}:*" | grep -q RUNNING
+    supervisorctl status "atlas-worker-${worker}" | grep -q RUNNING
 done
 
 printf 'Successfully deployed %s to %s\n' "$RELEASE_SHA" "$APP_URL"
