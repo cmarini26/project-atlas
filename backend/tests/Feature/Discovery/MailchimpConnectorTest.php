@@ -3,7 +3,6 @@
 namespace Tests\Feature\Discovery;
 
 use App\Enums\EmailConsentStatus;
-use App\Enums\EmailContactStatus;
 use App\Models\Company;
 use App\Models\EmailAudience;
 use App\Models\EmailContact;

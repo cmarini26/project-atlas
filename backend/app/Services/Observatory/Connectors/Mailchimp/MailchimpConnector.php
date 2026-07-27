@@ -8,11 +8,12 @@ use App\Models\EmailAudience;
 use App\Models\EmailContact;
 use App\Models\Integration;
 use App\Services\Observatory\Connectors\ConnectorResult;
+use App\Services\Observatory\Connectors\Contracts\Connector;
 use App\Services\Publishing\Email\EmailAudienceService;
 use DateTimeImmutable;
 use Illuminate\Support\Collection;
 
-class MailchimpConnector implements \App\Services\Observatory\Connectors\Contracts\Connector
+class MailchimpConnector implements Connector
 {
     public function __construct(
         private readonly MailchimpApiClient $client,

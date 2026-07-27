@@ -81,7 +81,7 @@ class SendGridEmailProvider implements EmailProvider
     }
 
     /**
-     * @param array<string, mixed> $body
+     * @param  array<string, mixed>  $body
      * @return array{body: array<string, mixed>, headers: array<string, string>}
      */
     private function request(string $method, string $path, ChannelCredentials $credentials, array $body = []): array

@@ -7,7 +7,6 @@ use App\Models\Integration;
 use App\Services\Observatory\Connectors\ConnectorResult;
 use App\Services\Observatory\Connectors\Shopify\ShopifyApiClient;
 use App\Services\Observatory\Connectors\Shopify\ShopifyConnector;
-use DateTimeImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Tests\TestCase;

@@ -86,8 +86,8 @@ class TwilioSmsProvider implements SmsProvider
     }
 
     /**
-     * @param array{account_sid: string, auth_token: string} $credentials
-     * @param array<string, mixed> $options
+     * @param  array{account_sid: string, auth_token: string}  $credentials
+     * @param  array<string, mixed>  $options
      * @return array<string, mixed>
      */
     private function request(string $method, string $path, array $credentials, array $options = []): array

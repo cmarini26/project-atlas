@@ -25,8 +25,7 @@ class SmsChannelService
         string $authToken,
         string $fromNumber,
         ?string $toNumber = null,
-    ): PingResult
-    {
+    ): PingResult {
         $candidateCredentials = new ChannelCredentials([
             'company_id' => $company->id,
             'channel_type' => 'sms',

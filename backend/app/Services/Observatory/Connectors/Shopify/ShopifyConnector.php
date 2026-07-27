@@ -4,10 +4,11 @@ namespace App\Services\Observatory\Connectors\Shopify;
 
 use App\Models\Integration;
 use App\Services\Observatory\Connectors\ConnectorResult;
+use App\Services\Observatory\Connectors\Contracts\Connector;
 use DateTimeImmutable;
 use Illuminate\Support\Collection;
 
-class ShopifyConnector implements \App\Services\Observatory\Connectors\Contracts\Connector
+class ShopifyConnector implements Connector
 {
     public function __construct(
         private readonly ShopifyApiClient $client,

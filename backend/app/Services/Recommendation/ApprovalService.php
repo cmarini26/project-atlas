@@ -30,8 +30,7 @@ class ApprovalService
         User $user,
         ?string $notes = null,
         ?array $selectedContentAssetIds = null,
-    ): Approval
-    {
+    ): Approval {
         if ($recommendation->status !== 'pending') {
             throw new InvalidArgumentException(
                 "Cannot approve recommendation with status: {$recommendation->status}"
