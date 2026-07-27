@@ -50,7 +50,10 @@ class ShopifyApiClient
         return $data['products'];
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * @param  array<string, mixed>  $query
+     * @return array<string, mixed>
+     */
     private function request(string $shopDomain, string $adminApiToken, string $path, array $query = []): array
     {
         $baseUrl = sprintf('https://%s/admin/api/%s/%s', $this->normalizeShopDomain($shopDomain), $this->apiVersion, ltrim($path, '/'));

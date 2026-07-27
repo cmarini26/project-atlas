@@ -4,6 +4,7 @@ namespace App\Services\Observatory\Connectors\Mailchimp;
 
 use App\Enums\EmailConsentStatus;
 use App\Enums\EmailContactSource;
+use App\Models\Company;
 use App\Models\EmailAudience;
 use App\Models\EmailContact;
 use App\Models\Integration;
@@ -12,6 +13,7 @@ use App\Services\Observatory\Connectors\Contracts\Connector;
 use App\Services\Publishing\Email\EmailAudienceService;
 use DateTimeImmutable;
 use Illuminate\Support\Collection;
+use LogicException;
 
 class MailchimpConnector implements Connector
 {
@@ -28,14 +30,19 @@ class MailchimpConnector implements Connector
     /** @return Collection<int, ConnectorResult> */
     public function sync(Integration $integration): Collection
     {
+        $company = $integration->company;
+
+        if ($company === null) {
+            throw new LogicException('A Mailchimp integration must belong to a company before it can sync.');
+        }
+
         $serverPrefix = (string) ($integration->config['server_prefix'] ?? '');
         $apiKey = (string) ($integration->config['api_key'] ?? '');
         $audienceId = (string) ($integration->config['audience_id'] ?? '');
 
         $audiencePayload = $this->client->fetchAudience($serverPrefix, $apiKey, $audienceId);
         $members = $this->client->fetchMembers($serverPrefix, $apiKey, $audienceId);
-        $company = $integration->company;
-        $atlasAudience = $this->resolveAtlasAudience($integration, (string) $audiencePayload['name']);
+        $atlasAudience = $this->resolveAtlasAudience($integration, $company, (string) $audiencePayload['name']);
         $syncedContactIds = [];
         $imported = 0;
         $nonSendable = 0;
@@ -102,10 +109,12 @@ class MailchimpConnector implements Connector
         ]);
     }
 
-    private function resolveAtlasAudience(Integration $integration, string $mailchimpAudienceName): EmailAudience
-    {
+    private function resolveAtlasAudience(
+        Integration $integration,
+        Company $company,
+        string $mailchimpAudienceName,
+    ): EmailAudience {
         $existingId = $integration->config['atlas_audience_id'] ?? null;
-        $company = $integration->company;
 
         if (is_string($existingId) && $existingId !== '') {
             $existing = EmailAudience::withoutGlobalScopes()

@@ -58,7 +58,10 @@ class MailchimpApiClient
         return $members;
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * @param  array<string, mixed>  $query
+     * @return array<string, mixed>
+     */
     private function request(string $serverPrefix, string $apiKey, string $path, array $query = []): array
     {
         $baseUrl = sprintf('https://%s.api.mailchimp.com/3.0/%s', trim($serverPrefix), ltrim($path, '/'));

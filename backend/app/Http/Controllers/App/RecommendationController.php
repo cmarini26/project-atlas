@@ -268,11 +268,18 @@ class RecommendationController extends Controller
             return null;
         }
 
-        $selected = collect($validated['selected_content_asset_ids'] ?? [])
-            ->map(fn (mixed $id): string => (string) $id)
-            ->unique()
-            ->values()
-            ->all();
+        $rawSelected = $validated['selected_content_asset_ids'];
+
+        if ($rawSelected === null) {
+            return null;
+        }
+
+        abort_unless(is_array($rawSelected), 422);
+
+        $selected = array_values(array_unique(array_map(
+            fn (mixed $id): string => (string) $id,
+            $rawSelected,
+        )));
 
         if ($recommendation->campaign_id === null) {
             return $selected;

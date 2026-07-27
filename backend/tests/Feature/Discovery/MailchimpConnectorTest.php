@@ -11,6 +11,7 @@ use App\Services\Observatory\Connectors\Mailchimp\MailchimpApiClient;
 use App\Services\Observatory\Connectors\Mailchimp\MailchimpConnector;
 use App\Services\Publishing\Email\EmailAudienceService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use LogicException;
 use Mockery;
 use Tests\TestCase;
 
@@ -96,5 +97,21 @@ class MailchimpConnectorTest extends TestCase
 
         $this->assertTrue($connector->supports($mailchimp));
         $this->assertFalse($connector->supports($instagram));
+    }
+
+    public function test_sync_rejects_an_integration_without_a_company(): void
+    {
+        $connector = new MailchimpConnector(Mockery::mock(MailchimpApiClient::class), app(EmailAudienceService::class));
+        $integration = Integration::withoutGlobalScopes()->make([
+            'type' => 'mailchimp',
+            'name' => 'Mailchimp',
+            'config' => ['server_prefix' => 'us14', 'api_key' => 'key', 'audience_id' => 'aud'],
+            'status' => 'active',
+        ]);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('must belong to a company');
+
+        $connector->sync($integration);
     }
 }

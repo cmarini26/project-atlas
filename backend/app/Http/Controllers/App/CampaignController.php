@@ -270,11 +270,13 @@ class CampaignController extends Controller
             'selected_content_asset_ids.*' => ['string'],
         ]);
 
-        $selected = collect($validated['selected_content_asset_ids'])
-            ->map(fn (mixed $id): string => (string) $id)
-            ->unique()
-            ->values()
-            ->all();
+        $rawSelected = $validated['selected_content_asset_ids'];
+        abort_unless(is_array($rawSelected), 422);
+
+        $selected = array_values(array_unique(array_map(
+            fn (mixed $id): string => (string) $id,
+            $rawSelected,
+        )));
 
         $validAssetIds = ContentAsset::withoutGlobalScopes()
             ->where('campaign_id', $campaign->id)
