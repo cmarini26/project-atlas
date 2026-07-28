@@ -17,6 +17,7 @@ use App\Http\Controllers\App\OpportunityController;
 use App\Http\Controllers\App\ProductTourController;
 use App\Http\Controllers\App\PublishingController;
 use App\Http\Controllers\App\RecommendationController;
+use App\Http\Controllers\App\SourceAssetController;
 use App\Http\Controllers\App\SettingsController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\PasswordResetController;
@@ -80,6 +81,12 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::get('/brain', [BusinessBrainController::class, 'index'])->name('brain');
+
+    Route::get('/assets', [SourceAssetController::class, 'index'])->name('assets.index');
+    Route::post('/assets', [SourceAssetController::class, 'store'])->name('assets.store');
+    Route::put('/assets/{sourceAsset}', [SourceAssetController::class, 'update'])->name('assets.update');
+    Route::post('/assets/{sourceAsset}/retry', [SourceAssetController::class, 'retry'])->name('assets.retry');
+    Route::delete('/assets/{sourceAsset}', [SourceAssetController::class, 'destroy'])->name('assets.destroy');
 
     Route::get('/marketing-health', [MarketingHealthController::class, 'index'])->name('marketing-health');
 

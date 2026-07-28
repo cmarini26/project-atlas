@@ -13,7 +13,7 @@ import Card from '@/Components/UI/Card.vue'
 import PageHeader from '@/Components/UI/PageHeader.vue'
 import ChannelCapabilityBadge from '@/Components/UI/ChannelCapabilityBadge.vue'
 import { channelLabel } from '@/lib/channelCapability'
-import { ArrowLeftIcon, SparklesIcon } from '@heroicons/vue/24/outline'
+import { ArrowLeftIcon, LinkIcon, RectangleStackIcon, SparklesIcon } from '@heroicons/vue/24/outline'
 import type { Recommendation, DecisionDetail, ContentAsset, ChannelMix } from '@/types'
 
 // Persistent layout: the sidebar/toast shell survives Inertia visits.
@@ -25,6 +25,13 @@ const props = defineProps<{
   channel_mix: ChannelMix
   content_assets: ContentAsset[]
   selected_content_asset_ids: string[]
+  source_asset: {
+    id: string
+    type: string
+    title: string
+    description: string | null
+    source_url: string | null
+  } | null
 }>()
 
 const editingAsset = ref<ContentAsset | null>(null)
@@ -153,6 +160,22 @@ function saveEdit(payload: { title: string; body: string }): void {
 
     <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div class="space-y-6">
+        <Card v-if="source_asset" class="border-[var(--color-accent-200)]">
+          <div class="flex items-start gap-3">
+            <div class="rounded-[var(--radius-sm)] bg-[var(--color-accent-50)] p-2 text-[var(--color-accent-700)]">
+              <RectangleStackIcon class="size-5" />
+            </div>
+            <div class="min-w-0">
+              <p class="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">Recommended from your Asset Library</p>
+              <p class="mt-1 text-sm font-semibold text-[var(--color-text-primary)]">{{ source_asset.title }}</p>
+              <p v-if="source_asset.description" class="mt-1 text-sm text-[var(--color-text-secondary)]">{{ source_asset.description }}</p>
+              <a v-if="source_asset.source_url" :href="source_asset.source_url" target="_blank" rel="noopener noreferrer" class="mt-2 inline-flex items-center gap-1 text-sm text-[var(--color-text-link)] hover:underline">
+                <LinkIcon class="size-4" /> View original source
+              </a>
+            </div>
+          </div>
+        </Card>
+
         <Card v-if="isPending && content_assets.length > 0" padding="none" class="overflow-hidden">
           <div class="bg-[var(--color-surface-panel)] px-5 py-4 border-b border-[var(--color-border)]">
             <h2 class="text-sm font-semibold text-[var(--color-text-primary)]">Delivery channels</h2>

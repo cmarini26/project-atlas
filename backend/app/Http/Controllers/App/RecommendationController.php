@@ -9,6 +9,7 @@ use App\Models\CompanyMembership;
 use App\Models\ContentAsset;
 use App\Models\MarketingChannel;
 use App\Models\Recommendation;
+use App\Models\SourceAsset;
 use App\Models\User;
 use App\Services\Campaign\CampaignChannelSelectionService;
 use App\Services\Recommendation\ApprovalService;
@@ -59,7 +60,7 @@ class RecommendationController extends Controller
 
         abort_if($recommendation->company_id !== $company->id, 404);
 
-        $recommendation->load(['decision', 'campaign.contentAssets.channel']);
+        $recommendation->load(['decision.opportunity.subject', 'campaign.contentAssets.channel']);
 
         $contentAssets = $recommendation->campaign !== null ? $recommendation->campaign->contentAssets : collect();
 
@@ -84,6 +85,7 @@ class RecommendationController extends Controller
                 'campaign_type' => $recommendation->campaign->campaign_type,
                 'status' => $recommendation->campaign->status,
             ] : null,
+            'source_asset' => $this->sourceAssetFor($recommendation),
             'channel_mix' => $this->channelMixPresenter->present($company, $recommendation->decision),
             'selected_content_asset_ids' => $contentAssets
                 ->filter(fn (ContentAsset $asset): bool => $asset->status !== 'archived')
@@ -246,6 +248,26 @@ class RecommendationController extends Controller
             'decision' => $r->relationLoaded('decision') && $r->decision ? [
                 'confidence_score' => $r->decision->confidence_score ?? 0,
             ] : null,
+        ];
+    }
+
+    /** @return array<string, mixed>|null */
+    private function sourceAssetFor(Recommendation $recommendation): ?array
+    {
+        $opportunity = $recommendation->decision?->opportunity;
+
+        if ($opportunity?->subject_type !== 'source_asset' || ! $opportunity->subject instanceof SourceAsset) {
+            return null;
+        }
+
+        $asset = $opportunity->subject;
+
+        return [
+            'id' => $asset->id,
+            'type' => $asset->type,
+            'title' => $asset->title,
+            'description' => $asset->description,
+            'source_url' => $asset->source_url,
         ];
     }
 

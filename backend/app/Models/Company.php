@@ -105,6 +105,12 @@ class Company extends Model
         return $this->hasMany(Observation::class);
     }
 
+    /** @return HasMany<SourceAsset, $this> */
+    public function sourceAssets(): HasMany
+    {
+        return $this->hasMany(SourceAsset::class);
+    }
+
     /** @return HasMany<Fact, $this> */
     public function facts(): HasMany
     {

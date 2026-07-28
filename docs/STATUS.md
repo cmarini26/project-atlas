@@ -34,6 +34,17 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
+**SCRUM-54 — Customer Asset Library and campaign provenance ✅ Implemented locally**
+*Completed locally: 2026-07-27*
+
+Customers can now add tenant-scoped products/services, promotions/events, photos/videos, documents/case studies, webpages/blog posts, and brand materials from a new `/app/assets` Asset Library. Optional source URLs, uploads, timing, descriptions, and metadata are preserved as customer-owned `SourceAsset` records, deliberately separate from Atlas-generated campaign `ContentAsset` records.
+
+Each new source is recorded as an idempotent manual Observation, analyzed deterministically into provenance-preserving Business Brain Facts, and converted into a deduplicated Opportunity that continues through Atlas's existing Decision → Campaign → Recommendation workflow. External publishing remains approval-gated. Recommendation review now identifies the originating source asset, and failed analysis can be retried from the library.
+
+Verification: 45 relevant PHP tests passed (162 assertions), including tenant isolation, CRUD, duplicate submission, analyst resolution, fact provenance, opportunity deduplication, and the existing observation/recommendation suites. `npm run build` passed. The full Vitest run still has 15 failures in pre-existing approval/campaign specs caused by missing props and stale dialog expectations; none involve this slice.
+
+**Previous milestone:**
+
 **Production-Readiness Gap Plan — Shopify observation + Mailchimp audience-sync connectors ✅ Implemented locally, pending live-account validation**
 *Completed locally: 2026-07-23*
 

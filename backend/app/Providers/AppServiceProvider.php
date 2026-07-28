@@ -23,6 +23,7 @@ use App\Events\ObservationRecorded;
 use App\Events\OpportunityDetected;
 use App\Events\RecommendationApproved;
 use App\Events\RecommendationCreated;
+use App\Listeners\CreateSourceAssetOpportunity;
 use App\Listeners\DispatchCampaignPreparation;
 use App\Listeners\DispatchObservationProcessing;
 use App\Listeners\ScheduleMetricRetrieval;
@@ -36,8 +37,10 @@ use App\Listeners\UpdateDiscoveryConnectorAttempt;
 use App\Models\Catalog;
 use App\Models\CatalogItem;
 use App\Models\Company;
+use App\Models\SourceAsset;
 use App\Services\Analyst\AnalystRegistry;
 use App\Services\Analyst\InstagramAnalyst;
+use App\Services\Analyst\SourceAssetAnalyst;
 use App\Services\Analyst\WebsiteAnalyst;
 use App\Services\Analytics\AnalyticsProviderRegistry;
 use App\Services\Analytics\FakeAnalyticsProvider;
@@ -80,6 +83,7 @@ class AppServiceProvider extends ServiceProvider
             return new AnalystRegistry([
                 $app->make(WebsiteAnalyst::class),
                 $app->make(InstagramAnalyst::class),
+                $app->make(SourceAssetAnalyst::class),
             ]);
         });
 
@@ -120,6 +124,7 @@ class AppServiceProvider extends ServiceProvider
             'catalog_item' => CatalogItem::class,
             'catalog' => Catalog::class,
             'company' => Company::class,
+            'source_asset' => SourceAsset::class,
         ]);
 
         Event::listen(FactExtracted::class, function (FactExtracted $event): void {
@@ -138,6 +143,7 @@ class AppServiceProvider extends ServiceProvider
         // Opportunity scans run after every processed observation — not on the
         // one-time DigitalTwinActivated event — so re-crawls and retried
         // onboardings still reach opportunities → decisions → recommendations.
+        Event::listen(ObservationProcessed::class, CreateSourceAssetOpportunity::class);
         Event::listen(ObservationProcessed::class, TriggerOpportunityDetection::class);
         Event::listen(OpportunityDetected::class, TriggerDecisionEvaluation::class);
         Event::listen(DecisionCommitted::class, DispatchCampaignPreparation::class);
