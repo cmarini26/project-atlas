@@ -53,7 +53,7 @@ class ContentGenerationAnalyst implements Analyst
             type: $type,
             body: (string) ($data['body'] ?? ''),
             title: isset($data['title']) ? (string) $data['title'] : null,
-            media: $this->resolveMediaFallback($brain),
+            media: $this->resolveMediaFallback($campaign, $brain),
             metadata: isset($data['metadata']) && is_array($data['metadata']) ? $data['metadata'] : null,
             promptName: $prompt->name(),
             promptVersion: $prompt->version(),
@@ -69,8 +69,19 @@ class ContentGenerationAnalyst implements Analyst
      *
      * @return list<array{url: string}>|null
      */
-    private function resolveMediaFallback(BusinessBrain $brain): ?array
+    private function resolveMediaFallback(Campaign $campaign, BusinessBrain $brain): ?array
     {
+        if ($campaign->brief !== null) {
+            $source = $campaign->brief->sourceAssets()
+                ->whereNotNull('media_path')
+                ->where('media_mime_type', 'like', 'image/%')
+                ->first();
+
+            if ($source !== null && $source->media_path !== null) {
+                return [['url' => asset("storage/{$source->media_path}")]];
+            }
+        }
+
         /** @var Collection<int, Observation> $crawls */
         $crawls = $brain->recentObservations->where('source_type', 'crawl');
 

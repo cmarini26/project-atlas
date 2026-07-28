@@ -34,6 +34,7 @@ use App\Listeners\TriggerDecisionEvaluation;
 use App\Listeners\TriggerOpportunityDetection;
 use App\Listeners\TriggerRecommendationCreation;
 use App\Listeners\UpdateDiscoveryConnectorAttempt;
+use App\Models\CampaignBrief;
 use App\Models\Catalog;
 use App\Models\CatalogItem;
 use App\Models\Company;
@@ -125,6 +126,7 @@ class AppServiceProvider extends ServiceProvider
             'catalog' => Catalog::class,
             'company' => Company::class,
             'source_asset' => SourceAsset::class,
+            'campaign_brief' => CampaignBrief::class,
         ]);
 
         Event::listen(FactExtracted::class, function (FactExtracted $event): void {

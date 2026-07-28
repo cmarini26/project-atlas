@@ -23,7 +23,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 1328 tests (1325 passing, 3 skipped where the local environment can't support it) + 175 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Channel Capability Matrix truth-alignment pass (see Current Milestone below). |
+| Tests             | ✅ Strong | 1400 tests (1397 passing, 3 skipped where the local environment can't support it) + 195 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: SCRUM-62 custom campaign composer (see Current Milestone below). |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
@@ -33,6 +33,17 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 ---
 
 ## Current Milestone
+
+**SCRUM-62 — Customer-authored campaigns from Asset Library sources ✅ Implemented locally**
+*Completed locally: 2026-07-28*
+
+Customers can now deliberately compose a campaign from one or more ready Asset Library sources. The composer captures the title, objective, goal, audience, additional guidance, timing, and active delivery channels, then routes that customer-authored brief through Atlas's existing Decision → Campaign → Content Asset → Recommendation pipeline.
+
+The resulting recommendation review preserves the original brief and all selected source-asset provenance. Customers can inspect generated drafts and change the selected delivery channels before approval. The approval boundary remains unchanged: composing a campaign creates only draft content and a pending recommendation, with no execution or external publishing.
+
+Verification: `php artisan test` → 1397 passed, 3 skipped, 3936 assertions; `npm test -- --run` → 195 passed; `npm exec vue-tsc -- --noEmit` → passed; PHPStan level 8 → 0 errors; Pint → passed. The production bundle compiled successfully; Vite currently exits nonzero after compilation because Rolldown reports invalid pure-annotation positions in the installed `@vueuse/core` dependency.
+
+**Previous milestone:**
 
 **Overnight enhancement audit — SCRUM-55/56/57 quality gates ✅ Implemented locally**
 *Completed locally: 2026-07-28*

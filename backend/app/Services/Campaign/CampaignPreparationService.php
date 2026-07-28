@@ -6,6 +6,7 @@ use App\Domain\BusinessBrain\BusinessBrain;
 use App\Domain\Campaign\Exceptions\BlueprintGenerationFailedException;
 use App\Domain\Campaign\ValueObjects\CampaignBlueprint;
 use App\Models\Campaign;
+use App\Models\CampaignBrief;
 use App\Models\Decision;
 use App\Services\Analyst\CampaignPreparationAnalyst;
 
@@ -29,12 +30,18 @@ class CampaignPreparationService
         $channelIds = $decision->channel_ids ?? [];
         $channelCount = count($channelIds);
 
+        $brief = $decision->opportunity?->subject instanceof CampaignBrief
+            ? $decision->opportunity->subject
+            : null;
+
         $campaign = Campaign::create([
             'company_id' => $decision->company_id,
             'decision_id' => $decision->id,
+            'campaign_brief_id' => $brief?->id,
             'campaign_type' => $decision->campaign_type,
-            'title' => $this->deriveTitle($blueprint),
-            'target_audience' => $blueprint->audience,
+            'title' => $brief !== null ? $brief->title : $this->deriveTitle($blueprint),
+            'strategy' => $brief?->objective,
+            'target_audience' => $brief?->audience ?: $blueprint->audience,
             'positioning' => $blueprint->coreMessage,
             'call_to_action' => $blueprint->callToAction,
             'blueprint' => $blueprint->toArray(),
@@ -43,6 +50,8 @@ class CampaignPreparationService
             'expected_asset_count' => $channelCount,
             'generated_asset_count' => 0,
             'status' => 'draft',
+            'scheduled_start_at' => $brief?->starts_at,
+            'scheduled_end_at' => $brief?->ends_at,
         ]);
 
         return $campaign;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Head, useForm, router } from '@inertiajs/vue3'
+import { Head, Link, useForm, router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import AssetMediaPreview from '@/Components/Assets/AssetMediaPreview.vue'
 import Badge from '@/Components/UI/Badge.vue'
@@ -123,15 +123,24 @@ function dateLabel(value: string | null): string {
       :icon="RectangleStackIcon"
     >
       <template #actions>
-        <button
-          type="button"
-          class="inline-flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--color-accent-600)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-accent-700)]"
-          @click="showForm ? closeForm() : showForm = true"
-        >
-          <XMarkIcon v-if="showForm" class="size-4" />
-          <PlusIcon v-else class="size-4" />
-          {{ showForm ? 'Close' : 'Add asset' }}
-        </button>
+        <div class="flex flex-wrap gap-2">
+          <Link
+            v-if="assets.some((asset) => asset.status === 'ready')"
+            href="/app/campaigns/create"
+            class="inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-accent-300)] bg-white px-4 py-2 text-sm font-semibold text-[var(--color-accent-700)] hover:bg-[var(--color-accent-50)]"
+          >
+            Create campaign
+          </Link>
+          <button
+            type="button"
+            class="inline-flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--color-accent-600)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-accent-700)]"
+            @click="showForm ? closeForm() : showForm = true"
+          >
+            <XMarkIcon v-if="showForm" class="size-4" />
+            <PlusIcon v-else class="size-4" />
+            {{ showForm ? 'Close' : 'Add asset' }}
+          </button>
+        </div>
       </template>
     </PageHeader>
 
@@ -231,6 +240,9 @@ function dateLabel(value: string | null): string {
             <button class="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--color-text-link)]" @click="beginEdit(asset)">
               <PencilSquareIcon class="size-4" /> Edit
             </button>
+            <Link v-if="asset.status === 'ready'" :href="`/app/campaigns/create?asset_id=${asset.id}`" class="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--color-text-link)]">
+              Create campaign
+            </Link>
             <button v-if="asset.status === 'failed'" class="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--color-text-link)]" @click="retry(asset)">
               <ArrowPathIcon class="size-4" /> Retry
             </button>

@@ -5,6 +5,7 @@ use App\Http\Controllers\App\AnalyticsController;
 use App\Http\Controllers\App\BusinessBrainController;
 use App\Http\Controllers\App\CampaignController;
 use App\Http\Controllers\App\CompanySelectorController;
+use App\Http\Controllers\App\CustomCampaignController;
 use App\Http\Controllers\App\DashboardController;
 use App\Http\Controllers\App\EmailAudienceController;
 use App\Http\Controllers\App\FeedbackController;
@@ -102,6 +103,8 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
 
     // Campaigns
     Route::get('/campaigns', [CampaignController::class, 'index'])->name('campaigns.index');
+    Route::get('/campaigns/create', [CustomCampaignController::class, 'create'])->name('campaigns.create');
+    Route::post('/campaigns', [CustomCampaignController::class, 'store'])->name('campaigns.store');
     Route::get('/campaigns/{campaign}', [CampaignController::class, 'show'])->name('campaigns.show');
     Route::patch('/campaigns/{campaign}/channels', [CampaignController::class, 'selectChannels'])->name('campaigns.channels.select');
     Route::patch('/campaigns/{campaign}/email-audience', [CampaignController::class, 'selectEmailAudience'])->name('campaigns.email-audience.select');

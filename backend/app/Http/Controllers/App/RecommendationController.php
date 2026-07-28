@@ -4,6 +4,7 @@ namespace App\Http\Controllers\App;
 
 use App\Http\Controllers\Controller;
 use App\Models\Campaign;
+use App\Models\CampaignBrief;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\ContentAsset;
@@ -60,7 +61,11 @@ class RecommendationController extends Controller
 
         abort_if($recommendation->company_id !== $company->id, 404);
 
-        $recommendation->load(['decision.opportunity.subject', 'campaign.contentAssets.channel']);
+        $recommendation->load([
+            'decision.opportunity.subject',
+            'campaign.brief.sourceAssets',
+            'campaign.contentAssets.channel',
+        ]);
 
         $contentAssets = $recommendation->campaign !== null ? $recommendation->campaign->contentAssets : collect();
 
@@ -85,7 +90,8 @@ class RecommendationController extends Controller
                 'campaign_type' => $recommendation->campaign->campaign_type,
                 'status' => $recommendation->campaign->status,
             ] : null,
-            'source_asset' => $this->sourceAssetFor($recommendation),
+            'campaign_brief' => $this->campaignBriefFor($recommendation),
+            'source_assets' => $this->sourceAssetsFor($recommendation),
             'channel_mix' => $this->channelMixPresenter->present($company, $recommendation->decision),
             'selected_content_asset_ids' => $contentAssets
                 ->filter(fn (ContentAsset $asset): bool => $asset->status !== 'archived')
@@ -112,6 +118,24 @@ class RecommendationController extends Controller
                 ];
             })->values()->all(),
         ]);
+    }
+
+    /** @return array<string, mixed>|null */
+    private function campaignBriefFor(Recommendation $recommendation): ?array
+    {
+        $brief = $recommendation->campaign?->brief;
+
+        if (! $brief instanceof CampaignBrief) {
+            return null;
+        }
+
+        return [
+            'title' => $brief->title,
+            'goal' => $brief->goal,
+            'objective' => $brief->objective,
+            'audience' => $brief->audience,
+            'guidance' => $brief->guidance,
+        ];
     }
 
     public function approve(Request $request, Recommendation $recommendation): RedirectResponse
@@ -251,24 +275,29 @@ class RecommendationController extends Controller
         ];
     }
 
-    /** @return array<string, mixed>|null */
-    private function sourceAssetFor(Recommendation $recommendation): ?array
+    /** @return list<array<string, mixed>> */
+    private function sourceAssetsFor(Recommendation $recommendation): array
     {
         $opportunity = $recommendation->decision?->opportunity;
 
-        if ($opportunity?->subject_type !== 'source_asset' || ! $opportunity->subject instanceof SourceAsset) {
-            return null;
+        if ($opportunity?->subject instanceof SourceAsset) {
+            $assets = collect([$opportunity->subject]);
+        } elseif ($opportunity?->subject instanceof CampaignBrief) {
+            $assets = $opportunity->subject->sourceAssets;
+        } else {
+            return [];
         }
 
-        $asset = $opportunity->subject;
-
-        return [
-            'id' => $asset->id,
-            'type' => $asset->type,
-            'title' => $asset->title,
-            'description' => $asset->description,
-            'source_url' => $asset->source_url,
-        ];
+        return array_values($assets
+            ->map(fn (SourceAsset $asset): array => [
+                'id' => $asset->id,
+                'type' => $asset->type,
+                'title' => $asset->title,
+                'description' => $asset->description,
+                'source_url' => $asset->source_url,
+            ])
+            ->values()
+            ->all());
     }
 
     /**
