@@ -55,12 +55,18 @@ function formatDate(date: string | null): string {
       title="Campaigns"
       description="Track every campaign from draft to completion in one place."
       :icon="MegaphoneIcon"
-    />
+    >
+      <template #actions>
+        <Link href="/app/campaigns/create" class="rounded-[var(--radius-sm)] bg-[var(--color-accent-600)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-accent-700)]">
+          Create campaign
+        </Link>
+      </template>
+    </PageHeader>
 
     <EmptyState
       v-if="campaigns.data.length === 0"
       title="No campaigns yet"
-      description="Campaigns are created when you approve a recommendation."
+      description="Create a campaign from your Asset Library or review an Atlas recommendation."
       variant="accent"
     >
       <template #icon><MegaphoneIcon class="size-6" /></template>

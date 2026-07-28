@@ -6,8 +6,13 @@ use App\Services\Observatory\Connectors\ConnectorRegistry;
 use App\Services\Observatory\Connectors\Instagram\InstagramConnector;
 use App\Services\Observatory\Connectors\Instagram\InstagramMediaFetcher;
 use App\Services\Observatory\Connectors\Instagram\InstagramProfileFetcher;
+use App\Services\Observatory\Connectors\Mailchimp\MailchimpApiClient;
+use App\Services\Observatory\Connectors\Mailchimp\MailchimpConnector;
+use App\Services\Observatory\Connectors\Shopify\ShopifyApiClient;
+use App\Services\Observatory\Connectors\Shopify\ShopifyConnector;
 use App\Services\Observatory\Connectors\Website\WebPageCrawler;
 use App\Services\Observatory\Connectors\Website\WebsiteConnector;
+use App\Services\Publishing\Email\EmailAudienceService;
 use Illuminate\Support\ServiceProvider;
 
 class ConnectorServiceProvider extends ServiceProvider
@@ -33,6 +38,21 @@ class ConnectorServiceProvider extends ServiceProvider
                         connectTimeout: (int) config('instagram.connect_timeout', 5),
                     ),
                     mediaLimit: (int) config('instagram.media_limit', 20),
+                ),
+                new ShopifyConnector(
+                    new ShopifyApiClient(
+                        apiVersion: (string) config('shopify.api_version', '2025-04'),
+                        requestTimeout: (int) config('shopify.request_timeout', 10),
+                        connectTimeout: (int) config('shopify.connect_timeout', 5),
+                    ),
+                    productLimit: (int) config('shopify.product_limit', 25),
+                ),
+                new MailchimpConnector(
+                    new MailchimpApiClient(
+                        requestTimeout: (int) config('mailchimp.request_timeout', 10),
+                        connectTimeout: (int) config('mailchimp.connect_timeout', 5),
+                    ),
+                    $this->app->make(EmailAudienceService::class),
                 ),
             ]);
         });

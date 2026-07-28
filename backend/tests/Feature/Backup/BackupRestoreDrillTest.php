@@ -59,7 +59,19 @@ class BackupRestoreDrillTest extends TestCase
     protected function tearDown(): void
     {
         foreach ([$this->sourceDb, $this->targetDb] as $db) {
-            @Process::run(['dropdb', '--host=127.0.0.1', '--if-exists', $db]);
+            try {
+                Process::env($this->postgresClientEnv())
+                    ->timeout(10)
+                    ->run([
+                        'dropdb',
+                        '--host=127.0.0.1',
+                        '--username='.$this->dbUsername(),
+                        '--if-exists',
+                        $db,
+                    ]);
+            } catch (Throwable) {
+                // Cleanup is best-effort when PostgreSQL is unavailable.
+            }
         }
 
         foreach (glob($this->destinationDir.'/*') ?: [] as $file) {
@@ -76,24 +88,50 @@ class BackupRestoreDrillTest extends TestCase
             'DB_HOST' => '127.0.0.1',
             'DB_PORT' => '5432',
             'DB_DATABASE' => $database,
-            'DB_USERNAME' => (string) (getenv('DB_USERNAME') ?: get_current_user()),
-            'DB_PASSWORD' => '',
+            'DB_USERNAME' => $this->dbUsername(),
+            'DB_PASSWORD' => $this->dbPassword(),
         ];
+    }
+
+    private function dbUsername(): string
+    {
+        return (string) config('database.connections.pgsql.username', get_current_user());
+    }
+
+    private function dbPassword(): string
+    {
+        return (string) config('database.connections.pgsql.password', '');
+    }
+
+    /** @return array<string, string> */
+    private function postgresClientEnv(): array
+    {
+        return ['PGPASSWORD' => $this->dbPassword()];
     }
 
     public function test_a_full_backup_and_restore_drill_round_trips_data_correctly(): void
     {
         try {
-            $created = Process::run(['createdb', '--host=127.0.0.1', $this->sourceDb]);
+            $created = Process::env($this->postgresClientEnv())->run([
+                'createdb',
+                '--host=127.0.0.1',
+                '--username='.$this->dbUsername(),
+                $this->sourceDb,
+            ]);
             if (! $created->successful()) {
                 $this->markTestSkipped('Cannot create a scratch PostgreSQL database: '.$created->errorOutput());
             }
 
-            $seeded = Process::run([
-                'psql', '--host=127.0.0.1', '--dbname='.$this->sourceDb, '--quiet',
-                '-c', 'CREATE TABLE widgets (id serial primary key, name text);',
-                '-c', "INSERT INTO widgets (name) VALUES ('alpha'), ('beta');",
-            ]);
+            $seeded = Process::env($this->postgresClientEnv())
+                ->run([
+                    'psql',
+                    '--host=127.0.0.1',
+                    '--username='.$this->dbUsername(),
+                    '--dbname='.$this->sourceDb,
+                    '--quiet',
+                    '-c', 'CREATE TABLE widgets (id serial primary key, name text);',
+                    '-c', "INSERT INTO widgets (name) VALUES ('alpha'), ('beta');",
+                ]);
             if (! $seeded->successful()) {
                 $this->markTestSkipped('Cannot seed the scratch database: '.$seeded->errorOutput());
             }
@@ -115,7 +153,12 @@ class BackupRestoreDrillTest extends TestCase
             $verify = Process::run(['bash', $this->verifyScript, $dumpFile]);
             $this->assertTrue($verify->successful(), 'Expected the verify script to confirm the dump is intact: '.$verify->errorOutput());
 
-            $createdTarget = Process::run(['createdb', '--host=127.0.0.1', $this->targetDb]);
+            $createdTarget = Process::env($this->postgresClientEnv())->run([
+                'createdb',
+                '--host=127.0.0.1',
+                '--username='.$this->dbUsername(),
+                $this->targetDb,
+            ]);
             if (! $createdTarget->successful()) {
                 $this->markTestSkipped('Cannot create the scratch restore-target database: '.$createdTarget->errorOutput());
             }
@@ -130,10 +173,16 @@ class BackupRestoreDrillTest extends TestCase
                 );
             }
 
-            $rowCount = Process::run([
-                'psql', '--host=127.0.0.1', '--dbname='.$this->targetDb, '--tuples-only', '--no-align',
-                '-c', 'SELECT count(*) FROM widgets;',
-            ]);
+            $rowCount = Process::env($this->postgresClientEnv())
+                ->run([
+                    'psql',
+                    '--host=127.0.0.1',
+                    '--username='.$this->dbUsername(),
+                    '--dbname='.$this->targetDb,
+                    '--tuples-only',
+                    '--no-align',
+                    '-c', 'SELECT count(*) FROM widgets;',
+                ]);
 
             $this->assertTrue($rowCount->successful());
             $this->assertSame('2', trim($rowCount->output()));

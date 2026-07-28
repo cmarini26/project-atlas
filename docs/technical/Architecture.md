@@ -552,7 +552,7 @@ A Connector adds support for a new integration type (e.g., a new inventory API, 
 ```php
 // In a new migration
 $table->enum('type', [
-    'website_crawl', 'rss_feed', 'api', 'csv_upload', 'manual', 'shopify', // new
+    'website_crawl', 'rss_feed', 'api', 'csv_upload', 'manual', 'instagram', 'shopify', 'mailchimp', // new
 ]);
 ```
 

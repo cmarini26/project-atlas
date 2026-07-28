@@ -3,6 +3,7 @@
 namespace App\AI\Prompts;
 
 use App\Domain\BusinessBrain\BusinessBrain;
+use App\Models\CampaignBrief;
 use App\Models\Decision;
 use App\Models\Fact;
 use App\Models\Knowledge;
@@ -89,6 +90,8 @@ SYSTEM;
             ->values()
             ->toJson();
 
+        $briefContext = $this->briefContext();
+
         return <<<TEXT
 Company: {$company->name}
 Industry: {$industry}
@@ -110,7 +113,39 @@ Knowledge:
 Catalog (sample):
 {$catalogJson}
 
+{$briefContext}
+
 Create a Campaign Blueprint for this decision. Be specific and ground every claim in the business context above.
+TEXT;
+    }
+
+    private function briefContext(): string
+    {
+        $subject = $this->decision->opportunity?->subject;
+
+        if (! $subject instanceof CampaignBrief) {
+            return '';
+        }
+
+        $subject->loadMissing('sourceAssets');
+        $assets = $subject->sourceAssets
+            ->map(fn ($asset): array => [
+                'title' => $asset->title,
+                'type' => $asset->type,
+                'description' => $asset->description,
+                'source_url' => $asset->source_url,
+            ])
+            ->values()
+            ->toJson();
+
+        return <<<TEXT
+Customer-authored campaign brief (follow this intent):
+- Title: {$subject->title}
+- Goal: {$subject->goal}
+- Objective: {$subject->objective}
+- Audience: {$subject->audience}
+- Additional guidance: {$subject->guidance}
+- Selected Asset Library sources: {$assets}
 TEXT;
     }
 

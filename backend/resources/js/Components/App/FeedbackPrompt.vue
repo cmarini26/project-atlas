@@ -28,17 +28,17 @@ function handleSubmit(): void {
   <Teleport to="body">
     <div
       v-if="state.isOpen"
-      class="fixed inset-x-0 bottom-0 z-40 flex justify-center p-4 sm:justify-end"
+      class="fixed inset-x-0 bottom-0 z-40 flex justify-center p-3 sm:inset-x-auto sm:right-5 sm:bottom-5 sm:block"
       role="dialog"
       aria-modal="true"
       aria-label="Share feedback"
     >
-      <div class="w-full max-w-sm bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl shadow-lg p-5">
-        <div class="flex items-start justify-between gap-3 mb-3">
+      <div class="w-full max-w-[340px] bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-[var(--radius-md)] shadow-[var(--shadow-raised)] p-4">
+        <div class="flex items-start justify-between gap-3 mb-2">
           <h2 class="text-sm font-semibold text-[var(--color-text-primary)]">How's Atlas working for you?</h2>
           <button
             type="button"
-            class="shrink-0 text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
+            class="shrink-0 rounded-[var(--radius-sm)] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)]"
             aria-label="Dismiss"
             @click="close"
           >
@@ -46,7 +46,7 @@ function handleSubmit(): void {
           </button>
         </div>
 
-        <p class="text-xs text-[var(--color-text-muted)] mb-3">How likely are you to recommend Atlas to another business owner? (1-10)</p>
+        <p class="text-xs leading-5 text-[var(--color-text-muted)] mb-3">How likely are you to recommend Atlas to another business owner? (1-10)</p>
 
         <div class="flex flex-wrap gap-1.5 mb-3">
           <button
@@ -54,7 +54,7 @@ function handleSubmit(): void {
             :key="n"
             type="button"
             :class="[
-              'size-8 rounded-lg text-xs font-medium border transition-colors duration-[var(--duration-fast)]',
+              'size-7 rounded-[var(--radius-sm)] text-xs font-medium border transition-colors duration-[var(--duration-fast)]',
               score === n
                 ? 'bg-[var(--color-accent-500)] border-[var(--color-accent-500)] text-white'
                 : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)]',
@@ -70,13 +70,13 @@ function handleSubmit(): void {
           rows="2"
           maxlength="500"
           placeholder="Anything you'd like us to know? (optional)"
-          class="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-primary)] resize-none mb-3 focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)]"
+          class="w-full px-3 py-2 text-sm rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-primary)] resize-none mb-3 focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)]"
         />
 
         <button
           type="button"
           :disabled="score === null || state.submitting"
-          class="w-full py-2 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+          class="w-full py-2 px-4 text-sm font-semibold rounded-[var(--radius-sm)] bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
           @click="handleSubmit"
         >
           {{ state.submitting ? 'Sending…' : 'Send feedback' }}

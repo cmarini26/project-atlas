@@ -7,6 +7,7 @@ use App\Models\Observation;
 use App\Services\Analyst\AnalystRegistry;
 use App\Services\Analyst\Exceptions\UnsupportedObservationException;
 use App\Services\Analyst\InstagramAnalyst;
+use App\Services\Analyst\SourceAssetAnalyst;
 use App\Services\Analyst\WebsiteAnalyst;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -65,6 +66,7 @@ class AnalystRegistryTest extends TestCase
     {
         $registry = $this->app->make(AnalystRegistry::class);
 
-        $this->assertCount(2, $registry->all());
+        $this->assertCount(3, $registry->all());
+        $this->assertTrue(collect($registry->all())->contains(fn ($analyst) => $analyst instanceof SourceAssetAnalyst));
     }
 }

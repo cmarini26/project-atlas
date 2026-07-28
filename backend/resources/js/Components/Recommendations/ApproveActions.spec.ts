@@ -23,10 +23,19 @@ const assets: ContentAsset[] = [
     body: 'Body text',
     title: 'Rare finds this week',
     status: 'draft',
+    media: null,
     metadata: {},
     channel: { type: 'blog' },
   },
 ]
+
+function approvalProps(contentAssets: ContentAsset[] = assets) {
+  return {
+    recommendationId: 'rec-1',
+    contentAssets,
+    selectedContentAssetIds: contentAssets.map((asset) => asset.id),
+  }
+}
 
 describe('ApproveActions', () => {
   // ConfirmDialog teleports to the real document.body regardless of the
@@ -39,7 +48,7 @@ describe('ApproveActions', () => {
 
   it('does not submit immediately when Approve is clicked', async () => {
     const wrapper = mount(ApproveActions, {
-      props: { recommendationId: 'rec-1', contentAssets: assets },
+      props: approvalProps(),
       attachTo: document.body,
     })
 
@@ -52,7 +61,7 @@ describe('ApproveActions', () => {
 
   it('shows a confirmation dialog naming the content, channel, and its real capability', async () => {
     const wrapper = mount(ApproveActions, {
-      props: { recommendationId: 'rec-1', contentAssets: assets },
+      props: approvalProps(),
       attachTo: document.body,
     })
 
@@ -78,13 +87,14 @@ describe('ApproveActions', () => {
         body: 'Body text',
         title: 'New arrivals',
         status: 'draft',
+        media: null,
         metadata: {},
         channel: { type: 'instagram', marketing_channel: null },
       },
     ]
 
     const wrapper = mount(ApproveActions, {
-      props: { recommendationId: 'rec-1', contentAssets: unconnectedAssets },
+      props: approvalProps(unconnectedAssets),
       attachTo: document.body,
     })
 
@@ -101,17 +111,18 @@ describe('ApproveActions', () => {
     const unsupportedAssets: ContentAsset[] = [
       {
         id: 'asset-4',
-        type: 'sms',
+        type: 'social_post',
         body: 'Body text',
         title: null,
         status: 'draft',
+        media: null,
         metadata: {},
-        channel: { type: 'sms' },
+        channel: { type: 'linkedin' },
       },
     ]
 
     const wrapper = mount(ApproveActions, {
-      props: { recommendationId: 'rec-1', contentAssets: unsupportedAssets },
+      props: approvalProps(unsupportedAssets),
       attachTo: document.body,
     })
 
@@ -132,13 +143,14 @@ describe('ApproveActions', () => {
         body: 'Body text',
         title: 'Weekly newsletter',
         status: 'draft',
+        media: null,
         metadata: {},
         channel: { type: 'email', marketing_channel: { supports_publishing: true } },
       },
     ]
 
     const wrapper = mount(ApproveActions, {
-      props: { recommendationId: 'rec-1', contentAssets: connectedAssets },
+      props: approvalProps(connectedAssets),
       attachTo: document.body,
     })
 
@@ -154,7 +166,7 @@ describe('ApproveActions', () => {
 
   it('falls back to a generic explanation when no content assets are provided', async () => {
     const wrapper = mount(ApproveActions, {
-      props: { recommendationId: 'rec-1' },
+      props: { recommendationId: 'rec-1', selectedContentAssetIds: ['asset-without-preview'] },
       attachTo: document.body,
     })
 
@@ -167,7 +179,7 @@ describe('ApproveActions', () => {
 
   it('submits the approval only after confirming in the dialog', async () => {
     const wrapper = mount(ApproveActions, {
-      props: { recommendationId: 'rec-42', contentAssets: assets },
+      props: { ...approvalProps(), recommendationId: 'rec-42' },
       attachTo: document.body,
     })
 

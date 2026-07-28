@@ -25,6 +25,8 @@ class IntegrationService
         return match ($type) {
             'website_crawl' => 'Website',
             'instagram' => 'Instagram',
+            'shopify' => 'Shopify',
+            'mailchimp' => 'Mailchimp',
             default => ucfirst(str_replace('_', ' ', $type)),
         };
     }

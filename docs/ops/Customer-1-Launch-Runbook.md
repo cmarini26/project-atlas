@@ -24,11 +24,12 @@ Create these accounts first; several later phases need working credentials from 
 | **Domain registrar** | A real, reachable domain for Atlas | A registered domain name |
 | **DNS provider** | May be the registrar or separate (e.g. Cloudflare) | Ability to add A/CNAME records |
 | **Hosting provider** | Runs the app server, database, Redis | A provisioned server (see Phase 1) — Laravel Forge, a managed VPS (DigitalOcean/Hetzner/Linode), or equivalent |
-| **Postmark** | Real transactional email (password reset, test sends) | A Server API Token, a Message Stream ID, and a verified sending domain (for SPF/DKIM) |
+| **Postmark or SendGrid** | Real transactional email (password reset, test sends) | Real provider credentials plus sender/domain verification for the chosen provider |
+| **Twilio** *(only if SMS is in Customer 1 scope)* | Real SMS connect/test/send path | Account SID, auth token, a sending number, and a real phone number you control for verification |
 | **Error tracking vendor** (Sentry or equivalent) | Real production exception visibility — code-side abstraction already exists (`App\ErrorTracking\ErrorTracker`), no vendor package installed yet | A project DSN |
 | **Uptime monitor** (e.g. UptimeRobot, Better Uptime, Pingdom) | External polling of the health endpoint | Nothing yet — configure in Phase 7 once the domain resolves |
 
-**Do not proceed to Phase 1 without Postmark and error-tracking accounts already created** — Phase 2's `.env` needs real values from both, and provisioning a server before you have them just means editing `.env` twice.
+**Do not proceed to Phase 1 without your chosen email provider and error-tracking accounts already created** — Phase 2's `.env` needs real values from both, and provisioning a server before you have them just means editing `.env` twice. Add Twilio too if SMS is explicitly part of Customer 1's beta promise.
 
 ---
 
@@ -106,12 +107,14 @@ REDIS_HOST=<real-redis-host>
 REDIS_PORT=6379
 REDIS_PASSWORD=<real-redis-password>   # NOT "null" — set a real password
 
-# Email — real Postmark credentials from Phase 0
-MAIL_MAILER=postmark
+# Email — real provider credentials from Phase 0
+MAIL_MAILER=postmark            # or your chosen live provider path
 MAIL_FROM_ADDRESS=<real-sending-address>
 MAIL_FROM_NAME="${APP_NAME}"
 POSTMARK_API_KEY=<real-postmark-server-token>
 POSTMARK_MESSAGE_STREAM_ID=<real-message-stream-id>
+# If using SendGrid instead of Postmark, set the real SendGrid credential(s)
+# required by the app's provider-aware email connect flow.
 
 # Error tracking — real vendor from Phase 0 (see Phase 7 for the one
 # additional code step this still requires)
@@ -129,6 +132,10 @@ ANTHROPIC_MODEL=claude-sonnet-4-6
 META_APP_ID=
 META_APP_SECRET=
 META_REDIRECT_URI=
+
+# Twilio — only if SMS is explicitly part of Customer 1 scope
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
 ```
 
 3. `chmod 600 .env` and confirm it's owned by the deploy user, not world-readable.
@@ -240,21 +247,23 @@ This is, per [Private-Beta-Execution.md](../plans/Private-Beta-Execution.md), th
 
 ---
 
-## Phase 8 — Transactional email verification
+## Phase 8 — Transactional email / outbound messaging verification
 
-Code and config for this were completed in Phase 2 (`MAIL_MAILER=postmark`, real credentials). This phase is pure verification.
+Code and config for this were completed in Phase 2 (real chosen provider credentials). This phase is pure verification.
 
-1. Confirm SPF and DKIM DNS records are published for the sending domain, per Postmark's dashboard instructions for your verified domain.
+1. Confirm the chosen email provider's sender/domain verification is complete (SPF/DKIM for Postmark; equivalent sender/domain verification for SendGrid).
 2. Trigger a real password-reset email to a real inbox you control: register (or use an existing) test account, request a password reset from the real production URL, and confirm the email **arrives in the inbox, not spam**, within a few minutes.
 3. Complete the reset end-to-end: click the link, set a new password, log in.
-4. Send a real test email via Settings → Email (Postmark) → "Send test" to a second real inbox and confirm delivery.
+4. Send a real test email via Settings → Email → "Send test" to a second real inbox and confirm delivery.
+5. If SMS/Twilio is part of Customer 1 scope, connect Twilio in Settings and send one real test SMS to a phone you control.
 
 ### Verification checklist — Phase 8
 
-- [ ] SPF/DKIM confirmed via Postmark's own domain-verification check.
+- [ ] The chosen email provider's sender/domain verification is confirmed.
 - [ ] Password reset email received in a real inbox, not spam, within minutes.
 - [ ] Reset flow completed end-to-end (request → email → link → new password → login).
 - [ ] Settings → Email test-send received in a real inbox.
+- [ ] If SMS is in scope, Settings → SMS test-send is received on a real phone.
 - [ ] `ProductionMailerGuard` is confirmed active by design (already true if `APP_ENV=production` and `MAIL_MAILER=postmark`, per Phase 2) — no separate action, just confirm the env values are what Phase 2 set.
 
 ---
@@ -288,7 +297,7 @@ Run this yourself, as a real test account, on the **real production environment*
 5. Approve it — confirm the confirmation dialog's per-channel language is accurate for whatever capability state each asset's channel is actually in (per [Channel-Capability-Matrix.md](../product/Channel-Capability-Matrix.md); this was fixed in the recommendation/publishing UI work, verify it still holds on the real deploy).
 6. **Measure elapsed time from URL entry to visible first Recommendation** on production — this is the number to compare against the 10-minute north-star metric.
 7. **Prove multi-tenancy, don't assume it**: onboard a second test company side by side and confirm neither can see the other's data anywhere — dashboard, Filament, API.
-8. If any real channel (WordPress/Meta/Postmark) will be connected for Customer 1, connect one for real and confirm the connect flow's live ping-before-persist verification actually rejects a deliberately wrong credential, then accepts the real one.
+8. If any real channel (WordPress/Meta/provider-aware Email/Twilio SMS) will be connected for Customer 1, connect one for real and confirm the connect flow's live ping-before-persist verification actually rejects a deliberately wrong credential, then accepts the real one.
 
 ### Verification checklist — Phase 10
 
@@ -344,3 +353,19 @@ Run [Private-Beta-Execution.md](../plans/Private-Beta-Execution.md) §3 (daily c
 - Read back through every failed job and support issue from the week — repeating root causes become next week's top priority, ahead of new feature work.
 - Decide explicitly whether to invite the next beta customer(s) or pause and fix something first, per Private-Beta-Execution.md §5's own guidance: a beta with fewer customers going well beats more customers half-watched.
 - Update [STATUS.md](../STATUS.md) with what happened this week.
+
+---
+
+## Addendum — 2026-07-20: channel breadth widened, launch posture stayed narrow
+
+Atlas's local worktree now supports:
+
+- provider-aware email (`postmark` + `sendgrid`)
+- a real Twilio connect/test flow
+- a real single-destination SMS publisher in code
+
+This runbook still recommends the narrowest honest Customer 1 posture:
+
+- treat **email + WordPress** as the primary real outbound channels to verify first
+- include **SMS** only if the single-destination scope is explicitly acceptable for Customer 1
+- do not broaden the Customer 1 promise just because more connector code exists locally

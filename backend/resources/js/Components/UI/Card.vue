@@ -40,14 +40,14 @@ const accentBorderClasses: Record<string, string> = {
     :is="href ? Link : as"
     :href="href"
     :class="[
-      'relative block bg-[var(--color-surface-elevated)] rounded-[var(--radius-md)]',
+      'relative block bg-[var(--color-surface-elevated)] rounded-[var(--radius-md)] border border-[color:color-mix(in_oklch,var(--color-border)_88%,white)]',
       paddingClasses[padding],
       divided ? 'divide-y divide-[var(--color-border)]' : '',
       href || clickable
-        ? 'hover:shadow-[var(--shadow-raised)] transition-shadow duration-[var(--duration-fast)] cursor-pointer'
+        ? 'hover:border-[var(--color-border-strong)] hover:shadow-[var(--shadow-raised)] transition-[border-color,box-shadow,transform] duration-[var(--duration-fast)] cursor-pointer hover:-translate-y-0.5'
         : '',
       accent !== 'none'
-        ? ['border-l-4 rounded-l-none shadow-[var(--shadow-accent)]', accentBorderClasses[accent]]
+        ? ['border-l-4 shadow-[var(--shadow-accent)]', accentBorderClasses[accent]]
         : 'shadow-[var(--shadow-card)]',
     ]"
   >

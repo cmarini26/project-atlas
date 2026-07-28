@@ -5,6 +5,7 @@ use App\Http\Controllers\App\AnalyticsController;
 use App\Http\Controllers\App\BusinessBrainController;
 use App\Http\Controllers\App\CampaignController;
 use App\Http\Controllers\App\CompanySelectorController;
+use App\Http\Controllers\App\CustomCampaignController;
 use App\Http\Controllers\App\DashboardController;
 use App\Http\Controllers\App\EmailAudienceController;
 use App\Http\Controllers\App\FeedbackController;
@@ -18,6 +19,7 @@ use App\Http\Controllers\App\ProductTourController;
 use App\Http\Controllers\App\PublishingController;
 use App\Http\Controllers\App\RecommendationController;
 use App\Http\Controllers\App\SettingsController;
+use App\Http\Controllers\App\SourceAssetController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\OnboardingController;
@@ -81,6 +83,12 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
 
     Route::get('/brain', [BusinessBrainController::class, 'index'])->name('brain');
 
+    Route::get('/assets', [SourceAssetController::class, 'index'])->name('assets.index');
+    Route::post('/assets', [SourceAssetController::class, 'store'])->name('assets.store');
+    Route::put('/assets/{sourceAsset}', [SourceAssetController::class, 'update'])->name('assets.update');
+    Route::post('/assets/{sourceAsset}/retry', [SourceAssetController::class, 'retry'])->name('assets.retry');
+    Route::delete('/assets/{sourceAsset}', [SourceAssetController::class, 'destroy'])->name('assets.destroy');
+
     Route::get('/marketing-health', [MarketingHealthController::class, 'index'])->name('marketing-health');
 
     Route::get('/opportunities', [OpportunityController::class, 'index'])->name('opportunities');
@@ -88,13 +96,17 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
     // Recommendation workflow
     Route::get('/recommendations', [RecommendationController::class, 'index'])->name('recommendations.index');
     Route::get('/recommendations/{recommendation}', [RecommendationController::class, 'show'])->name('recommendations.show');
+    Route::patch('/recommendations/{recommendation}/channels', [RecommendationController::class, 'selectChannels'])->name('recommendations.channels.select');
     Route::post('/recommendations/{recommendation}/approve', [RecommendationController::class, 'approve'])->name('recommendations.approve');
     Route::post('/recommendations/{recommendation}/approve-edit', [RecommendationController::class, 'approveEdit'])->name('recommendations.approve-edit');
     Route::post('/recommendations/{recommendation}/reject', [RecommendationController::class, 'reject'])->name('recommendations.reject');
 
     // Campaigns
     Route::get('/campaigns', [CampaignController::class, 'index'])->name('campaigns.index');
+    Route::get('/campaigns/create', [CustomCampaignController::class, 'create'])->name('campaigns.create');
+    Route::post('/campaigns', [CustomCampaignController::class, 'store'])->name('campaigns.store');
     Route::get('/campaigns/{campaign}', [CampaignController::class, 'show'])->name('campaigns.show');
+    Route::patch('/campaigns/{campaign}/channels', [CampaignController::class, 'selectChannels'])->name('campaigns.channels.select');
     Route::patch('/campaigns/{campaign}/email-audience', [CampaignController::class, 'selectEmailAudience'])->name('campaigns.email-audience.select');
 
     // Publishing
@@ -112,6 +124,10 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
     Route::patch('/settings', [SettingsController::class, 'update'])->name('settings.update');
     Route::post('/settings/integrations/{integration}/sync', [SettingsController::class, 'syncIntegration'])->name('settings.integrations.sync');
     Route::post('/settings/integrations/instagram', [SettingsController::class, 'connectInstagram'])->name('settings.integrations.instagram.connect');
+    Route::post('/settings/integrations/shopify', [SettingsController::class, 'connectShopify'])->name('settings.integrations.shopify.connect');
+    Route::post('/settings/integrations/shopify/revoke', [SettingsController::class, 'disconnectShopify'])->name('settings.integrations.shopify.revoke');
+    Route::post('/settings/integrations/mailchimp', [SettingsController::class, 'connectMailchimp'])->name('settings.integrations.mailchimp.connect');
+    Route::post('/settings/integrations/mailchimp/revoke', [SettingsController::class, 'disconnectMailchimp'])->name('settings.integrations.mailchimp.revoke');
 
     // Meta publishing OAuth (Instagram/Facebook) — distinct from the
     // Instagram *observation* integration above, which uses a manually
@@ -129,7 +145,11 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
     Route::post('/settings/email/revoke', [SettingsController::class, 'disconnectEmail'])->name('settings.email.revoke');
     Route::post('/settings/email/test', [SettingsController::class, 'sendEmailTest'])->name('settings.email.test');
 
-    // Email audiences/contacts — the minimal recipient model for
+    Route::post('/settings/sms/connect', [SettingsController::class, 'connectSms'])->name('settings.sms.connect');
+    Route::post('/settings/sms/revoke', [SettingsController::class, 'disconnectSms'])->name('settings.sms.revoke');
+    Route::post('/settings/sms/test', [SettingsController::class, 'sendSmsTest'])->name('settings.sms.test');
+
+    // Email Audience Settings (owner/admin only)
     // multi-recipient Email campaigns (Phase 1A).
     Route::get('/settings/email/audiences', [EmailAudienceController::class, 'index'])->name('settings.email.audiences.index');
     Route::post('/settings/email/audiences', [EmailAudienceController::class, 'store'])->name('settings.email.audiences.store');

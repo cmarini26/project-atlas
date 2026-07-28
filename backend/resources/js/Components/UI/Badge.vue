@@ -7,7 +7,7 @@ defineProps<{
 <template>
   <span
     :class="[
-      'inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium',
+      'inline-flex items-center px-2 py-0.5 rounded-[var(--radius-sm)] text-xs font-semibold',
       !$props.variant || $props.variant === 'default' ? 'bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] border border-[var(--color-border)]' : '',
       $props.variant === 'accent' ? 'bg-[var(--color-accent-50)] text-[var(--color-accent-700)] border border-[var(--color-accent-200)]' : '',
       $props.variant === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : '',

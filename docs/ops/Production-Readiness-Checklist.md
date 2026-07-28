@@ -32,7 +32,7 @@
 | `APP_ENV=production` | | ⬜ | |
 | `APP_DEBUG=false` — verified by requesting a URL that throws and confirming no stack trace reaches the browser | | ⬜ | Don't just check the config value; provoke a real error |
 | `APP_URL` matches the real domain, not `localhost` | | ⬜ | |
-| Every credential in `.env.example` with a placeholder has a real value set (`POSTMARK_API_KEY`, `POSTMARK_MESSAGE_STREAM_ID`, `ERROR_TRACKING_DRIVER`/`_DSN`, DB/Redis credentials) | | ⬜ | Grep `.env.example` for every unset var before deploy, don't rely on memory |
+| Every credential in `.env.example` with a placeholder has a real value set (`POSTMARK_API_KEY` **or** SendGrid credentials, `ERROR_TRACKING_DRIVER`/`_DSN`, DB/Redis credentials, Twilio credentials if SMS is part of beta scope) | | ⬜ | Grep `.env.example` for every unset var before deploy, don't rely on memory |
 | Secrets are stored in a real secrets manager or the hosting provider's env-var store — never committed to the repo | | ⬜ | |
 
 ## 3. Domain / SSL / proxy
@@ -100,16 +100,17 @@
 | A named person (not "the team") owns responding to alerts | | ⬜ | |
 | Someone checks the error tracker at least once daily during the beta | | ⬜ | Ongoing, per [Private-Beta-Execution.md](../plans/Private-Beta-Execution.md) §3 |
 
-## 9. Transactional email
+## 9. Transactional email / outbound messaging
 
 | Item | Owner | Status | Notes |
 |---|---|---|---|
-| Postmark mailer fully wired in code (`config/mail.php`, `symfony/postmark-mailer` installed) | | ✅ | Code-complete, Blocker 6 |
+| Provider-aware email is wired in code (`PostmarkEmailProvider`, `SendGridEmailProvider`, Settings connect flow) | | ✅ | Code-complete in the local worktree; Atlas now supports `postmark` and `sendgrid` as real email providers in code |
 | `ProductionMailerGuard` refuses delivery and logs critically if `APP_ENV=production` with `MAIL_MAILER=log`/`array` | | ✅ | Code-complete — verify it's not silently satisfied by an unset `MAIL_MAILER` falling through to `log` in real production |
-| `POSTMARK_API_KEY` / `POSTMARK_MESSAGE_STREAM_ID` set to real values in production | | ⬜ | |
-| A real test email sent and received in an actual inbox (not just "the API call returned 200") | | ⬜ | |
-| Sending domain has SPF/DKIM configured — verify mail doesn't land in spam for at least one major provider | | ⬜ | |
+| Real production email-provider credentials are set in production (`POSTMARK_*` **or** SendGrid-equivalent API credentials, depending on chosen provider) | | ⬜ | |
+| A real test email sent and received in an actual inbox (not just "the API call returned 200") | | ⬜ | Verify with whichever email provider the beta is actually using |
+| Sending domain / sender identity has been verified for the chosen provider — verify mail doesn't land in spam for at least one major provider | | ⬜ | SPF/DKIM for Postmark; equivalent sender/domain verification for SendGrid |
 | Password reset tested end-to-end in production: request → receive email → click link → set new password → log in | | ⬜ | |
+| If SMS/Twilio is in beta scope: Twilio credentials are configured and one real test SMS is delivered to a real phone you control | | ⬜ | Do **not** check this unless SMS is actually part of Customer 1's promise |
 
 ## 10. Log retention
 
@@ -135,7 +136,7 @@
 | A support channel (email alias or Slack) is defined, documented, and someone is actually watching it | | ⬜ | |
 | An operational runbook exists covering at least: crawl failure, AI provider outage, queue worker down, failed-job spike | | ⬜ | **No dedicated runbook document exists yet** — this is a real gap, not a link to fill in |
 | 24-hour response SLA is defined and tracked | | ⬜ | Per [Private-Beta-Execution.md](../plans/Private-Beta-Execution.md) §3/§5 |
-| Beta communications ready: invite email and Getting Started guide, both stating plainly what is/isn't real yet (which channels genuinely send vs. simulate) | | ⬜ | Per the [Channel Capability Matrix](../product/Channel-Capability-Matrix.md) — never let this drift from current code truth |
+| Beta communications ready: invite email and Getting Started guide, both stating plainly what is/isn't real yet (which channels genuinely send vs. simulate, and that SMS is single-destination-only if included) | | ⬜ | Per the [Channel Capability Matrix](../product/Channel-Capability-Matrix.md) — never let this drift from current code truth |
 
 ## 13. Post-deploy verification
 
@@ -160,3 +161,19 @@ Re-run this checklist in full:
 - Before any change to hosting provider, domain, or deploy process.
 - Whenever a Critical Production Blocker's status changes in [Critical-Production-Blockers.md](../plans/Critical-Production-Blockers.md) — update the corresponding row's Status here in the same change, don't let the two documents drift.
 - At minimum, monthly during the private beta, even with no known changes — infrastructure drifts silently (an expired cert, a disk filling up, a backup that quietly stopped running).
+
+---
+
+## Addendum — 2026-07-20: outbound channel reality widened, ops gate did not
+
+Since the 2026-07-16 readiness pass, Atlas's local worktree now includes:
+
+- provider-aware email (`postmark` + `sendgrid`)
+- a real Twilio Settings connect/test flow
+- a real **single-destination** SMS publisher in code
+
+This checklist's operational meaning is unchanged:
+
+- any channel promised to Customer 1 still requires **live production verification** before it can be treated as beta-ready
+- email remains the preferred narrow beta channel because its execution/measure/learn loop is deepest
+- SMS should only be included if its narrower scope is explicitly acceptable for the beta promise

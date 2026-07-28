@@ -60,7 +60,7 @@
 
 ## 5. Recommendation Usefulness (Qualitative and Quantitative)
 
-**Quantitative component:** approval rate (§3) and edit frequency/substance (how often Edit & Approve is chosen, and how much of the generated content is actually changed). An expected-vs-actual outcome comparison for a published campaign is **not yet a meaningful metric** — every channel currently only simulates delivery (see [Channel-Publishing-Reality-Audit.md](../reviews/Channel-Publishing-Reality-Audit.md)), so "outcome" for now means engagement with the recommendation itself, not real external reach. This will become a real metric once at least one channel genuinely publishes.
+**Quantitative component:** approval rate (§3) and edit frequency/substance (how often Edit & Approve is chosen, and how much of the generated content is actually changed). An expected-vs-actual outcome comparison is now **channel-dependent** rather than universally deferred: email can support a real outcome loop in code, WordPress/Meta have real execution but shallower outcome measurement, and Twilio SMS is currently real only as a narrow single-destination execution path with no analytics/learning loop yet. Use the [Channel Capability Matrix](../product/Channel-Capability-Matrix.md) as the truth source for what counts as a meaningful "outcome" per channel at the time of measurement.
 
 **Qualitative component:** direct answers from [Customer-Interview-Guide.md](Customer-Interview-Guide.md) §2 — "does this sound like it's about *your* business" and the per-quadrant rationale reactions — recorded in [Founder-Learning-Log.md](Founder-Learning-Log.md).
 
@@ -111,5 +111,21 @@
 - **Daily** (first week per new customer): time-to-first-recommendation, onboarding completion, and engagement are checked as part of `Private-Beta-Execution.md` §5's daily tasks.
 - **Weekly**: all eight metrics above are reviewed together at the end-of-week review `Private-Beta-Execution.md` §5 already calls for, alongside a decision on whether to invite the next customer(s) or pause to fix something first.
 - **Monthly**: recommendation usefulness and willingness-to-pay are specifically revisited per customer at the one-month interview checkpoint.
+
+---
+
+## Addendum — 2026-07-20: success metrics now need channel-aware interpretation
+
+Earlier drafts of this document assumed no real outbound execution existed yet. That is no longer true in the local worktree:
+
+- email is real and provider-aware (`postmark` + `sendgrid`)
+- WordPress and Meta remain real in code
+- Twilio SMS is real in code, but only as a **single-destination** path with no analytics/learning loop yet
+
+Implication for Stage A metrics:
+
+- do **not** treat all channels as equal evidence during beta review
+- weight the strongest signal toward channels with the deepest full loop, especially **email**
+- if SMS is included at all, evaluate it as a narrow execution convenience, not as proof of a mature campaign-distribution system
 
 *These metrics should be revisited — not necessarily replaced — once Stage A's own success criteria are met and the roadmap advances to Stage B; see `Version-1.0-Roadmap.md` §5 for how the bar changes at each stage.*

@@ -138,6 +138,94 @@ class CampaignControllerTest extends TestCase
             );
     }
 
+    public function test_show_includes_content_asset_media(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $campaign = $this->createCampaign($company);
+
+        $channel = Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'blog',
+            'name' => 'Blog',
+            'is_active' => true,
+        ]);
+
+        ContentAsset::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_id' => $campaign->id,
+            'channel_id' => $channel->id,
+            'type' => 'blog_post',
+            'body' => 'Body copy',
+            'media' => [['url' => 'https://example.com/hero.jpg']],
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs($user)
+            ->get("/app/campaigns/{$campaign->id}")
+            ->assertInertia(fn ($page) => $page
+                ->where('content_assets.0.media.0.url', 'https://example.com/hero.jpg')
+            );
+    }
+
+    public function test_campaign_may_update_selected_channels_before_publishing_starts(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $campaign = $this->createCampaign($company);
+
+        $firstChannel = Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'email',
+            'name' => 'Email',
+            'is_active' => true,
+        ]);
+        $secondChannel = Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'blog',
+            'name' => 'Blog',
+            'is_active' => true,
+        ]);
+
+        Decision::withoutGlobalScopes()->findOrFail($campaign->decision_id)->update([
+            'channel_ids' => [$firstChannel->id, $secondChannel->id],
+        ]);
+
+        $firstAsset = ContentAsset::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_id' => $campaign->id,
+            'channel_id' => $firstChannel->id,
+            'type' => 'email',
+            'body' => 'Email body',
+            'status' => 'draft',
+        ]);
+        $secondAsset = ContentAsset::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_id' => $campaign->id,
+            'channel_id' => $secondChannel->id,
+            'type' => 'blog_post',
+            'body' => 'Blog body',
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs($user)
+            ->patch("/app/campaigns/{$campaign->id}/channels", ['selected_content_asset_ids' => [$secondAsset->id]])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('content_assets', ['id' => $firstAsset->id, 'status' => 'archived']);
+        $this->assertDatabaseHas('content_assets', ['id' => $secondAsset->id, 'status' => 'draft']);
+        $this->assertSame([$secondChannel->id], Decision::withoutGlobalScopes()->findOrFail($campaign->decision_id)->channel_ids);
+    }
+
+    public function test_campaign_cannot_update_selected_channels_after_execution_exists(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $campaign = $this->createCampaign($company);
+        $execution = $this->makeEmailExecution($company, $campaign);
+
+        $this->actingAs($user)
+            ->patch("/app/campaigns/{$campaign->id}/channels", ['selected_content_asset_ids' => [$execution->content_asset_id]])
+            ->assertForbidden();
+    }
+
     public function test_email_campaign_may_select_a_company_owned_audience(): void
     {
         [$user, $company] = $this->userWithCompany();

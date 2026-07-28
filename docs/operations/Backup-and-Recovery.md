@@ -10,7 +10,7 @@
 
 | | Status |
 |---|---|
-| Backup script exists, tested, fails loudly | ✅ Code-complete (this document, `infrastructure/backup/`) |
+| Database and uploaded-file backup scripts exist, are tested, and fail loudly | ✅ Code-complete (this document, `infrastructure/backup/`) |
 | Verify script exists, tested | ✅ Code-complete |
 | Restore script exists, tested, requires explicit confirmation | ✅ Code-complete |
 | A local restore drill has been run and round-trips data correctly | ✅ Code-complete (`tests/Feature/Backup/BackupRestoreDrillTest.php` — a real drill against scratch PostgreSQL databases, not a mock) |
@@ -27,7 +27,7 @@ A script existing does not mean a backup exists. A cron entry existing does not 
 
 ### PostgreSQL database
 
-The database (`DB_CONNECTION=pgsql`, per [Production-Topology.md](../deployment/Production-Topology.md)) is the only stateful store Atlas's own code manages today, and the only one this blocker addresses in depth.
+The database (`DB_CONNECTION=pgsql`, per [Production-Topology.md](../deployment/Production-Topology.md)) is Atlas's primary structured-data store. Customer uploads on the public disk are the other application-managed state and are covered separately below.
 
 - **Mechanism:** `pg_dump` (logical, schema + data, plain SQL format, gzip-compressed) via [`infrastructure/backup/atlas-db-backup.sh`](../../infrastructure/backup/atlas-db-backup.sh). Logical dumps were chosen over physical/WAL-archiving because they're provider-neutral — they work identically against any managed PostgreSQL offering, whereas WAL archiving setup is provider-specific and, on many managed providers, already handled by the provider's own automated backup feature as a configuration toggle (see "What a managed provider may already give you" below).
 - **Frequency:** at minimum, daily. Increase frequency (e.g., every 6 hours) once real customer data volume makes a day of data loss unacceptable — this is a judgment call for whoever operates the beta, not a fixed rule.
@@ -35,9 +35,9 @@ The database (`DB_CONNECTION=pgsql`, per [Production-Topology.md](../deployment/
 
 ### Application-managed uploaded files
 
-**None exist today.** `grep -rn "Storage::" app/` returns nothing — no code path in this application uploads, generates, or stores a file on disk or object storage (a High Priority audit finding: "File storage defaults to local disk with no object storage populated"). There is currently nothing to back up beyond the database.
+The Asset Library stores customer-owned image, video, and document uploads on Laravel's `public` disk under `backend/storage/app/public/source-assets/`. These files are production data: database recovery without the matching files leaves source-asset records and previews broken.
 
-If this changes — e.g., a future `ContentAsset` gains a generated image, or Filament file-upload fields are used — that data must be added to this strategy at that time: either migrate `FILESYSTEM_DISK` to S3-compatible object storage (which typically has its own provider-level versioning/replication, separate from this document's script-based approach) or extend the backup script to archive the relevant disk path. Don't assume this section is still accurate without re-checking `app/` for `Storage::` usage first.
+While production uses local storage, [`infrastructure/backup/atlas-files-backup.sh`](../../infrastructure/backup/atlas-files-backup.sh) must run alongside every database backup, targeting `backend/storage/app/public`. The archive must use the same encryption, off-site copy, retention, monitoring, and restore-drill standards as the database dump. A future move to versioned S3-compatible object storage may replace this script, but only after object versioning, lifecycle policy, cross-account or cross-region recovery, and an actual restore test are operationally verified.
 
 ### Environment/secrets recovery
 
@@ -55,15 +55,16 @@ Most managed PostgreSQL offerings (the stack's documented preference — see `CL
 
 ## Operational artifacts
 
-Three scripts exist in [`infrastructure/backup/`](../../infrastructure/backup/), mirroring the style already established by `infrastructure/supervisor/atlas-worker.conf` (Blocker 4) and `infrastructure/cron/atlas-scheduler` (Blocker 4):
+Four scripts exist in [`infrastructure/backup/`](../../infrastructure/backup/), mirroring the style already established by `infrastructure/supervisor/atlas-worker.conf` (Blocker 4) and `infrastructure/cron/atlas-scheduler` (Blocker 4):
 
 | Script | Purpose |
 |---|---|
 | [`atlas-db-backup.sh`](../../infrastructure/backup/atlas-db-backup.sh) | Dumps the database (via `pg_dump`), gzip-compresses it, optionally encrypts it (GPG) and/or uploads it off-site, optionally prunes old local dumps by retention age. |
 | [`atlas-db-verify.sh`](../../infrastructure/backup/atlas-db-verify.sh) | A lightweight integrity check on a dump — confirms it isn't truncated/corrupt and contains schema. **Not** a substitute for the full restore drill below. |
 | [`atlas-db-restore.sh`](../../infrastructure/backup/atlas-db-restore.sh) | Restores a dump into a target database. Destructive; requires explicit confirmation (see "Safety" below). |
+| [`atlas-files-backup.sh`](../../infrastructure/backup/atlas-files-backup.sh) | Archives customer-uploaded files from Laravel's public disk, with the same optional encryption, off-site upload, and retention controls as database backups. |
 
-All three read connection info from the same `DB_HOST`/`DB_PORT`/`DB_DATABASE`/`DB_USERNAME`/`DB_PASSWORD` environment variables Laravel itself uses — no separate credential configuration to maintain.
+The database scripts read the same `DB_HOST`/`DB_PORT`/`DB_DATABASE`/`DB_USERNAME`/`DB_PASSWORD` variables Laravel uses. The uploaded-file script needs only its source and destination paths; both backup scripts share the optional encryption, off-site upload, and retention controls.
 
 ### Backup usage
 
@@ -77,6 +78,17 @@ Optional environment variables:
 - `BACKUP_RETENTION_DAYS` — delete local dumps older than N days after a successful backup. Unset means no pruning (safe default; an operator can prune manually until a retention policy is decided — see "Retention guidance").
 - `BACKUP_GPG_RECIPIENT` — if set, encrypts the dump with `gpg --encrypt -r <recipient>` before it's written to its final path. See "Encryption requirements."
 - `BACKUP_OFFSITE_COMMAND` — if set, a shell command template run after a successful local backup, with `{file}` replaced by the backup's path (e.g. `aws s3 cp {file} s3://atlas-backups/`, `rclone copy {file} remote:atlas-backups/`, or a `b2 upload-file` invocation). Deliberately not a specific vendor — see "Off-site storage requirements." A failure here is logged loudly but does **not** delete the still-valid local backup.
+
+### Uploaded-file backup usage
+
+```bash
+BACKUP_RETENTION_DAYS=14 BACKUP_OFFSITE_COMMAND="..." \
+  ./infrastructure/backup/atlas-files-backup.sh \
+  /var/www/atlas/backend/storage/app/public \
+  /var/backups/atlas
+```
+
+Use `BACKUP_GPG_RECIPIENT` for encryption exactly as with database dumps. Validate an unencrypted archive with `tar -tzf <archive>` and periodically restore it into a scratch directory, confirming representative files match their source-asset records.
 
 ### Verify usage
 
@@ -144,6 +156,10 @@ Backups are **not** run through Laravel's own scheduler (`routes/console.php`) �
   BACKUP_RETENTION_DAYS=14 BACKUP_OFFSITE_COMMAND="..." \
   /var/www/atlas/infrastructure/backup/atlas-db-backup.sh /var/backups/atlas \
   >> /var/log/atlas/backup.log 2>&1
+35 2 * * * BACKUP_RETENTION_DAYS=14 BACKUP_OFFSITE_COMMAND="..." \
+  /var/www/atlas/infrastructure/backup/atlas-files-backup.sh \
+  /var/www/atlas/backend/storage/app/public /var/backups/atlas \
+  >> /var/log/atlas/backup.log 2>&1
 ```
 
 **Installing this cron entry does not, by itself, mean backups are operational.** Per the "Code-complete vs. operator-complete" table above, an operator must still: confirm the first scheduled run actually completed (check the log, not just that cron fired), confirm the off-site copy actually landed at its destination, and perform at least one real restore drill against the actual backup destination — not just this repository's local drill — before this is a true, verified backup system.
@@ -158,6 +174,7 @@ This is the drill an operator runs against real infrastructure once it exists �
 - [ ] `atlas-db-verify.sh` confirms the retrieved file is intact.
 - [ ] `atlas-db-restore.sh` is run against a genuinely separate, scratch database — never the live production database.
 - [ ] The restored data is spot-checked for correctness: row counts on a few key tables, and at least one specific record's content, not just "the restore command exited 0."
+- [ ] The matching uploaded-file archive is restored into a scratch directory and representative source-asset files are opened and matched to database records.
 - [ ] The scratch database is dropped afterward — a restore drill should leave no lasting artifact.
 - [ ] The whole drill is repeatable by a second person following only this document, without asking whoever performed the first restore (a direct requirement from both this plan's Blocker 8 and the Private Beta Execution Checklist's Go/No-Go gate).
 - [ ] This checklist is repeated on a regular cadence during the beta (at minimum weekly, per Private-Beta-Execution.md's daily/weekly operational cadence) — not just once before launch.

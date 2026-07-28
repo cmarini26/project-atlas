@@ -93,7 +93,7 @@ function formatDate(date: string | null): string {
 
 <template>
   <Head><title>Overview — Atlas</title></Head>
-  <div class="max-w-4xl">
+  <div>
     <PageHeader
       title="Overview"
       description="Your daily snapshot — see what needs a decision and how your brand twin is doing."
@@ -108,7 +108,7 @@ function formatDate(date: string | null): string {
     </div>
 
     <!-- Summary counts -->
-    <div data-tour="summary-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+    <div data-tour="summary-cards" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
       <SummaryCard
         label="Pending"
         :value="counts.pending_recommendations"
@@ -181,21 +181,27 @@ function formatDate(date: string | null): string {
     </div>
 
     <!-- Recent executions -->
-    <Card data-tour="recent-executions">
+    <Card data-tour="recent-executions" padding="none" class="overflow-hidden">
       <template #header>
-        <h2 class="text-sm font-semibold text-[var(--color-text-primary)]">Recent Publishing Activity</h2>
-        <Link href="/app/publishing" class="text-xs text-[var(--color-text-link)] hover:underline">View all</Link>
+        <div>
+          <h2 class="text-sm font-semibold text-[var(--color-text-primary)]">Recent Publishing Activity</h2>
+          <p class="mt-1 text-xs text-[var(--color-text-muted)]">Live sends and simulated processing in one queue</p>
+        </div>
+        <Link href="/app/publishing" class="text-xs font-semibold text-[var(--color-text-link)] hover:underline">View all</Link>
       </template>
 
-      <div v-if="recent_executions.length > 0" class="space-y-3">
+      <div v-if="recent_executions.length > 0" class="divide-y divide-[var(--color-border)]">
         <div
           v-for="execution in recent_executions"
           :key="execution.id"
-          class="flex items-center gap-3"
+          class="flex items-center gap-4 px-5 py-4"
         >
+          <div class="size-10 rounded-[var(--radius-sm)] bg-[var(--color-surface)] ring-1 ring-[var(--color-border)] flex items-center justify-center text-[var(--color-text-muted)] shrink-0">
+            <PaperAirplaneIcon class="size-5" aria-hidden="true" />
+          </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2">
-              <p class="text-sm text-[var(--color-text-secondary)] truncate">
+              <p class="text-sm font-semibold text-[var(--color-text-primary)] truncate">
                 {{ execution.channel ? channelLabel(execution.channel.type) : 'Unknown channel' }}
               </p>
               <ChannelCapabilityBadge
@@ -204,7 +210,7 @@ function formatDate(date: string | null): string {
                 :linked-marketing-channel="execution.channel.marketing_channel ? { supportsPublishing: execution.channel.marketing_channel.supports_publishing } : null"
               />
             </div>
-            <p class="text-xs text-[var(--color-text-muted)]">{{ formatDate(execution.scheduled_at) }}</p>
+            <p class="mt-1 text-xs text-[var(--color-text-muted)]">{{ formatDate(execution.scheduled_at) }}</p>
           </div>
           <Badge
             :variant="execution.status === 'published' || execution.status === 'completed' ? 'success' : execution.status === 'failed' ? 'warning' : 'muted'"
@@ -214,9 +220,11 @@ function formatDate(date: string | null): string {
         </div>
       </div>
 
-      <EmptyState v-else title="No activity yet" description="Publishing activity appears here once campaigns run — real for connected channels, simulated for the rest.">
+      <div v-else class="p-6">
+        <EmptyState title="No activity yet" description="Publishing activity appears here once campaigns run — real for connected channels, simulated for the rest.">
         <template #icon><PaperAirplaneIcon class="size-6" /></template>
-      </EmptyState>
+        </EmptyState>
+      </div>
     </Card>
   </div>
 </template>

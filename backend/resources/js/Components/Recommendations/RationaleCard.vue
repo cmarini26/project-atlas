@@ -14,16 +14,16 @@ const labels: Record<string, string> = {
 </script>
 
 <template>
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
     <div
       v-for="(value, key) in rationaleDisplay"
       :key="key"
-      class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-4"
+      class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-[var(--radius-md)] p-5 shadow-[var(--shadow-card)]"
     >
-      <h3 class="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide mb-2">
+      <h3 class="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-[0.12em] mb-2">
         {{ labels[key] ?? String(key).replace(/_/g, ' ') }}
       </h3>
-      <p class="text-base leading-relaxed text-[var(--color-text-secondary)]">{{ value }}</p>
+      <p class="text-base leading-7 text-[var(--color-text-secondary)]">{{ value }}</p>
     </div>
   </div>
 </template>

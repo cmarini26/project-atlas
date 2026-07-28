@@ -3,6 +3,7 @@
 namespace App\AI\Prompts;
 
 use App\Domain\BusinessBrain\BusinessBrain;
+use App\Models\CampaignBrief;
 use App\Models\CatalogItem;
 use App\Models\Fact;
 use App\Models\Knowledge;
@@ -117,6 +118,27 @@ TEXT;
 
     private function resolveSubject(): string
     {
+        if ($this->opportunity->subject_type === 'campaign_brief' && $this->opportunity->subject instanceof CampaignBrief) {
+            $brief = $this->opportunity->subject->loadMissing('sourceAssets');
+            $assets = $brief->sourceAssets
+                ->map(fn ($asset): string => "- {$asset->title}: {$asset->description}")
+                ->implode("\n");
+
+            return <<<TEXT
+
+Customer campaign brief:
+- Title: {$brief->title}
+- Goal: {$brief->goal}
+- Objective: {$brief->objective}
+- Audience: {$brief->audience}
+- Additional guidance: {$brief->guidance}
+- Requested start: {$brief->starts_at}
+- Requested end: {$brief->ends_at}
+- Selected source assets:
+{$assets}
+TEXT;
+        }
+
         if ($this->opportunity->subject_type !== 'catalog_item' || $this->opportunity->subject_id === null) {
             return '';
         }

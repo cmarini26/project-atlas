@@ -17,6 +17,7 @@ class Campaign extends Model
     protected $fillable = [
         'company_id',
         'decision_id',
+        'campaign_brief_id',
         'recommendation_id',
         'email_audience_id',
         'campaign_type',
@@ -50,6 +51,12 @@ class Campaign extends Model
     public function decision(): BelongsTo
     {
         return $this->belongsTo(Decision::class);
+    }
+
+    /** @return BelongsTo<CampaignBrief, $this> */
+    public function brief(): BelongsTo
+    {
+        return $this->belongsTo(CampaignBrief::class, 'campaign_brief_id');
     }
 
     /** @return BelongsTo<EmailAudience, $this> */

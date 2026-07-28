@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { reactive } from 'vue'
 import Index from './Index.vue'
+import type { MarketingChannelCapability } from '@/lib/marketingChannelCapability'
 
 const postMock = vi.fn()
 const patchMock = vi.fn()
@@ -24,8 +25,7 @@ vi.mock('@inertiajs/vue3', () => ({
     }),
 }))
 
-function makeChannel(overrides: Record<string, unknown> = {}) {
-  return {
+const baseChannel = {
     id: 'channel-1',
     type: 'instagram',
     display_name: 'CBB Auctions Instagram',
@@ -33,7 +33,12 @@ function makeChannel(overrides: Record<string, unknown> = {}) {
     status: 'active',
     importance: 'primary',
     objective: ['awareness'],
-    capability: 'declared',
+    capability: 'declared' as MarketingChannelCapability,
+}
+
+function makeChannel(overrides: Partial<typeof baseChannel> = {}) {
+  return {
+    ...baseChannel,
     ...overrides,
   }
 }

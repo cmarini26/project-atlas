@@ -24,6 +24,8 @@ class BackupScriptSafetyTest extends TestCase
 
     private string $restoreScript;
 
+    private string $filesBackupScript;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -32,6 +34,7 @@ class BackupScriptSafetyTest extends TestCase
         $this->backupScript = "{$root}/atlas-db-backup.sh";
         $this->verifyScript = "{$root}/atlas-db-verify.sh";
         $this->restoreScript = "{$root}/atlas-db-restore.sh";
+        $this->filesBackupScript = "{$root}/atlas-files-backup.sh";
     }
 
     /**
@@ -77,6 +80,43 @@ class BackupScriptSafetyTest extends TestCase
     {
         $this->assertFileExists($this->restoreScript);
         $this->assertTrue(is_executable($this->restoreScript));
+    }
+
+    public function test_the_files_backup_script_exists_and_is_executable(): void
+    {
+        $this->assertFileExists($this->filesBackupScript);
+        $this->assertTrue(is_executable($this->filesBackupScript));
+    }
+
+    public function test_files_backup_fails_loudly_when_source_is_missing(): void
+    {
+        $result = Process::run(['bash', $this->filesBackupScript, '/tmp/atlas-missing-'.uniqid()]);
+
+        $this->assertFalse($result->successful());
+        $this->assertStringContainsString('FAILED', $this->combinedOutput($result));
+    }
+
+    public function test_files_backup_archives_customer_uploads(): void
+    {
+        $source = sys_get_temp_dir().'/atlas-files-source-'.uniqid();
+        $destination = sys_get_temp_dir().'/atlas-files-backup-'.uniqid();
+        mkdir($source, 0777, true);
+        file_put_contents("{$source}/customer-story.pdf", 'customer-owned-content');
+
+        try {
+            $result = Process::run(['bash', $this->filesBackupScript, $source, $destination]);
+
+            $this->assertTrue($result->successful(), $this->combinedOutput($result));
+            $archives = glob("{$destination}/atlas-files-*.tar.gz");
+            $this->assertIsArray($archives);
+            $this->assertCount(1, $archives);
+
+            $listing = Process::run(['tar', '-tzf', $archives[0]]);
+            $this->assertTrue($listing->successful());
+            $this->assertStringContainsString('customer-story.pdf', $listing->output());
+        } finally {
+            Process::run(['rm', '-rf', $source, $destination]);
+        }
     }
 
     // ── Backup script fails loudly on missing configuration ──────────────────

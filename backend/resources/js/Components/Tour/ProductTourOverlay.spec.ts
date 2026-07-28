@@ -75,6 +75,43 @@ describe('ProductTourOverlay', () => {
     expect(text).toContain('Done')
   })
 
+  it('keeps the last-step card inside a short viewport', async () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 })
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 500 })
+
+    const target = document.createElement('div')
+    target.dataset.tour = 'recent-executions'
+    target.getBoundingClientRect = () => ({
+      top: 430,
+      right: 374,
+      bottom: 480,
+      left: 16,
+      width: 358,
+      height: 50,
+      x: 16,
+      y: 430,
+      toJSON: () => ({}),
+    })
+    document.body.appendChild(target)
+
+    const { startTour, nextStep } = useProductTour()
+    startTour()
+    nextStep()
+    nextStep()
+    nextStep()
+
+    wrapper = mount(ProductTourOverlay, { attachTo: document.body })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const dialog = document.body.querySelector('[role="dialog"]')
+    const card = dialog?.querySelector(':scope > div:last-child') as HTMLElement | null
+
+    expect(card).not.toBeNull()
+    expect(Number.parseFloat(card?.style.top ?? '999')).toBeLessThanOrEqual(276)
+    expect(card?.className).toContain('max-h-[calc(100dvh-2rem)]')
+    expect(card?.className).toContain('overflow-y-auto')
+  })
+
   it('closes the overlay when Skip is clicked', async () => {
     const { state, startTour } = useProductTour()
     startTour()

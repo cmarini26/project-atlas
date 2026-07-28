@@ -6,6 +6,7 @@ use App\AI\Exceptions\AiProviderOverloadedException;
 use App\Events\ObservationProcessed;
 use App\Models\Company;
 use App\Models\Observation;
+use App\Models\SourceAsset;
 use App\Services\Analyst\AnalystRegistry;
 use App\Services\Brain\FactService;
 use App\Services\Brain\KnowledgeService;
@@ -136,5 +137,19 @@ class ProcessObservation implements ShouldQueue
 
             report($e);
         }
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        if (! str_starts_with($this->observation->source_identifier, 'source_asset:')) {
+            return;
+        }
+
+        SourceAsset::withoutGlobalScopes()
+            ->whereKey(substr($this->observation->source_identifier, strlen('source_asset:')))
+            ->update([
+                'status' => 'failed',
+                'processing_error' => $exception?->getMessage() ?? 'Atlas could not analyze this asset.',
+            ]);
     }
 }

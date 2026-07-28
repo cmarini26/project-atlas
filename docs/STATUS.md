@@ -23,19 +23,78 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 |-------------------|--------|-------|
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
-| Tests             | ✅ Strong | 1328 tests (1325 passing, 3 skipped where the local environment can't support it) + 175 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: Channel Capability Matrix truth-alignment pass (see Current Milestone below). |
+| Tests             | ✅ Strong | 1400 tests (1397 passing, 3 skipped where the local environment can't support it) + 195 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: SCRUM-62 custom campaign composer (see Current Milestone below). |
 | CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
 | Infrastructure    | ⬜ Not provisioned | No staging or production environment |
 
-**Overall:** Milestone 10 complete + onboarding pipeline fixed (Phase 1–9) + P0 product-polish tier shipped + P1 Customer Trust & Navigation slice shipped (approval confirmation dialog, safety-tested company switcher, persistent layout + `Link` sweep, toast primitive — see [P1-Customer-Trust-Navigation-Review.md](reviews/P1-Customer-Trust-Navigation-Review.md)) + Channel Publishing Reality audit complete (see [Channel-Publishing-Reality-Audit.md](reviews/Channel-Publishing-Reality-Audit.md)) + Milestone 11 specified and planned (see [marketing-presence.md](../specs/core/marketing-presence.md) and [Milestone-11-Marketing-Presence.md](plans/Milestone-11-Marketing-Presence.md)) + **Milestone 11 Phases 1–7 implemented** (see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md)). The `marketing_channels` table, `App\Models\MarketingChannel`, five new backed enums, and `MarketingChannelFactory` exist — declaring a marketing channel is representable in the database with zero API connection required. `App\Services\MarketingPresence\MarketingPresenceService` provides the full CRUD lifecycle; `MarketingChannelCapabilityResolver` derives a channel's domain-level lifecycle stage. The onboarding wizard has a fourth, final step declaring channels with zero metadata. A Settings sub-page (`/app/settings/marketing-presence`) lets a user view/add/edit/disable declared channels with capability badges. `App\Domain\BusinessBrain\BusinessBrain` carries a synthesized `MarketingPresenceSummary` (never raw rows). `App\Services\Decision\MarketingChannelSelector` makes `DecisionEngine::evaluate()` Marketing-Presence-aware when resolving `Decision.channel_ids` — preferring `primary`-linked channels, excluding `inactive`/`planned`-linked ones, and reporting declared-but-unlinked channels as draft-only content targets. **New in Phase 7:** the Recommendation detail page now shows a "channel mix" (primary/supporting/draft-only/unavailable, computed fresh at display time via `App\Services\Recommendation\ChannelMixPresenter`), and the existing four-state capability badge (`ChannelCapabilityBadge.vue`/`channelCapability.ts`) was extended — additively, not replaced — to resolve capability from a linked `MarketingChannel`'s `supports_publishing` flag when one exists, falling back to the prior global type-only lookup otherwise, per `specs/core/marketing-presence.md` §11. No new AI prompt work, no schema change, no regression to the approval workflow. No Opportunity detection changes, no publishing changes were made. Remaining P1 items (email notifications, Sentry, AI usage persistence, icon/Button/FormField primitives, a first real channel publisher) and all P2 items are tracked in [Product-Polish-Audit.md](reviews/Product-Polish-Audit.md). 840 tests (838 passing, 2 Redis skipped) + 24 Vitest tests. PHPStan level 8 — 0 errors. Pint clean.
+**Overall:** Milestone 10 complete + onboarding pipeline fixed (Phase 1–9) + P0 product-polish tier shipped + P1 Customer Trust & Navigation slice shipped (approval confirmation dialog, safety-tested company switcher, persistent layout + `Link` sweep, toast primitive — see [P1-Customer-Trust-Navigation-Review.md](reviews/P1-Customer-Trust-Navigation-Review.md)) + Channel Publishing Reality audit complete (see [Channel-Publishing-Reality-Audit.md](reviews/Channel-Publishing-Reality-Audit.md)) + Milestone 11 specified and planned (see [marketing-presence.md](../specs/core/marketing-presence.md) and [Milestone-11-Marketing-Presence.md](plans/Milestone-11-Marketing-Presence.md)) + **Milestone 11 Phases 1–7 implemented** (see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md)). The `marketing_channels` table, `App\Models\MarketingChannel`, five new backed enums, and `MarketingChannelFactory` exist — declaring a marketing channel is representable in the database with zero API connection required. `App\Services\MarketingPresence\MarketingPresenceService` provides the full CRUD lifecycle; `MarketingChannelCapabilityResolver` derives a channel's domain-level lifecycle stage. The onboarding wizard has a fourth, final step declaring channels with zero metadata. A Settings sub-page (`/app/settings/marketing-presence`) lets a user view/add/edit/disable declared channels with capability badges. `App\Domain\BusinessBrain\BusinessBrain` carries a synthesized `MarketingPresenceSummary` (never raw rows). `App\Services\Decision\MarketingChannelSelector` makes `DecisionEngine::evaluate()` Marketing-Presence-aware when resolving `Decision.channel_ids` — preferring `primary`-linked channels, excluding `inactive`/`planned`-linked ones, and reporting declared-but-unlinked channels as draft-only content targets. **New locally since the 2026-07-16 doc pass:** SendGrid now exists as a second real email provider in the provider registry/settings flow, and Twilio now has both a Settings connect/test path and a real single-destination SMS campaign publisher in code (see 2026-07-20 milestone note below).
 
 ---
 
 ## Current Milestone
 
-**Production-Readiness Gap Plan — Production Readiness Checklist + WordPress/UI hardening ✅ Complete**
-*Completed: 2026-07-16* — see [Production-Readiness-Checklist.md](ops/Production-Readiness-Checklist.md)
+**SCRUM-62 — Customer-authored campaigns from Asset Library sources ✅ Implemented locally**
+*Completed locally: 2026-07-28*
+
+Customers can now deliberately compose a campaign from one or more ready Asset Library sources. The composer captures the title, objective, goal, audience, additional guidance, timing, and active delivery channels, then routes that customer-authored brief through Atlas's existing Decision → Campaign → Content Asset → Recommendation pipeline.
+
+The resulting recommendation review preserves the original brief and all selected source-asset provenance. Customers can inspect generated drafts and change the selected delivery channels before approval. The approval boundary remains unchanged: composing a campaign creates only draft content and a pending recommendation, with no execution or external publishing.
+
+Verification: `php artisan test` → 1397 passed, 3 skipped, 3936 assertions; `npm test -- --run` → 195 passed; `npm exec vue-tsc -- --noEmit` → passed; PHPStan level 8 → 0 errors; Pint → passed. The production bundle compiled successfully; Vite currently exits nonzero after compilation because Rolldown reports invalid pure-annotation positions in the installed `@vueuse/core` dependency.
+
+**Previous milestone:**
+
+**Overnight enhancement audit — SCRUM-55/56/57 quality gates ✅ Implemented locally**
+*Completed locally: 2026-07-28*
+
+Restored the repository's authoritative verification signal before continuing feature work. SCRUM-55 updates stale approval and Campaign Show fixtures to preserve the current selection-first safety contract; all 189 Vitest tests now pass. SCRUM-56 raises PHPUnit's test-process memory ceiling to 512 MB, acknowledges the installed TypeScript 6 deprecation window while retaining the existing path alias, resolves every newly-visible Vue type error, and restores repository-wide Pint cleanliness. SCRUM-57 makes the Asset Library's Eloquent relationships, observation dispatch, collection serialization, and date casts PHPStan level 8 clean without suppressions or baselines.
+
+Verification: `php artisan test` → 1380 passed, 3 skipped, 3830 assertions; `npm test -- --run` → 189 passed; `npm exec vue-tsc -- --noEmit` → passed; PHPStan level 8 → 0 errors; Pint → passed; production build → passed.
+
+**SCRUM-58 — Asset media identity ✅ Implemented locally:** source-asset idempotency now includes a SHA-256 checksum of uploaded file content. Identical submissions remain idempotent, different media with the same descriptive fields remain distinct, replacing media triggers fresh analysis, archived assets can be re-added, and editing into an existing identical asset returns an actionable validation error instead of a database constraint failure.
+
+**SCRUM-59 — Media-aware Asset Library previews ✅ Implemented locally:** uploaded media now retains its detected MIME type. The Asset Library renders images, videos, and documents with appropriate accessible previews, while legacy records without MIME metadata fall back safely by file extension instead of showing broken images.
+
+**SCRUM-60 — Durable source-asset uploads ✅ Implemented locally:** production deployment now creates and verifies Laravel's public-storage link while preserving upload storage across releases. A tested uploaded-file backup script and corrected recovery runbook cover Asset Library files alongside database backups, including encryption, off-site copy, retention, and restore-drill requirements.
+
+**SCRUM-61 — Transaction-safe source-asset uploads ✅ Implemented locally:** newly stored media is now compensatingly deleted when asset or observation persistence rolls back. Failed updates preserve the original database record and original file, while concurrent identical-create constraint races discard only the losing upload and resolve to the already committed asset.
+
+**Previous milestone:**
+
+**SCRUM-54 — Customer Asset Library and campaign provenance ✅ Implemented locally**
+*Completed locally: 2026-07-27*
+
+Customers can now add tenant-scoped products/services, promotions/events, photos/videos, documents/case studies, webpages/blog posts, and brand materials from a new `/app/assets` Asset Library. Optional source URLs, uploads, timing, descriptions, and metadata are preserved as customer-owned `SourceAsset` records, deliberately separate from Atlas-generated campaign `ContentAsset` records.
+
+Each new source is recorded as an idempotent manual Observation, analyzed deterministically into provenance-preserving Business Brain Facts, and converted into a deduplicated Opportunity that continues through Atlas's existing Decision → Campaign → Recommendation workflow. External publishing remains approval-gated. Recommendation review now identifies the originating source asset, and failed analysis can be retried from the library.
+
+Verification: 45 relevant PHP tests passed (162 assertions), including tenant isolation, CRUD, duplicate submission, analyst resolution, fact provenance, opportunity deduplication, and the existing observation/recommendation suites. `npm run build` passed. The full Vitest run still has 15 failures in pre-existing approval/campaign specs caused by missing props and stale dialog expectations; none involve this slice.
+
+**Previous milestone:**
+
+**Production-Readiness Gap Plan — Shopify observation + Mailchimp audience-sync connectors ✅ Implemented locally, pending live-account validation**
+*Completed locally: 2026-07-23*
+
+Atlas now has a real, customer-reachable connector path for the first beta tester's actual stack — **Shopify for website/store context** and **Mailchimp for email audience sync** — instead of only the earlier WordPress + provider-native email path.
+
+- **Shopify observation is now a real integration type.** `SettingsController` exposes a Shopify connect/disconnect flow, `ShopifyConnectionService` pings the real Shopify Admin API before persisting, `ShopifyConnector` is registered in `ConnectorServiceProvider`, and a connected Shopify integration can now sync live store + product context into Atlas's Observation pipeline.
+- **Mailchimp audience sync is now a real integration type.** `SettingsController` exposes a Mailchimp connect/disconnect flow, `MailchimpConnectionService` validates the audience before persisting, and `MailchimpConnector` now imports Mailchimp audience members into Atlas `email_audiences` / `email_contacts` so Atlas can target real recipients using the existing email campaign path.
+- **Scope note:** this is intentionally the narrowest honest beta slice. Shopify is an **observation/import connector**, not a publishing destination. Mailchimp is an **audience-sync connector**, not a Mailchimp-native send/analytics provider. Atlas can now observe the beta tester's Shopify store and pull their Mailchimp audience into Atlas, but outbound email execution still runs through Atlas's real provider-backed email channel layer (Postmark / SendGrid), not through Mailchimp campaign sending.
+
+**Verification completed for this slice:**
+
+- `php artisan test --filter='(SettingsControllerTest|ConnectorRegistryTest|ShopifyConnectorTest|MailchimpConnectorTest)'` → **56 passed, 245 assertions**
+- `php artisan migrate:fresh --env=testing --force` → passed with the new integration-type migration ordering intact
+- `php artisan test` → **1366 passed, 3 skipped, 3 deprecated**
+- `npm run build` → passed after the Settings UI changes
+
+**Why this matters:** the first beta tester is no longer blocked purely by an unsupported Shopify + Mailchimp stack at the code level. Atlas now has a real path to ingest the tester's store context and recipient audience. The remaining honesty boundary is still **live third-party account validation** plus the existing infrastructure / deployment / operations blockers.
+
+**Previous milestone:**
+
+**Production-Readiness Gap Plan — SendGrid + Twilio connector slice ✅ Implemented locally, pending broader release/docs sweep**
+*Completed locally: 2026-07-20*
 
 Backfills two more code-side slices shipped since the Phase 0/1 entry below without a STATUS.md entry, plus today's operational-readiness doc work:
 

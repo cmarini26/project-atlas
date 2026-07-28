@@ -25,9 +25,9 @@ withDefaults(
 defineEmits<{ click: [MouseEvent] }>()
 
 const variantClasses: Record<string, string> = {
-  primary: 'bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)]',
-  secondary: 'border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)]',
-  ghost: 'text-[var(--color-text-link)] hover:underline',
+  primary: 'bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] shadow-[var(--shadow-card)]',
+  secondary: 'border border-[var(--color-border-strong)] bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-panel)] hover:text-[var(--color-text-primary)]',
+  ghost: 'text-[var(--color-text-link)] hover:bg-[var(--color-accent-50)] hover:underline',
   danger: 'bg-rose-600 text-white hover:bg-rose-700',
 }
 
@@ -44,9 +44,9 @@ const sizeClasses: Record<string, string> = {
     :type="as === 'button' ? type : undefined"
     :disabled="as === 'button' ? disabled || loading : undefined"
     :class="[
-      'inline-flex items-center justify-center gap-2 font-medium rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-fast)]',
+      'inline-flex items-center justify-center gap-2 font-semibold rounded-[var(--radius-sm)] transition-colors duration-[var(--duration-fast)]',
       variantClasses[variant],
-      variant !== 'ghost' ? sizeClasses[size] : '',
+      variant !== 'ghost' ? sizeClasses[size] : ['rounded-[var(--radius-sm)]', sizeClasses[size]],
       fullWidth ? 'w-full' : '',
       disabled || loading ? 'opacity-60 cursor-not-allowed' : '',
     ]"

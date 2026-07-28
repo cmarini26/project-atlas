@@ -91,7 +91,26 @@ These were explicitly out of scope for M7:
 
 | Item | Priority | Notes |
 |------|----------|-------|
-| `PostmarkEmailProvider` | High | M8 target; credential validation should ping `/server` endpoint |
+| `PostmarkEmailProvider` | High | **Historical:** this was the next-step target at the time. Postmark is now implemented, and Atlas has also added `SendGridEmailProvider`; use newer docs for current provider truth. |
 | `AnthropicProvider` (real) | High | Still `FakeAiProvider` in all environments; must bind real provider before production use |
 | `from_name` / `from_email` default fallback | Low | `EmailRenderer` returns empty strings when not in metadata; `LogEmailProvider` logs them but real providers will need valid sender details — enforce via credential validation in M8 |
 | Filament email preview | Low | Executions visible in `ExecutionResource`; no email-specific preview UI |
+
+---
+
+## Addendum — 2026-07-20: this milestone is now historical, not current-state truth
+
+This review correctly describes what shipped in Milestone 7, but it should no longer be read as Atlas's current email state.
+
+Since this milestone:
+
+- `PostmarkEmailProvider` was implemented
+- Atlas's email connect flow became provider-aware
+- `SendGridEmailProvider` was added as a second real email provider
+- email became a real closed-loop channel in code, while SendGrid broadened the send-provider surface
+
+Use these documents for current truth instead:
+
+- [STATUS.md](../STATUS.md)
+- [Channel-Capability-Matrix.md](../product/Channel-Capability-Matrix.md)
+- [EmailArchitecture.md](../architecture/EmailArchitecture.md)

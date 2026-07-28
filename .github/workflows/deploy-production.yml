@@ -1,0 +1,146 @@
+name: Deploy Production
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref or commit SHA to deploy
+        required: true
+        default: main
+
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy The Clear Move
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: https://theclearmove.com
+
+    steps:
+      - name: Resolve deployment ref
+        id: deployment
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          MANUAL_REF: ${{ inputs.ref }}
+          VERIFIED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
+            echo "ref=$VERIFIED_SHA" >> "$GITHUB_OUTPUT"
+          else
+            if [[ ! "$MANUAL_REF" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+              echo "Manual ref contains unsupported characters" >&2
+              exit 2
+            fi
+            echo "ref=$MANUAL_REF" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out verified source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.deployment.outputs.ref }}
+
+      - name: Record deployed commit
+        id: commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: bcmath, curl, dom, intl, mbstring, pdo_pgsql, xml, zip
+          coverage: none
+
+      - name: Install production PHP dependencies
+        working-directory: backend
+        run: |
+          cp .env.example .env
+          composer install \
+            --no-dev \
+            --no-interaction \
+            --prefer-dist \
+            --optimize-autoloader
+          rm .env
+
+      - name: Build frontend assets
+        working-directory: backend
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+          test -f public/build/manifest.json
+
+      - name: Package release
+        env:
+          RELEASE_SHA: ${{ steps.commit.outputs.sha }}
+        run: |
+          tar \
+            --exclude='.git' \
+            --exclude='backend/.env' \
+            --exclude='backend/node_modules' \
+            --exclude='backend/playwright-report' \
+            --exclude='backend/test-results' \
+            -czf "${RUNNER_TEMP}/atlas-${RELEASE_SHA}.tar.gz" .
+
+      - name: Configure production SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.PRODUCTION_KNOWN_HOSTS }}
+        run: |
+          test -n "$SSH_PRIVATE_KEY"
+          test -n "$SSH_KNOWN_HOSTS"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/production"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/production" "$HOME/.ssh/known_hosts"
+
+      - name: Upload release
+        env:
+          RELEASE_SHA: ${{ steps.commit.outputs.sha }}
+          SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST }}
+          SSH_USER: ${{ secrets.PRODUCTION_SSH_USER }}
+        run: |
+          test -n "$SSH_HOST"
+          test -n "$SSH_USER"
+          scp \
+            -i "$HOME/.ssh/production" \
+            "${RUNNER_TEMP}/atlas-${RELEASE_SHA}.tar.gz" \
+            infrastructure/deploy/deploy-production.sh \
+            "${SSH_USER}@${SSH_HOST}:/tmp/"
+
+      - name: Activate release
+        env:
+          RELEASE_SHA: ${{ steps.commit.outputs.sha }}
+          SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST }}
+          SSH_USER: ${{ secrets.PRODUCTION_SSH_USER }}
+        run: |
+          ssh -i "$HOME/.ssh/production" "${SSH_USER}@${SSH_HOST}" \
+            "sudo env RELEASE_SHA='${RELEASE_SHA}' \
+              RELEASE_ARCHIVE='/tmp/atlas-${RELEASE_SHA}.tar.gz' \
+              APP_ROOT='/var/www/atlas' \
+              APP_URL='https://theclearmove.com' \
+              PHP_FPM_SERVICE='php8.5-fpm' \
+              bash /tmp/deploy-production.sh"
+
+      - name: Verify public production endpoints
+        run: |
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 \
+            https://theclearmove.com/api/live
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 \
+            https://theclearmove.com/api/ready
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 \
+            https://theclearmove.com/api/health

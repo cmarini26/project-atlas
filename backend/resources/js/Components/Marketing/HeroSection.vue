@@ -44,9 +44,9 @@ const quadrants = [
         </h1>
 
         <p class="text-body-lg text-[var(--color-text-secondary)] max-w-xl mb-8">
-          Atlas connects to your business, builds a living model of what you sell, and recommends
+          The Clear Move connects to your business, builds a living model of what you sell, and recommends
           the right campaign at the right moment — with a full explanation of why. You review it.
-          You approve it. Atlas handles the rest.
+          You approve it. The Clear Move handles the rest.
         </p>
 
         <div

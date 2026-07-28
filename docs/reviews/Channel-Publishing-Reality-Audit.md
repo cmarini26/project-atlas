@@ -165,3 +165,19 @@ Production-readiness gap plan, Phase 0/1 close-out. Since the 2026-07-15 addendu
 - **Did not give WordPress a `MarketingChannelType` equivalent** — still the single largest remaining badge-truth gap. See the matrix's "Remaining truth gaps" §1.
 - **Did not add a Facebook observation connector, Google Business Profile observation, or a per-recipient email drill-down view** — all tracked in the matrix's "Remaining truth gaps."
 - **Did not attempt production validation against any real third-party account** — every provider in this codebase remains tested against HTTP-mocked requests only. This is Phase 6 of the production-readiness gap plan, not a doc-truth fix.
+
+---
+
+## Addendum — 2026-07-20: provider-aware email + real Twilio SMS make this audit even more historical
+
+This document is now primarily useful as **history**. The current source of truth remains [`docs/product/Channel-Capability-Matrix.md`](../product/Channel-Capability-Matrix.md), and that matrix changed again after this audit's 2026-07-16 addendum:
+
+1. **Email is no longer single-provider in practice.** `SettingsController::connectEmail()` and `EmailChannelService` are now provider-aware, and `PublisherServiceProvider` registers `SendGridEmailProvider` alongside `PostmarkEmailProvider`. Email remains Atlas's deepest channel, but the operational truth is now "provider-aware email" rather than "Postmark-only email."
+2. **SMS is no longer purely simulated/unreachable.** Atlas now has a real Twilio-backed Settings connect/test path plus a real `SmsPublisher` registered ahead of `LogChannelPublisher`. The current SMS scope is intentionally narrow — one sending number and one default destination number per company/channel, not a full audience/list + analytics loop — but it is no longer honest to describe SMS as categorically simulated-only in the codebase.
+3. **The old headline and intermediate tables in this audit are now doubly stale.** Read them only as a snapshot of the state when the audit was first written, not as a description of Atlas today.
+
+What has **not** changed:
+
+- No provider in this codebase has yet been verified against a real live third-party account in production.
+- Generic capability-badge truth still lags for channel types that lack a `MarketingChannelType` equivalent (`blog`, `sms`). Settings remains the accurate per-company source of truth for those channel connections.
+- LinkedIn, X, and landing-page execution are still simulated-only.

@@ -241,7 +241,9 @@ What exists now: `App\ErrorTracking\Contracts\ErrorTracker` (an interface with o
 
 ---
 
-## Blocker 6 — Wire Real Transactional Email
+## Blocker 6 — Real transactional email
+
+**2026-07-20 note:** the code-side scope of this blocker has broadened since the original write-up. Atlas no longer has only a Postmark-shaped email path in code; `SendGridEmailProvider` now exists as a second real send provider, and the Settings connect flow is provider-aware (`postmark` or `sendgrid`). The blocker's operational remainder is unchanged: **real credentials, sender verification, and live production validation** are still required before beta regardless of which provider is chosen.
 
 **Status:** ✅ Complete — 2026-07-10. Scope grew beyond this section's original "no controller changes" constraint, per the live task's explicit delivery-safety requirements (production-misconfiguration rejection, failure logging, anti-enumeration verification) — see "Decided during implementation" below. The Postmark mailer transport itself was also missing its underlying package (`symfony/postmark-mailer` was never installed, so selecting `MAIL_MAILER=postmark` would have thrown a class-not-found error even with valid credentials); that gap is now fixed too.
 

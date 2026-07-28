@@ -9,6 +9,7 @@ import type { ContentAsset } from '@/types'
 const props = defineProps<{
   recommendationId: string
   contentAssets?: ContentAsset[]
+  selectedContentAssetIds?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -21,7 +22,9 @@ const rejectNote = ref('')
 const approveError = ref<string | null>(null)
 const rejectError = ref<string | null>(null)
 
-const approveForm = useForm({})
+const approveForm = useForm({
+  selected_content_asset_ids: props.selectedContentAssetIds ?? [],
+})
 const rejectForm = useForm({ notes: '' })
 
 const assetTypeLabels: Record<string, string> = {
@@ -77,6 +80,8 @@ const approvalEffects = computed(() =>
   }),
 )
 
+const hasSelectedContent = computed(() => (props.selectedContentAssetIds?.length ?? 0) > 0)
+
 function requestApproval(): void {
   approveError.value = null
   showConfirm.value = true
@@ -84,6 +89,7 @@ function requestApproval(): void {
 
 function approve(): void {
   approveError.value = null
+  approveForm.selected_content_asset_ids = props.selectedContentAssetIds ?? []
   approveForm.post(`/app/recommendations/${props.recommendationId}/approve`, {
     preserveScroll: true,
     onSuccess: () => {
@@ -110,11 +116,11 @@ function reject(): void {
 
 <template>
   <div class="space-y-4">
-    <div class="flex flex-col sm:flex-row gap-3">
+    <div class="grid gap-3">
       <button
         type="button"
-        :disabled="approveForm.processing || rejectForm.processing"
-        class="flex-1 py-2.5 px-4 text-sm font-medium rounded-lg bg-[var(--color-accent-500)] text-white hover:bg-[var(--color-accent-600)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+        :disabled="approveForm.processing || rejectForm.processing || !hasSelectedContent"
+        class="w-full py-3 px-4 text-sm font-semibold rounded-[var(--radius-sm)] bg-[var(--color-surface-nav)] text-white hover:bg-black disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)] shadow-[var(--shadow-card)]"
         @click="requestApproval"
       >
         {{ approveForm.processing ? 'Approving…' : 'Approve' }}
@@ -122,8 +128,8 @@ function reject(): void {
 
       <button
         type="button"
-        :disabled="approveForm.processing || rejectForm.processing"
-        class="flex-1 py-2.5 px-4 text-sm font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+        :disabled="approveForm.processing || rejectForm.processing || !hasSelectedContent"
+        class="w-full py-2.5 px-4 text-sm font-semibold rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-white text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-panel)] hover:text-[var(--color-text-primary)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
         @click="emit('editAndApprove')"
       >
         Edit &amp; Approve
@@ -131,8 +137,8 @@ function reject(): void {
 
       <button
         type="button"
-        :disabled="approveForm.processing || rejectForm.processing"
-        class="flex-1 py-2.5 px-4 text-sm font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-subtle)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+        :disabled="approveForm.processing || rejectForm.processing || !hasSelectedContent"
+        class="w-full py-2.5 px-4 text-sm font-semibold rounded-[var(--radius-sm)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-panel)] hover:text-[var(--color-text-secondary)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
         @click="showRejectNote = !showRejectNote"
       >
         Not this time
@@ -141,7 +147,9 @@ function reject(): void {
 
     <p v-if="approveError" class="text-sm text-rose-600" role="alert">{{ approveError }}</p>
 
-    <p class="text-xs text-[var(--color-text-muted)]">
+    <p v-if="!hasSelectedContent" class="text-sm text-amber-700" role="alert">Select at least one delivery channel above before approving.</p>
+
+    <p class="rounded-[var(--radius-sm)] bg-[var(--color-surface-panel)] px-3 py-2 text-xs leading-5 text-[var(--color-text-muted)] ring-1 ring-[var(--color-border)]">
       Approving queues this content for delivery. Until a live channel is connected, delivery is simulated and logged internally — nothing is sent to a real platform yet. You can make edits before approving if anything needs changing.
     </p>
 
@@ -151,14 +159,14 @@ function reject(): void {
         id="reject-note"
         v-model="rejectNote"
         rows="2"
-        class="w-full px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] resize-none focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)]"
+        class="w-full px-3 py-2 text-sm rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] resize-none focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)]"
         placeholder="Tell Atlas why (helps it learn)"
       />
       <p v-if="rejectError" class="text-sm text-rose-600" role="alert">{{ rejectError }}</p>
       <button
         type="button"
         :disabled="rejectForm.processing"
-        class="w-full py-2 px-4 text-sm font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
+        class="w-full py-2 px-4 text-sm font-semibold rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-white text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-panel)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
         @click="reject"
       >
         {{ rejectForm.processing ? 'Passing…' : 'Confirm: not this time' }}

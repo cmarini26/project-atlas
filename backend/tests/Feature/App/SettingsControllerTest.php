@@ -12,6 +12,8 @@ use App\Models\InstagramAccount;
 use App\Models\Integration;
 use App\Models\MarketingChannel;
 use App\Models\User;
+use App\Services\Observatory\MailchimpConnectionService;
+use App\Services\Observatory\ShopifyConnectionService;
 use App\Services\Publishing\Email\Contracts\EmailProvider;
 use App\Services\Publishing\Email\EmailProviderRegistry;
 use App\Services\Publishing\Exceptions\PublishingException;
@@ -317,6 +319,7 @@ class SettingsControllerTest extends TestCase
 
         $this->actingAs($user)
             ->post('/app/settings/email/connect', [
+                'provider_type' => 'postmark',
                 'api_token' => 'server-token-abc123',
                 'from_email' => 'hello@cbb-auctions.example',
                 'from_name' => 'CBB Auctions',
@@ -342,6 +345,7 @@ class SettingsControllerTest extends TestCase
 
         $this->actingAs($user)
             ->post('/app/settings/email/connect', [
+                'provider_type' => 'postmark',
                 'api_token' => 'wrong-token',
                 'from_email' => 'hello@cbb-auctions.example',
             ])
@@ -370,6 +374,7 @@ class SettingsControllerTest extends TestCase
         $this->bindEmailProvider(pingResult: new PingResult(reachable: true));
 
         $this->actingAs($user)->post('/app/settings/email/connect', [
+            'provider_type' => 'postmark',
             'api_token' => 'server-token-abc123',
             'from_email' => 'hello@cbb-auctions.example',
         ]);
@@ -395,6 +400,7 @@ class SettingsControllerTest extends TestCase
         $this->bindEmailProvider(pingResult: new PingResult(reachable: true));
 
         $this->actingAs($user)->post('/app/settings/email/connect', [
+            'provider_type' => 'postmark',
             'api_token' => 'old-token',
             'from_email' => 'hello@cbb-auctions.example',
         ]);
@@ -402,6 +408,7 @@ class SettingsControllerTest extends TestCase
         $this->bindEmailProvider(pingResult: new PingResult(reachable: true));
 
         $this->actingAs($user)->post('/app/settings/email/connect', [
+            'provider_type' => 'postmark',
             'api_token' => 'new-token',
             'from_email' => 'hello@cbb-auctions.example',
         ]);
@@ -421,6 +428,7 @@ class SettingsControllerTest extends TestCase
         $this->bindEmailProvider(pingResult: new PingResult(reachable: true));
 
         $this->actingAs($userA)->post('/app/settings/email/connect', [
+            'provider_type' => 'postmark',
             'api_token' => 'company-a-token',
             'from_email' => 'hello@company-a.example',
         ]);
@@ -441,6 +449,7 @@ class SettingsControllerTest extends TestCase
         ]);
 
         $this->actingAs($user)->post('/app/settings/email/connect', [
+            'provider_type' => 'postmark',
             'api_token' => 'server-token-abc123',
             'from_email' => 'hello@cbb-auctions.example',
         ]);
@@ -458,6 +467,7 @@ class SettingsControllerTest extends TestCase
 
         $this->actingAs($user)
             ->post('/app/settings/email/connect', [
+                'provider_type' => 'postmark',
                 'api_token' => 'server-token-abc123',
                 'from_email' => 'hello@cbb-auctions.example',
             ])
@@ -644,16 +654,17 @@ class SettingsControllerTest extends TestCase
 
     /**
      * Binds a fresh EmailProviderRegistry containing a single mocked
-     * EmailProvider (supports() → 'postmark' only), mirroring the pattern
-     * CheckChannelHealthTest already uses for ChannelPublisherRegistry.
+     * EmailProvider, mirroring the pattern CheckChannelHealthTest already uses
+     * for ChannelPublisherRegistry.
      */
     private function bindEmailProvider(
+        string $providerType = 'postmark',
         ?PingResult $pingResult = null,
         ?string $sendMessageId = null,
         ?PublishingException $sendException = null,
     ): EmailProvider {
         $provider = Mockery::mock(EmailProvider::class);
-        $provider->shouldReceive('supports')->with('postmark')->andReturn(true)->byDefault();
+        $provider->shouldReceive('supports')->with($providerType)->andReturn(true)->byDefault();
 
         if ($pingResult !== null) {
             $provider->shouldReceive('ping')->andReturn($pingResult);
@@ -777,6 +788,81 @@ class SettingsControllerTest extends TestCase
                 ->where('instagram_account.username', 'cbb_auctions')
                 ->where('instagram_account.follower_count', 4210)
             );
+    }
+
+    public function test_connect_shopify_creates_an_integration_and_dispatches_sync(): void
+    {
+        Bus::fake();
+
+        [$user, $company] = $this->userWithCompany();
+
+        $service = Mockery::mock(ShopifyConnectionService::class);
+        $service->shouldReceive('connect')->once()->andReturn(new PingResult(reachable: true));
+        $this->app->instance(ShopifyConnectionService::class, $service);
+
+        Integration::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'shopify',
+            'name' => 'Acme Shopify',
+            'status' => 'active',
+            'config' => ['shop_domain' => 'acme.myshopify.com'],
+        ]);
+
+        $this->actingAs($user)
+            ->post('/app/settings/integrations/shopify', [
+                'shop_domain' => 'acme.myshopify.com',
+                'admin_api_token' => 'shpat_test',
+            ])
+            ->assertRedirect();
+
+        Bus::assertDispatched(SyncIntegration::class, fn ($job) => $job->integration->company_id === $company->id && $job->integration->type === 'shopify');
+    }
+
+    public function test_connect_mailchimp_creates_an_integration_and_dispatches_sync(): void
+    {
+        Bus::fake();
+
+        [$user, $company] = $this->userWithCompany();
+
+        $service = Mockery::mock(MailchimpConnectionService::class);
+        $service->shouldReceive('connect')->once()->andReturn(new PingResult(reachable: true));
+        $this->app->instance(MailchimpConnectionService::class, $service);
+
+        Integration::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'mailchimp',
+            'name' => 'Mailchimp: Newsletter',
+            'status' => 'active',
+            'config' => ['audience_id' => 'abc123'],
+        ]);
+
+        $this->actingAs($user)
+            ->post('/app/settings/integrations/mailchimp', [
+                'server_prefix' => 'us14',
+                'api_key' => 'mc-key',
+                'audience_id' => 'abc123',
+            ])
+            ->assertRedirect();
+
+        Bus::assertDispatched(SyncIntegration::class, fn ($job) => $job->integration->company_id === $company->id && $job->integration->type === 'mailchimp');
+    }
+
+    public function test_connect_shopify_requires_valid_input(): void
+    {
+        [$user] = $this->userWithCompany();
+
+        $this->actingAs($user)
+            ->post('/app/settings/integrations/shopify', [])
+            ->assertSessionHasErrors(['shop_domain', 'admin_api_token']);
+    }
+
+    public function test_connect_mailchimp_requires_valid_input(): void
+    {
+        [$user] = $this->userWithCompany();
+
+        $this->actingAs($user)
+            ->post('/app/settings/integrations/mailchimp', [])
+            ->assertSessionHasErrors(['server_prefix', 'api_key', 'audience_id']);
     }
 
     public function test_connect_instagram_creates_an_integration_and_dispatches_sync(): void

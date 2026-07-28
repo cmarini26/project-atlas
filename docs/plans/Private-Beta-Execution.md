@@ -131,7 +131,7 @@ Run through this checklist yourself, end-to-end, as a real test account, before 
 
 ### Approval Flow
 
-- [ ] Approve works, and the confirmation dialog correctly and honestly describes what will happen (which channel, and that delivery is simulated/logged unless a real publisher is live for that channel).
+- [ ] Approve works, and the confirmation dialog correctly and honestly describes what will happen (which channel, and whether delivery is real, simulated, or manually required for that specific channel/company state).
 - [ ] Edit & Approve works: edited content is saved and reflected in what gets queued.
 - [ ] Reject ("Not This Time") works, with optional notes, and the Opportunity/Decision state updates correctly.
 - [ ] Only owner/admin roles can approve or reject (test with a `member`-role account and confirm it's denied).
@@ -139,9 +139,9 @@ Run through this checklist yourself, end-to-end, as a real test account, before 
 
 ### Publishing Expectations
 
-- [ ] For every channel type this beta customer could end up with, confirm and document whether it is: (a) genuinely publishing externally, (b) logging internally only (simulated), or (c) not reachable at all yet. As of this writing, no channel type does (a) — every "Published" state in the UI is (b) or unreachable. **This must be re-verified at beta-launch time, not assumed from this document, since a real publisher may ship before then.**
+- [ ] For every channel type this beta customer could end up with, confirm and document whether it is: (a) genuinely publishing externally, (b) logging internally only (simulated), or (c) not reachable at all yet. **Current code truth is no longer "none do (a)":** WordPress/blog, provider-aware email, Meta, and Twilio SMS all have real execution paths in code, but each still requires live production-account verification before beta launch.
 - [ ] The Publishing page's language matches this reality exactly — no claim of a live send where none exists.
-- [ ] If a real publisher (e.g., email via Postmark) has shipped by the time of onboarding, confirm at least one real send has actually been observed landing in a real inbox for a real (or realistic test) recipient — not just that the provider API returned success.
+- [ ] If a real publisher (e.g., email via Postmark or SendGrid, or SMS via Twilio) has shipped by the time of onboarding, confirm at least one real send has actually been observed arriving at the real destination you control — not just that the provider API returned success.
 - [ ] The customer has been told, in writing (invite email or Getting Started guide), exactly which channels are real and which are simulated, before they approve their first campaign.
 
 ---
@@ -233,5 +233,18 @@ Once Customer 1 is invited, the cadence changes from "prepare" to "watch and res
 - Update `docs/STATUS.md` with what happened this week: customers onboarded, issues found, issues fixed, and any change to the Go/No-Go posture for continuing.
 
 ---
+
+## Addendum — 2026-07-20: updated channel reality for the beta checklist
+
+Since this checklist was first authored, Atlas's execution surface widened in the local worktree:
+
+- **Email is now provider-aware** (`postmark` and `sendgrid`), not a single-provider assumption.
+- **SMS/Twilio now has a real Settings connect/test path and a real single-destination publisher in code.**
+
+What this does **not** change for the beta checklist:
+
+- The Go/No-Go gate still requires **live production verification** of any channel you intend to expose to Customer 1.
+- SMS should still be treated as **narrow-scope** unless/until a fuller audience/list + analytics + learning loop exists.
+- This checklist should continue to prefer the narrowest honest beta promise: website observation + recommendation/approval + real email/WordPress execution, with any additional channel clearly labeled by actual readiness.
 
 *This checklist should be run in full before Customer 1, and its daily/weekly sections should keep running for as long as the private beta is active. When Stage A's success metrics (defined in [Version-1.0-Roadmap.md](Version-1.0-Roadmap.md)) are met, move to Stage B planning — don't keep operating Stage A's cadence indefinitely once its job is done.*
