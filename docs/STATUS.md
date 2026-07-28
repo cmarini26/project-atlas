@@ -47,6 +47,8 @@ Verification: `php artisan test` → 1380 passed, 3 skipped, 3830 assertions; `n
 
 **SCRUM-60 — Durable source-asset uploads ✅ Implemented locally:** production deployment now creates and verifies Laravel's public-storage link while preserving upload storage across releases. A tested uploaded-file backup script and corrected recovery runbook cover Asset Library files alongside database backups, including encryption, off-site copy, retention, and restore-drill requirements.
 
+**SCRUM-61 — Transaction-safe source-asset uploads ✅ Implemented locally:** newly stored media is now compensatingly deleted when asset or observation persistence rolls back. Failed updates preserve the original database record and original file, while concurrent identical-create constraint races discard only the losing upload and resolve to the already committed asset.
+
 **Previous milestone:**
 
 **SCRUM-54 — Customer Asset Library and campaign provenance ✅ Implemented locally**

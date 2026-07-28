@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Models\Observation;
 use App\Models\SourceAsset;
 use DateTimeInterface;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
+use Throwable;
 
 class SourceAssetService
 {
@@ -33,26 +35,43 @@ class SourceAssetService
             return $existing;
         }
 
-        [$asset, $observation] = DB::transaction(function () use ($company, $data, $fingerprint, $mediaFingerprint): array {
-            $media = $data['media'] ?? null;
-            $mediaPath = $media instanceof UploadedFile
-                ? $media->store("source-assets/{$company->id}", 'public')
-                : null;
+        $mediaPath = $media instanceof UploadedFile
+            ? $this->storeMedia($media, $company->id)
+            : null;
 
-            $asset = SourceAsset::withoutGlobalScopes()->create([
-                ...Arr::except($data, ['media']),
-                'company_id' => $company->id,
-                'media_path' => $mediaPath,
-                'media_mime_type' => $media instanceof UploadedFile ? $media->getMimeType() : null,
-                'media_fingerprint' => $mediaFingerprint,
-                'content_fingerprint' => $fingerprint,
-                'status' => 'processing',
-            ]);
-            $observation = $this->observationFor($asset);
-            $asset->update(['observation_id' => $observation->id]);
+        try {
+            [$asset, $observation] = DB::transaction(function () use ($company, $data, $fingerprint, $mediaFingerprint, $media, $mediaPath): array {
+                $asset = SourceAsset::withoutGlobalScopes()->create([
+                    ...Arr::except($data, ['media']),
+                    'company_id' => $company->id,
+                    'media_path' => $mediaPath,
+                    'media_mime_type' => $media instanceof UploadedFile ? $media->getMimeType() : null,
+                    'media_fingerprint' => $mediaFingerprint,
+                    'content_fingerprint' => $fingerprint,
+                    'status' => 'processing',
+                ]);
+                $observation = $this->observationFor($asset);
+                $asset->update(['observation_id' => $observation->id]);
 
-            return [$asset, $observation];
-        });
+                return [$asset, $observation];
+            });
+        } catch (Throwable $exception) {
+            $this->deleteMedia($mediaPath);
+
+            if ($exception instanceof QueryException && $this->isUniqueConstraintViolation($exception)) {
+                $existing = SourceAsset::withoutGlobalScopes()
+                    ->where('company_id', $company->id)
+                    ->whereNull('deleted_at')
+                    ->where('content_fingerprint', $fingerprint)
+                    ->first();
+
+                if ($existing !== null) {
+                    return $existing;
+                }
+            }
+
+            throw $exception;
+        }
 
         ObservationRecorded::dispatch($observation);
 
@@ -85,8 +104,10 @@ class SourceAssetService
             ]);
         }
 
+        $newPath = null;
         if ($media instanceof UploadedFile) {
-            $attributes['media_path'] = $media->store("source-assets/{$asset->company_id}", 'public');
+            $newPath = $this->storeMedia($media, $asset->company_id);
+            $attributes['media_path'] = $newPath;
             $attributes['media_mime_type'] = $media->getMimeType();
         }
 
@@ -95,13 +116,20 @@ class SourceAssetService
         $attributes['status'] = 'processing';
         $attributes['processing_error'] = null;
 
-        $observation = DB::transaction(function () use ($asset, $attributes): Observation {
-            $asset->update($attributes);
-            $observation = $this->observationFor($asset->refresh());
-            $asset->update(['observation_id' => $observation->id]);
+        try {
+            $observation = DB::transaction(function () use ($asset, $attributes): Observation {
+                $asset->update($attributes);
+                $observation = $this->observationFor($asset->refresh());
+                $asset->update(['observation_id' => $observation->id]);
 
-            return $observation;
-        });
+                return $observation;
+            });
+        } catch (Throwable $exception) {
+            $this->deleteMedia($newPath);
+            $asset->refresh();
+
+            throw $exception;
+        }
 
         if ($media instanceof UploadedFile && $oldPath !== null) {
             Storage::disk('public')->delete($oldPath);
@@ -210,5 +238,28 @@ class SourceAssetService
         }
 
         return $fingerprint;
+    }
+
+    private function storeMedia(UploadedFile $file, string $companyId): string
+    {
+        $path = $file->store("source-assets/{$companyId}", 'public');
+
+        if (! is_string($path)) {
+            throw new RuntimeException('Could not store the uploaded source asset.');
+        }
+
+        return $path;
+    }
+
+    private function deleteMedia(?string $path): void
+    {
+        if ($path !== null) {
+            Storage::disk('public')->delete($path);
+        }
+    }
+
+    private function isUniqueConstraintViolation(QueryException $exception): bool
+    {
+        return in_array($exception->errorInfo[0] ?? null, ['23000', '23505'], true);
     }
 }

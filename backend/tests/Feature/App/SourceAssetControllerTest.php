@@ -5,11 +5,13 @@ namespace Tests\Feature\App;
 use App\Jobs\ProcessObservation;
 use App\Models\Company;
 use App\Models\CompanyMembership;
+use App\Models\Observation;
 use App\Models\SourceAsset;
 use App\Models\User;
 use App\Services\SourceAssets\SourceAssetService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -174,6 +176,67 @@ class SourceAssetControllerTest extends TestCase
         $this->assertDatabaseCount('source_assets', 1);
         $this->assertDatabaseCount('observations', 2);
         Queue::assertPushed(ProcessObservation::class);
+    }
+
+    public function test_failed_create_removes_newly_stored_media(): void
+    {
+        Queue::fake();
+        Storage::fake('public');
+        [, $company] = $this->userWithCompany();
+        $service = $this->app->make(SourceAssetService::class);
+        $event = 'eloquent.creating: '.Observation::class;
+        Event::listen($event, static fn (): never => throw new \RuntimeException('Forced observation failure.'));
+
+        try {
+            $service->create($company, [
+                'type' => 'document_case_study',
+                'title' => 'Customer proof',
+                'media' => UploadedFile::fake()->createWithContent('proof.pdf', 'new-upload'),
+            ]);
+            $this->fail('Expected source asset persistence to fail.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Forced observation failure.', $exception->getMessage());
+        } finally {
+            Event::forget($event);
+        }
+
+        $this->assertDatabaseMissing('source_assets', ['company_id' => $company->id]);
+        $this->assertSame([], Storage::disk('public')->allFiles("source-assets/{$company->id}"));
+    }
+
+    public function test_failed_update_removes_replacement_and_preserves_original_media(): void
+    {
+        Queue::fake();
+        Storage::fake('public');
+        [, $company] = $this->userWithCompany();
+        $service = $this->app->make(SourceAssetService::class);
+        $asset = $service->create($company, [
+            'type' => 'photo_video',
+            'title' => 'Original creative',
+            'media' => UploadedFile::fake()->createWithContent('original.jpg', 'original-upload'),
+        ]);
+        $originalPath = $asset->media_path;
+        $event = 'eloquent.creating: '.Observation::class;
+        Event::listen($event, static fn (): never => throw new \RuntimeException('Forced observation failure.'));
+
+        try {
+            $service->update($asset, [
+                'type' => 'photo_video',
+                'title' => 'Replacement creative',
+                'media' => UploadedFile::fake()->createWithContent('replacement.jpg', 'replacement-upload'),
+            ]);
+            $this->fail('Expected source asset persistence to fail.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Forced observation failure.', $exception->getMessage());
+        } finally {
+            Event::forget($event);
+        }
+
+        $asset->refresh();
+        $this->assertSame('Original creative', $asset->title);
+        $this->assertSame($originalPath, $asset->media_path);
+        Storage::disk('public')->assertExists($originalPath);
+        $this->assertSame([$originalPath], Storage::disk('public')->allFiles("source-assets/{$company->id}"));
     }
 
     public function test_customer_cannot_mutate_another_companys_asset(): void
