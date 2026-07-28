@@ -74,6 +74,11 @@ chmod 640 "${BACKEND_ROOT}/.env"
 cd "$BACKEND_ROOT"
 
 sudo -u www-data php artisan migrate --force
+if [ ! -e "${BACKEND_ROOT}/public/storage" ] && [ ! -L "${BACKEND_ROOT}/public/storage" ]; then
+    sudo -u www-data php artisan storage:link
+fi
+test -L "${BACKEND_ROOT}/public/storage"
+test "$(readlink -f "${BACKEND_ROOT}/public/storage")" = "$(readlink -f "${BACKEND_ROOT}/storage/app/public")"
 sudo -u www-data php artisan optimize
 systemctl reload "$PHP_FPM_SERVICE"
 sudo -u www-data php artisan queue:restart

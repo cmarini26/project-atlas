@@ -45,6 +45,8 @@ Verification: `php artisan test` → 1380 passed, 3 skipped, 3830 assertions; `n
 
 **SCRUM-59 — Media-aware Asset Library previews ✅ Implemented locally:** uploaded media now retains its detected MIME type. The Asset Library renders images, videos, and documents with appropriate accessible previews, while legacy records without MIME metadata fall back safely by file extension instead of showing broken images.
 
+**SCRUM-60 — Durable source-asset uploads ✅ Implemented locally:** production deployment now creates and verifies Laravel's public-storage link while preserving upload storage across releases. A tested uploaded-file backup script and corrected recovery runbook cover Asset Library files alongside database backups, including encryption, off-site copy, retention, and restore-drill requirements.
+
 **Previous milestone:**
 
 **SCRUM-54 — Customer Asset Library and campaign provenance ✅ Implemented locally**
