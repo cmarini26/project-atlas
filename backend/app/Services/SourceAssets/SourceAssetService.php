@@ -6,19 +6,26 @@ use App\Events\ObservationRecorded;
 use App\Models\Company;
 use App\Models\Observation;
 use App\Models\SourceAsset;
+use DateTimeInterface;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 class SourceAssetService
 {
     /** @param array<string, mixed> $data */
     public function create(Company $company, array $data): SourceAsset
     {
-        $fingerprint = $this->fingerprint($data);
+        $media = $data['media'] ?? null;
+        $mediaFingerprint = $media instanceof UploadedFile ? $this->mediaFingerprint($media) : null;
+        $fingerprint = $this->fingerprint($data, $mediaFingerprint);
         $existing = SourceAsset::withoutGlobalScopes()
             ->where('company_id', $company->id)
+            ->whereNull('deleted_at')
             ->where('content_fingerprint', $fingerprint)
             ->first();
 
@@ -26,7 +33,7 @@ class SourceAssetService
             return $existing;
         }
 
-        [$asset, $observation] = DB::transaction(function () use ($company, $data, $fingerprint): array {
+        [$asset, $observation] = DB::transaction(function () use ($company, $data, $fingerprint, $mediaFingerprint): array {
             $mediaPath = isset($data['media']) && $data['media'] instanceof UploadedFile
                 ? $data['media']->store("source-assets/{$company->id}", 'public')
                 : null;
@@ -35,6 +42,7 @@ class SourceAssetService
                 ...Arr::except($data, ['media']),
                 'company_id' => $company->id,
                 'media_path' => $mediaPath,
+                'media_fingerprint' => $mediaFingerprint,
                 'content_fingerprint' => $fingerprint,
                 'status' => 'processing',
             ]);
@@ -55,13 +63,32 @@ class SourceAssetService
         $oldPath = $asset->media_path;
         $media = $data['media'] ?? null;
         $attributes = Arr::except($data, ['media']);
+        $mediaFingerprint = $media instanceof UploadedFile
+            ? $this->mediaFingerprint($media)
+            : $asset->media_fingerprint;
+
+        $merged = [...$asset->only(['type', 'title', 'description', 'source_url', 'metadata', 'starts_at', 'ends_at']), ...$attributes];
+        $fingerprint = $this->fingerprint($merged, $mediaFingerprint);
+
+        $duplicateExists = SourceAsset::withoutGlobalScopes()
+            ->where('company_id', $asset->company_id)
+            ->whereNull('deleted_at')
+            ->where('content_fingerprint', $fingerprint)
+            ->whereKeyNot($asset->id)
+            ->exists();
+
+        if ($duplicateExists) {
+            throw ValidationException::withMessages([
+                'title' => 'An identical asset already exists in your library.',
+            ]);
+        }
 
         if ($media instanceof UploadedFile) {
             $attributes['media_path'] = $media->store("source-assets/{$asset->company_id}", 'public');
         }
 
-        $merged = [...$asset->only(['type', 'title', 'description', 'source_url', 'metadata', 'starts_at', 'ends_at']), ...$attributes];
-        $attributes['content_fingerprint'] = $this->fingerprint($merged);
+        $attributes['media_fingerprint'] = $mediaFingerprint;
+        $attributes['content_fingerprint'] = $fingerprint;
         $attributes['status'] = 'processing';
         $attributes['processing_error'] = null;
 
@@ -94,6 +121,9 @@ class SourceAssetService
 
     public function archive(SourceAsset $asset): void
     {
+        $asset->update([
+            'content_fingerprint' => hash('sha256', "archived:{$asset->id}:".now()->getTimestampMs()),
+        ]);
         $asset->delete();
     }
 
@@ -120,10 +150,61 @@ class SourceAssetService
     }
 
     /** @param array<string, mixed> $data */
-    private function fingerprint(array $data): string
+    private function fingerprint(array $data, ?string $mediaFingerprint): string
     {
-        return hash('sha256', json_encode(Arr::only($data, [
-            'type', 'title', 'description', 'source_url', 'metadata', 'starts_at', 'ends_at',
-        ]), JSON_THROW_ON_ERROR));
+        $identity = [];
+
+        foreach (['type', 'title', 'description', 'source_url', 'metadata', 'starts_at', 'ends_at'] as $key) {
+            $value = $data[$key] ?? null;
+            $identity[$key] = in_array($key, ['starts_at', 'ends_at'], true)
+                ? $this->canonicalDate($value)
+                : $this->canonicalize($value);
+        }
+
+        return hash('sha256', json_encode([
+            ...$identity,
+            'media_fingerprint' => $mediaFingerprint,
+        ], JSON_THROW_ON_ERROR));
+    }
+
+    private function canonicalize(mixed $value): mixed
+    {
+        if ($value instanceof DateTimeInterface) {
+            return Carbon::instance($value)->utc()->toIso8601String();
+        }
+
+        if (is_array($value)) {
+            if (! array_is_list($value)) {
+                ksort($value);
+            }
+
+            return array_map(fn (mixed $item): mixed => $this->canonicalize($item), $value);
+        }
+
+        return $value;
+    }
+
+    private function canonicalDate(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if ($value instanceof DateTimeInterface) {
+            return Carbon::instance($value)->utc()->toIso8601String();
+        }
+
+        return Carbon::parse((string) $value)->utc()->toIso8601String();
+    }
+
+    private function mediaFingerprint(UploadedFile $file): string
+    {
+        $fingerprint = hash_file('sha256', $file->path());
+
+        if ($fingerprint === false) {
+            throw new RuntimeException('Could not fingerprint the uploaded source asset.');
+        }
+
+        return $fingerprint;
     }
 }

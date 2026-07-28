@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\SourceAsset;
 use App\Models\User;
+use App\Services\SourceAssets\SourceAssetService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
@@ -78,6 +79,82 @@ class SourceAssetControllerTest extends TestCase
         $this->assertDatabaseCount('observations', 1);
     }
 
+    public function test_different_uploaded_media_with_same_fields_create_distinct_assets(): void
+    {
+        Queue::fake();
+        Storage::fake('public');
+        [$user] = $this->userWithCompany();
+        $payload = [
+            'type' => 'photo_video',
+            'title' => 'Campaign hero',
+            'description' => 'Current campaign creative.',
+        ];
+
+        $this->actingAs($user)->post('/app/assets', [
+            ...$payload,
+            'media' => UploadedFile::fake()->createWithContent('hero.jpg', 'first-image'),
+        ]);
+        $this->actingAs($user)->post('/app/assets', [
+            ...$payload,
+            'media' => UploadedFile::fake()->createWithContent('hero.jpg', 'second-image'),
+        ]);
+
+        $this->assertDatabaseCount('source_assets', 2);
+        $this->assertDatabaseCount('observations', 2);
+    }
+
+    public function test_same_uploaded_media_and_fields_remain_idempotent(): void
+    {
+        Queue::fake();
+        Storage::fake('public');
+        [$user] = $this->userWithCompany();
+        $payload = [
+            'type' => 'document_case_study',
+            'title' => 'Customer story',
+            'description' => 'Proof from a customer.',
+        ];
+
+        foreach (range(1, 2) as $_attempt) {
+            $this->actingAs($user)->post('/app/assets', [
+                ...$payload,
+                'media' => UploadedFile::fake()->createWithContent('story.pdf', 'same-document'),
+            ]);
+        }
+
+        $this->assertDatabaseCount('source_assets', 1);
+        $this->assertDatabaseCount('observations', 1);
+    }
+
+    public function test_replacing_media_changes_identity_and_queues_fresh_analysis(): void
+    {
+        Queue::fake();
+        Storage::fake('public');
+        [$user] = $this->userWithCompany();
+        $payload = [
+            'type' => 'photo_video',
+            'title' => 'Campaign hero',
+            'description' => 'Current campaign creative.',
+        ];
+
+        $this->actingAs($user)->post('/app/assets', [
+            ...$payload,
+            'media' => UploadedFile::fake()->createWithContent('hero.jpg', 'first-image'),
+        ]);
+        $asset = SourceAsset::withoutGlobalScopes()->firstOrFail();
+        $originalFingerprint = $asset->content_fingerprint;
+        Queue::fake();
+
+        $this->actingAs($user)->put("/app/assets/{$asset->id}", [
+            ...$payload,
+            'media' => UploadedFile::fake()->createWithContent('hero.jpg', 'replacement-image'),
+        ])->assertRedirect();
+
+        $this->assertNotSame($originalFingerprint, $asset->refresh()->content_fingerprint);
+        $this->assertDatabaseCount('source_assets', 1);
+        $this->assertDatabaseCount('observations', 2);
+        Queue::assertPushed(ProcessObservation::class);
+    }
+
     public function test_customer_cannot_mutate_another_companys_asset(): void
     {
         Queue::fake();
@@ -117,6 +194,37 @@ class SourceAssetControllerTest extends TestCase
         $this->assertSame('processing', $asset->status);
         $this->assertNotNull($asset->observation_id);
         Queue::assertPushed(ProcessObservation::class);
+    }
+
+    public function test_update_to_an_identical_existing_asset_returns_validation_error(): void
+    {
+        Queue::fake();
+        [$user, $company] = $this->userWithCompany();
+        $service = $this->app->make(SourceAssetService::class);
+        $existing = $service->create($company, ['type' => 'product_service', 'title' => 'Existing asset']);
+        $candidate = $service->create($company, ['type' => 'product_service', 'title' => 'Candidate asset']);
+
+        $this->actingAs($user)->put("/app/assets/{$candidate->id}", [
+            'type' => $existing->type,
+            'title' => $existing->title,
+        ])->assertSessionHasErrors('title');
+
+        $this->assertSame('Candidate asset', $candidate->refresh()->title);
+    }
+
+    public function test_archived_asset_can_be_added_again(): void
+    {
+        Queue::fake();
+        [$user, $company] = $this->userWithCompany();
+        $payload = ['type' => 'product_service', 'title' => 'Reusable offer'];
+
+        $this->actingAs($user)->post('/app/assets', $payload);
+        $asset = SourceAsset::withoutGlobalScopes()->where('company_id', $company->id)->firstOrFail();
+        $this->actingAs($user)->delete("/app/assets/{$asset->id}");
+        $this->actingAs($user)->post('/app/assets', $payload);
+
+        $this->assertSame(2, SourceAsset::withoutGlobalScopes()->where('company_id', $company->id)->count());
+        $this->assertSame(1, SourceAsset::withoutGlobalScopes()->where('company_id', $company->id)->whereNull('deleted_at')->count());
     }
 
     /** @return array{User, Company} */

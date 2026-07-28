@@ -20,6 +20,7 @@ return new class() extends Migration
             $table->json('metadata')->nullable();
             $table->string('status')->default('processing')->index();
             $table->text('processing_error')->nullable();
+            $table->string('media_fingerprint', 64)->nullable();
             $table->string('content_fingerprint', 64);
             $table->timestamp('starts_at')->nullable();
             $table->timestamp('ends_at')->nullable();
