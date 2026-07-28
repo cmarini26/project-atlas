@@ -92,7 +92,7 @@
 | Item | Owner | Status | Notes |
 |---|---|---|---|
 | `ErrorTracker` abstraction wired into exception handling | | ✅ | Code-complete: `App\ErrorTracking\Contracts\ErrorTracker` + `NullErrorTracker`, wired in `bootstrap/app.php`'s `withExceptions()` (Blocker 5) |
-| A real error-tracking vendor (Sentry or equivalent) is installed and configured | | ⬜ | Not done — see Blocker 5's "what remains for production activation": `composer require sentry/sentry-laravel`, implement `SentryErrorTracker`, add the `match` arm, set `ERROR_TRACKING_DRIVER`/`_DSN` |
+| A real error-tracking vendor (Sentry or equivalent) is installed and configured | Carlo Marini | 🟡 | Sentry SDK, privacy-safe driver, and verification command are code-complete. A real project DSN, production activation, test event, and received notification remain operational acceptance steps. |
 | A deliberately-thrown test exception in production appears in the error tracker within minutes | | ⬜ | |
 | `failed_jobs` visibility and Retry/Discard recovery workflow | | ✅ | Code-complete: `FailedJobResource` Filament panel (`/admin/failed-jobs`), superadmin-gated |
 | Uptime monitoring configured against a real health endpoint (`/api/health`, `/api/ready`, `/api/live`), polling ~every 60s | Carlo Marini | 🟡 | AWS-native Route 53/CloudWatch/SNS artifact is code-complete in `infrastructure/cloudformation/atlas-uptime-monitor.yml`; stack creation, SNS confirmation, and live alert drill remain operator steps. |
