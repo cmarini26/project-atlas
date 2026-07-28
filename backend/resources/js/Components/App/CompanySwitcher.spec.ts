@@ -9,7 +9,7 @@ vi.mock('@inertiajs/vue3', () => ({
   router: { post: (...args: unknown[]) => postMock(...args) },
 }))
 
-const company: Company = { id: 'co-1', name: 'CBB Auctions' }
+const company: Company = { id: 'co-1', name: 'CBB Auctions', slug: 'cbb-auctions', industry: 'Collectibles' }
 
 const companies: CompanyOption[] = [
   { id: 'co-1', name: 'CBB Auctions' },

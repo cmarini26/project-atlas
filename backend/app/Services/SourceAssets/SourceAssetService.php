@@ -26,7 +26,7 @@ class SourceAssetService
             return $existing;
         }
 
-        $asset = DB::transaction(function () use ($company, $data, $fingerprint): SourceAsset {
+        [$asset, $observation] = DB::transaction(function () use ($company, $data, $fingerprint): array {
             $mediaPath = isset($data['media']) && $data['media'] instanceof UploadedFile
                 ? $data['media']->store("source-assets/{$company->id}", 'public')
                 : null;
@@ -41,10 +41,10 @@ class SourceAssetService
             $observation = $this->observationFor($asset);
             $asset->update(['observation_id' => $observation->id]);
 
-            return $asset;
+            return [$asset, $observation];
         });
 
-        ObservationRecorded::dispatch($asset->observation);
+        ObservationRecorded::dispatch($observation);
 
         return $asset->refresh();
     }
@@ -65,17 +65,19 @@ class SourceAssetService
         $attributes['status'] = 'processing';
         $attributes['processing_error'] = null;
 
-        DB::transaction(function () use ($asset, $attributes): void {
+        $observation = DB::transaction(function () use ($asset, $attributes): Observation {
             $asset->update($attributes);
             $observation = $this->observationFor($asset->refresh());
             $asset->update(['observation_id' => $observation->id]);
+
+            return $observation;
         });
 
         if ($media instanceof UploadedFile && $oldPath !== null) {
             Storage::disk('public')->delete($oldPath);
         }
 
-        ObservationRecorded::dispatch($asset->observation);
+        ObservationRecorded::dispatch($observation);
 
         return $asset->refresh();
     }

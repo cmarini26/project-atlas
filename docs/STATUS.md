@@ -34,6 +34,15 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
+**Overnight enhancement audit — SCRUM-55/56/57 quality gates ✅ Implemented locally**
+*Completed locally: 2026-07-28*
+
+Restored the repository's authoritative verification signal before continuing feature work. SCRUM-55 updates stale approval and Campaign Show fixtures to preserve the current selection-first safety contract; all 189 Vitest tests now pass. SCRUM-56 raises PHPUnit's test-process memory ceiling to 512 MB, acknowledges the installed TypeScript 6 deprecation window while retaining the existing path alias, resolves every newly-visible Vue type error, and restores repository-wide Pint cleanliness. SCRUM-57 makes the Asset Library's Eloquent relationships, observation dispatch, collection serialization, and date casts PHPStan level 8 clean without suppressions or baselines.
+
+Verification: `php artisan test` → 1380 passed, 3 skipped, 3830 assertions; `npm test -- --run` → 189 passed; `npm exec vue-tsc -- --noEmit` → passed; PHPStan level 8 → 0 errors; Pint → passed; production build → passed.
+
+**Previous milestone:**
+
 **SCRUM-54 — Customer Asset Library and campaign provenance ✅ Implemented locally**
 *Completed locally: 2026-07-27*
 

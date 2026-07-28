@@ -209,6 +209,7 @@ export interface CompanyOption {
 }
 
 export interface SharedProps {
+    [key: string]: unknown
     auth: { user: AuthUser | null }
     company: Company | null
     companies: CompanyOption[]

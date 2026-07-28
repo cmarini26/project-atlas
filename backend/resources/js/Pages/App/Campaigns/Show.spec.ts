@@ -30,6 +30,8 @@ const baseProps = {
   executions: [],
   kpi_snapshot: null,
   decision: null,
+  selected_content_asset_ids: [],
+  can_edit_channel_selection: false,
 }
 
 describe('Campaigns/Show — Email audience targeting', () => {

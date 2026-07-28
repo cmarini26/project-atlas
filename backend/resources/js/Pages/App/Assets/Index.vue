@@ -48,10 +48,10 @@ const labels: Record<string, string> = {
   brand_material: 'Brand material',
 }
 
-const statusVariant: Record<string, 'success' | 'accent' | 'danger' | 'muted'> = {
+const statusVariant: Record<string, 'success' | 'accent' | 'warning' | 'muted'> = {
   ready: 'success',
   processing: 'accent',
-  failed: 'danger',
+  failed: 'warning',
   archived: 'muted',
 }
 

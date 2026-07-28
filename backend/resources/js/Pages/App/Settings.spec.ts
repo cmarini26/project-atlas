@@ -47,6 +47,7 @@ const baseProps = {
   meta_channels: [],
   wordpress_channel: null,
   email_channel: null,
+  sms_channel: null,
 }
 
 describe('Settings — Email (Postmark)', () => {

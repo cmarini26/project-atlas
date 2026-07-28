@@ -8,7 +8,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property Carbon|null $starts_at
+ * @property Carbon|null $ends_at
+ * @property Carbon|null $processed_at
+ */
 class SourceAsset extends Model
 {
     use BelongsToCompany, HasUlids, SoftDeletes;
@@ -34,16 +40,19 @@ class SourceAsset extends Model
         ];
     }
 
+    /** @return BelongsTo<Observation, $this> */
     public function observation(): BelongsTo
     {
         return $this->belongsTo(Observation::class);
     }
 
+    /** @return BelongsTo<Company, $this> */
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
     }
 
+    /** @return HasMany<Opportunity, $this> */
     public function opportunities(): HasMany
     {
         return $this->hasMany(Opportunity::class, 'subject_id')->where('subject_type', 'source_asset');
