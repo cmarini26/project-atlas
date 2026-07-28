@@ -95,7 +95,7 @@
 | A real error-tracking vendor (Sentry or equivalent) is installed and configured | | ⬜ | Not done — see Blocker 5's "what remains for production activation": `composer require sentry/sentry-laravel`, implement `SentryErrorTracker`, add the `match` arm, set `ERROR_TRACKING_DRIVER`/`_DSN` |
 | A deliberately-thrown test exception in production appears in the error tracker within minutes | | ⬜ | |
 | `failed_jobs` visibility and Retry/Discard recovery workflow | | ✅ | Code-complete: `FailedJobResource` Filament panel (`/admin/failed-jobs`), superadmin-gated |
-| Uptime monitoring configured against a real health endpoint (`/api/health`, `/api/ready`, `/api/live`), polling ~every 60s | | ⬜ | |
+| Uptime monitoring configured against a real health endpoint (`/api/health`, `/api/ready`, `/api/live`), polling ~every 60s | Carlo Marini | 🟡 | AWS-native Route 53/CloudWatch/SNS artifact is code-complete in `infrastructure/cloudformation/atlas-uptime-monitor.yml`; stack creation, SNS confirmation, and live alert drill remain operator steps. |
 | A test alert has been deliberately triggered and actually received | | ⬜ | |
 | A named person (not "the team") owns responding to alerts | | ⬜ | |
 | Someone checks the error tracker at least once daily during the beta | | ⬜ | Ongoing, per [Private-Beta-Execution.md](../plans/Private-Beta-Execution.md) §3 |
