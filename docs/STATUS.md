@@ -24,15 +24,31 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 | Specifications    | ✅ Complete | Domain model, architecture, database, AI, MVP workflow, analytics engine, and learning engine all defined. `specs/core/marketing-presence.md` — Milestone 11 domain spec, approved; **Phases 1–7 (domain model, service layer, onboarding, Settings UI, Business Brain integration, channel selection, Recommendation UI) now implemented**. |
 | Implementation    | ✅ Customer dashboard complete | All 10 milestones delivered. Full customer-facing Vue 3 + Inertia.js dashboard live. Milestone 11 (Marketing Presence) Phases 1–7 shipped — see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md). Phase 8 (consolidated test checklist) covered incrementally by each phase's own tests; no distinct session run. |
 | Tests             | ✅ Strong | 1400 tests (1397 passing, 3 skipped where the local environment can't support it) + 195 Vitest tests; PHPStan level 8 — 0 errors; Pint clean. Latest: SCRUM-62 custom campaign composer (see Current Milestone below). |
-| CI/CD             | 🟡 Active | GitHub Actions running on push to main; `pdo_sqlite` extension fix applied — awaiting confirmation CI is green |
+| CI/CD             | ✅ Active | GitHub Actions deploys `main` to production; repeat deployments have completed successfully. |
 | Design partner    | 🟡 Informal | CBB Auctions engaged as design partner; formal agreement TBD |
-| Infrastructure    | ⬜ Not provisioned | No staging or production environment |
+| Infrastructure    | 🟡 Production online | `theclearmove.com` is live on AWS EC2 with HTTPS, PostgreSQL, Redis, supervised workers, and the Laravel scheduler. Backups/restore, external monitoring/error tracking, and live provider validation remain beta blockers. |
 
 **Overall:** Milestone 10 complete + onboarding pipeline fixed (Phase 1–9) + P0 product-polish tier shipped + P1 Customer Trust & Navigation slice shipped (approval confirmation dialog, safety-tested company switcher, persistent layout + `Link` sweep, toast primitive — see [P1-Customer-Trust-Navigation-Review.md](reviews/P1-Customer-Trust-Navigation-Review.md)) + Channel Publishing Reality audit complete (see [Channel-Publishing-Reality-Audit.md](reviews/Channel-Publishing-Reality-Audit.md)) + Milestone 11 specified and planned (see [marketing-presence.md](../specs/core/marketing-presence.md) and [Milestone-11-Marketing-Presence.md](plans/Milestone-11-Marketing-Presence.md)) + **Milestone 11 Phases 1–7 implemented** (see [Milestone-11-Phase-1-Review.md](reviews/Milestone-11-Phase-1-Review.md) through [Milestone-11-Phase-7-Review.md](reviews/Milestone-11-Phase-7-Review.md)). The `marketing_channels` table, `App\Models\MarketingChannel`, five new backed enums, and `MarketingChannelFactory` exist — declaring a marketing channel is representable in the database with zero API connection required. `App\Services\MarketingPresence\MarketingPresenceService` provides the full CRUD lifecycle; `MarketingChannelCapabilityResolver` derives a channel's domain-level lifecycle stage. The onboarding wizard has a fourth, final step declaring channels with zero metadata. A Settings sub-page (`/app/settings/marketing-presence`) lets a user view/add/edit/disable declared channels with capability badges. `App\Domain\BusinessBrain\BusinessBrain` carries a synthesized `MarketingPresenceSummary` (never raw rows). `App\Services\Decision\MarketingChannelSelector` makes `DecisionEngine::evaluate()` Marketing-Presence-aware when resolving `Decision.channel_ids` — preferring `primary`-linked channels, excluding `inactive`/`planned`-linked ones, and reporting declared-but-unlinked channels as draft-only content targets. **New locally since the 2026-07-16 doc pass:** SendGrid now exists as a second real email provider in the provider registry/settings flow, and Twilio now has both a Settings connect/test path and a real single-destination SMS campaign publisher in code (see 2026-07-20 milestone note below).
 
 ---
 
 ## Current Milestone
+
+**Private Beta Operational Validation — in progress**
+*Started: 2026-07-28*
+
+The production application is deployed at `theclearmove.com`. Repeat GitHub Actions deployments, the three health endpoints, supervised workers for all five queues, and scheduled command execution have been verified against the live system. SCRUM-43 adds a repeatable `atlas:verify-queues` operational probe so queue consumption can be proven without creating or changing customer data.
+
+The next phase deliberately prioritizes operational proof over new connector breadth:
+
+1. automate production database and uploaded-asset backups, then perform and document a real restore drill (SCRUM-17–19);
+2. configure uptime monitoring, error tracking, alert ownership, and failed-job response (SCRUM-13–16);
+3. validate the first-customer golden path against real accounts: website/Shopify observation, Mailchimp audience import, provider-backed email, and WordPress publishing/analytics (SCRUM-20–26 and SCRUM-52);
+4. finish legal, support, production dry-run, tenant-isolation, and second-person go/no-go gates (SCRUM-27–31).
+
+See [Private-Beta-Next-Phase.md](plans/Private-Beta-Next-Phase.md) for the evidence and release gates.
+
+**Previous milestone:**
 
 **SCRUM-62 — Customer-authored campaigns from Asset Library sources ✅ Implemented locally**
 *Completed locally: 2026-07-28*
