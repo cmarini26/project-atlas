@@ -1,0 +1,99 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: External uptime monitoring and email alerting for The Clear Move production readiness endpoint.
+
+Parameters:
+  AlertEmail:
+    Type: String
+    Description: Named operator email address that must confirm the SNS subscription.
+    AllowedPattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+    ConstraintDescription: Enter a valid email address.
+  MonitoredHost:
+    Type: String
+    Default: theclearmove.com
+    Description: Public hostname to monitor without a scheme or path.
+  MonitoredPath:
+    Type: String
+    Default: /api/ready
+    Description: HTTPS path that verifies the application and its production dependencies.
+  ExpectedContent:
+    Type: String
+    Default: '"status":"ok"'
+    Description: Response substring required for a healthy check. Change temporarily to run an alert drill.
+
+Resources:
+  AtlasUptimeAlerts:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: Atlas production uptime
+      TopicName: atlas-production-uptime-alerts
+      Subscription:
+        - Endpoint: !Ref AlertEmail
+          Protocol: email
+      Tags:
+        - Key: application
+          Value: atlas
+        - Key: environment
+          Value: production
+
+  AtlasReadyHealthCheck:
+    Type: AWS::Route53::HealthCheck
+    Properties:
+      HealthCheckConfig:
+        EnableSNI: true
+        FailureThreshold: 3
+        FullyQualifiedDomainName: !Ref MonitoredHost
+        MeasureLatency: true
+        Port: 443
+        Regions:
+          - us-east-1
+          - us-west-1
+          - eu-west-1
+        RequestInterval: 30
+        ResourcePath: !Ref MonitoredPath
+        SearchString: !Ref ExpectedContent
+        Type: HTTPS_STR_MATCH
+      HealthCheckTags:
+        - Key: Name
+          Value: atlas-production-ready
+        - Key: application
+          Value: atlas
+        - Key: environment
+          Value: production
+
+  AtlasReadyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: atlas-production-ready-unhealthy
+      AlarmDescription: The Clear Move readiness endpoint is unavailable or a required dependency is unhealthy.
+      Namespace: AWS/Route53
+      MetricName: HealthCheckStatus
+      Dimensions:
+        - Name: HealthCheckId
+          Value: !GetAtt AtlasReadyHealthCheck.HealthCheckId
+      Statistic: Minimum
+      Period: 60
+      EvaluationPeriods: 2
+      DatapointsToAlarm: 2
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions:
+        - !Ref AtlasUptimeAlerts
+      OKActions:
+        - !Ref AtlasUptimeAlerts
+      Tags:
+        - Key: application
+          Value: atlas
+        - Key: environment
+          Value: production
+
+Outputs:
+  HealthCheckId:
+    Description: Route 53 health check identifier.
+    Value: !GetAtt AtlasReadyHealthCheck.HealthCheckId
+  AlarmName:
+    Description: CloudWatch alarm name.
+    Value: !Ref AtlasReadyAlarm
+  AlertTopicArn:
+    Description: SNS topic used for alarm and recovery notifications.
+    Value: !Ref AtlasUptimeAlerts
