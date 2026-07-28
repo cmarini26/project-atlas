@@ -43,4 +43,19 @@ class ProductionDeployScriptTest extends TestCase
             'The storage link must be verified before application caches are optimized.',
         );
     }
+
+    public function test_deploy_checks_supervisor_worker_groups(): void
+    {
+        $contents = file_get_contents($this->script);
+
+        $this->assertIsString($contents);
+        $this->assertStringContainsString(
+            'supervisorctl status "atlas-worker-${worker}:*" | grep -q RUNNING',
+            $contents,
+        );
+        $this->assertStringNotContainsString(
+            'supervisorctl status "atlas-worker-${worker}" | grep -q RUNNING',
+            $contents,
+        );
+    }
 }
