@@ -43,6 +43,8 @@ Verification: `php artisan test` → 1380 passed, 3 skipped, 3830 assertions; `n
 
 **SCRUM-58 — Asset media identity ✅ Implemented locally:** source-asset idempotency now includes a SHA-256 checksum of uploaded file content. Identical submissions remain idempotent, different media with the same descriptive fields remain distinct, replacing media triggers fresh analysis, archived assets can be re-added, and editing into an existing identical asset returns an actionable validation error instead of a database constraint failure.
 
+**SCRUM-59 — Media-aware Asset Library previews ✅ Implemented locally:** uploaded media now retains its detected MIME type. The Asset Library renders images, videos, and documents with appropriate accessible previews, while legacy records without MIME metadata fall back safely by file extension instead of showing broken images.
+
 **Previous milestone:**
 
 **SCRUM-54 — Customer Asset Library and campaign provenance ✅ Implemented locally**

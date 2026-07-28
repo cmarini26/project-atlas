@@ -30,6 +30,7 @@ class SourceAssetController extends Controller
                 'description' => $asset->description,
                 'source_url' => $asset->source_url,
                 'media_url' => $asset->media_path ? asset("storage/{$asset->media_path}") : null,
+                'media_mime_type' => $asset->media_mime_type,
                 'metadata' => $asset->metadata ?? [],
                 'status' => $asset->status,
                 'processing_error' => $asset->processing_error,

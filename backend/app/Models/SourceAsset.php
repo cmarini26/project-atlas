@@ -26,7 +26,7 @@ class SourceAsset extends Model
 
     protected $fillable = [
         'company_id', 'observation_id', 'type', 'title', 'description',
-        'source_url', 'media_path', 'metadata', 'status', 'processing_error',
+        'source_url', 'media_path', 'media_mime_type', 'metadata', 'status', 'processing_error',
         'media_fingerprint', 'content_fingerprint', 'starts_at', 'ends_at', 'processed_at',
     ];
 

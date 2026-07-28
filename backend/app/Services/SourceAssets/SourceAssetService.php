@@ -34,14 +34,16 @@ class SourceAssetService
         }
 
         [$asset, $observation] = DB::transaction(function () use ($company, $data, $fingerprint, $mediaFingerprint): array {
-            $mediaPath = isset($data['media']) && $data['media'] instanceof UploadedFile
-                ? $data['media']->store("source-assets/{$company->id}", 'public')
+            $media = $data['media'] ?? null;
+            $mediaPath = $media instanceof UploadedFile
+                ? $media->store("source-assets/{$company->id}", 'public')
                 : null;
 
             $asset = SourceAsset::withoutGlobalScopes()->create([
                 ...Arr::except($data, ['media']),
                 'company_id' => $company->id,
                 'media_path' => $mediaPath,
+                'media_mime_type' => $media instanceof UploadedFile ? $media->getMimeType() : null,
                 'media_fingerprint' => $mediaFingerprint,
                 'content_fingerprint' => $fingerprint,
                 'status' => 'processing',
@@ -85,6 +87,7 @@ class SourceAssetService
 
         if ($media instanceof UploadedFile) {
             $attributes['media_path'] = $media->store("source-assets/{$asset->company_id}", 'public');
+            $attributes['media_mime_type'] = $media->getMimeType();
         }
 
         $attributes['media_fingerprint'] = $mediaFingerprint;
@@ -140,6 +143,7 @@ class SourceAssetService
                 'description' => $asset->description,
                 'source_url' => $asset->source_url,
                 'media_path' => $asset->media_path,
+                'media_mime_type' => $asset->media_mime_type,
                 'metadata' => $asset->metadata,
                 'starts_at' => $asset->starts_at?->toIso8601String(),
                 'ends_at' => $asset->ends_at?->toIso8601String(),

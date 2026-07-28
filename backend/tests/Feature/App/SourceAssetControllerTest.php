@@ -58,8 +58,29 @@ class SourceAssetControllerTest extends TestCase
         $this->assertSame('processing', $asset->status);
         $this->assertNotNull($asset->observation_id);
         $this->assertStringStartsWith("source-assets/{$company->id}/", (string) $asset->media_path);
+        $this->assertSame('image/jpeg', $asset->media_mime_type);
         Storage::disk('public')->assertExists($asset->media_path);
         Queue::assertPushed(ProcessObservation::class, fn (ProcessObservation $job) => $job->observation->id === $asset->observation_id);
+    }
+
+    public function test_index_exposes_media_mime_type_for_safe_previews(): void
+    {
+        Storage::fake('public');
+        Queue::fake();
+        [$user] = $this->userWithCompany();
+
+        $this->actingAs($user)->post('/app/assets', [
+            'type' => 'document_case_study',
+            'title' => 'Customer story',
+            'media' => UploadedFile::fake()->create('story.pdf', 10, 'application/pdf'),
+        ]);
+
+        $this->actingAs($user)->get('/app/assets')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('assets.0.media_mime_type', 'application/pdf')
+                ->where('assets.0.media_url', fn (string $url): bool => str_contains($url, '/storage/source-assets/'))
+            );
     }
 
     public function test_duplicate_submission_is_idempotent(): void

@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { Head, useForm, router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
+import AssetMediaPreview from '@/Components/Assets/AssetMediaPreview.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import Card from '@/Components/UI/Card.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
@@ -17,6 +18,7 @@ type SourceAsset = {
   description: string | null
   source_url: string | null
   media_url: string | null
+  media_mime_type: string | null
   status: string
   processing_error: string | null
   starts_at: string | null
@@ -200,7 +202,12 @@ function dateLabel(value: string | null): string {
 
     <section v-else-if="assets.length > 0" class="grid gap-4 md:grid-cols-2">
       <Card v-for="asset in assets" :key="asset.id" padding="none" class="overflow-hidden">
-        <img v-if="asset.media_url" :src="asset.media_url" :alt="asset.title" class="h-44 w-full object-cover" />
+        <AssetMediaPreview
+          v-if="asset.media_url"
+          :url="asset.media_url"
+          :title="asset.title"
+          :mime-type="asset.media_mime_type"
+        />
         <div class="p-5">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
