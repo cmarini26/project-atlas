@@ -8,6 +8,7 @@ use App\AI\Providers\LocalAiProvider;
 use App\AI\Testing\FakeAiProvider;
 use App\ErrorTracking\Contracts\ErrorTracker;
 use App\ErrorTracking\NullErrorTracker;
+use App\ErrorTracking\SentryErrorTracker;
 use App\Events\CampaignAssetsReady;
 use App\Events\DecisionCommitted;
 use App\Events\ExecutionCompleted;
@@ -54,6 +55,8 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use InvalidArgumentException;
+use Sentry\State\HubInterface;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -88,20 +91,17 @@ class AppServiceProvider extends ServiceProvider
             ]);
         });
 
-        // Only 'null' has a real implementation today (no vendor package is
-        // installed yet — see Critical-Production-Blockers.md Blocker 5).
-        // Forced to null in testing regardless of config so test runs never
-        // attempt to phone home; a future real driver (e.g. Sentry) only
-        // needs a new case added below, not a change to withExceptions()'s
-        // wiring in bootstrap/app.php.
+        // Testing is always inert regardless of environment configuration.
+        // Production can opt into Sentry without changing exception handling.
         $this->app->singleton(ErrorTracker::class, function (): ErrorTracker {
             if ($this->app->environment('testing')) {
                 return new NullErrorTracker();
             }
 
             return match (config('services.error_tracking.driver')) {
-                // 'sentry' => new SentryErrorTracker(...),
-                default => new NullErrorTracker(),
+                'null' => new NullErrorTracker(),
+                'sentry' => new SentryErrorTracker($this->app->make(HubInterface::class)),
+                default => throw new InvalidArgumentException('Unsupported ERROR_TRACKING_DRIVER value.'),
             };
         });
 

@@ -50,10 +50,8 @@ return [
         'redirect_uri' => env('META_REDIRECT_URI'),
     ],
 
-    // Abstraction only for now — no real vendor (Sentry or equivalent) is
-    // installed yet. 'null' (the default) binds NullErrorTracker, a no-op.
-    // See docs/plans/Critical-Production-Blockers.md, Blocker 5, for exactly
-    // what's left to activate a real driver in production.
+    // The null driver is inert. The sentry driver is activated only when both
+    // it and a production DSN are configured.
     'error_tracking' => [
         'driver' => env('ERROR_TRACKING_DRIVER', 'null'),
         'dsn' => env('ERROR_TRACKING_DSN'),
