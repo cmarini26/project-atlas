@@ -91,7 +91,24 @@ curl --fail --silent --show-error --retry 5 --retry-delay 3 \
     "${APP_URL}/api/ready" >/dev/null
 
 for worker in high ai default observations maintenance; do
-    supervisorctl status "atlas-worker-${worker}:*" | grep -q RUNNING
+    worker_running=0
+
+    for attempt in {1..10}; do
+        worker_status="$(supervisorctl status "atlas-worker-${worker}:*" 2>&1 || true)"
+
+        if [[ -n "$worker_status" ]] && ! grep -qv ' RUNNING ' <<< "$worker_status"; then
+            worker_running=1
+            break
+        fi
+
+        sleep 3
+    done
+
+    if [[ "$worker_running" != "1" ]]; then
+        printf 'Worker group atlas-worker-%s did not become healthy:\n%s\n' \
+            "$worker" "$worker_status" >&2
+        exit 1
+    fi
 done
 
 printf 'Successfully deployed %s to %s\n' "$RELEASE_SHA" "$APP_URL"
