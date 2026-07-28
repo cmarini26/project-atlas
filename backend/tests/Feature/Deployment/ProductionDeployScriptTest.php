@@ -50,12 +50,18 @@ class ProductionDeployScriptTest extends TestCase
 
         $this->assertIsString($contents);
         $this->assertStringContainsString(
-            'supervisorctl status "atlas-worker-${worker}:*" | grep -q RUNNING',
+            'worker_status="$(supervisorctl status "atlas-worker-${worker}:*" 2>&1 || true)"',
             $contents,
         );
-        $this->assertStringNotContainsString(
-            'supervisorctl status "atlas-worker-${worker}" | grep -q RUNNING',
+        $this->assertStringContainsString(
+            'for attempt in {1..10}; do',
             $contents,
         );
+        $this->assertStringContainsString(
+            "! grep -qv ' RUNNING ' <<< \"\$worker_status\"",
+            $contents,
+        );
+        $this->assertStringContainsString('sleep 3', $contents);
+        $this->assertStringContainsString('did not become healthy', $contents);
     }
 }
