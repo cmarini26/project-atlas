@@ -5,6 +5,8 @@
 **Target:** `https://theclearmove.com/api/ready`  
 **Infrastructure source:** `infrastructure/cloudformation/atlas-uptime-monitor.yml`
 
+**Response target:** [Private-Beta Incident Response](Incident-Response.md)
+
 ## What the monitor proves
 
 The Route 53 check runs outside the Atlas EC2 server every 30 seconds from three AWS regions. A check is healthy only when:

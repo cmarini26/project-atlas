@@ -4,6 +4,8 @@
 **Atlas driver:** `App\ErrorTracking\SentryErrorTracker`  
 **Verification:** `php artisan atlas:verify-error-tracking --send`
 
+**Incident owner and response target:** [Private-Beta Incident Response](Incident-Response.md)
+
 ## Scope
 
 Sentry receives reported Laravel exceptions from HTTP requests, queue workers,
@@ -65,7 +67,9 @@ Then confirm in Sentry:
 4. an email notification is received by the named incident owner.
 
 Record the Sentry event link and notification timestamp in SCRUM-13. Resolve the
-verification issue after acceptance; do not ignore the project globally.
+verification issue after acceptance; do not ignore the project globally. Alert
+acknowledgement and customer-communication timing follow the private-beta
+incident-response policy.
 
 ## Alert baseline
 

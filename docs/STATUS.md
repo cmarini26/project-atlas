@@ -34,10 +34,14 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
-**SCRUM-13 — Production error tracking with Sentry — in progress**
+**SCRUM-13 — Production error tracking with Sentry — complete**
 *Started: 2026-07-28*
 
-Atlas now has a production-selectable Sentry driver behind its existing `ErrorTracker` boundary, the official Sentry Laravel SDK, a controlled verification command, and privacy-first configuration that removes request bodies, headers, cookies, query strings, user identity, SQL bindings, and arbitrary application context. Production activation still requires a real Sentry project DSN, deployment, one received verification event, and a confirmed alert notification before the ticket is complete.
+Atlas now has a production-selectable Sentry driver behind its existing `ErrorTracker` boundary, the official Sentry Laravel SDK, a controlled verification command, and privacy-first configuration that removes request bodies, headers, cookies, query strings, user identity, SQL bindings, and arbitrary application context. Production was activated and verified on 2026-07-28: the controlled exception appeared as `ATLAS-1` and the configured email alert triggered.
+
+**SCRUM-16 — Incident ownership and alert routing — complete**
+
+Carlo Marini is the named private-beta incident owner. `docs/operations/Incident-Response.md` now defines the Sentry and CloudWatch/SNS routes, a 30-minute daytime acknowledgement target, overnight review time, a 60-minute customer-update target for confirmed impact, response and escalation steps, and the explicit single-operator risk until a trained backup is assigned.
 
 The dependency audit performed during this slice also found four current medium-severity advisories in the locked Guzzle release. Guzzle and its compatible supporting packages were upgraded to patched releases; `composer audit` now reports no known advisories.
 

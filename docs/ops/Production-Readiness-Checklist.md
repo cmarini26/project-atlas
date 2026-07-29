@@ -92,12 +92,12 @@
 | Item | Owner | Status | Notes |
 |---|---|---|---|
 | `ErrorTracker` abstraction wired into exception handling | | ✅ | Code-complete: `App\ErrorTracking\Contracts\ErrorTracker` + `NullErrorTracker`, wired in `bootstrap/app.php`'s `withExceptions()` (Blocker 5) |
-| A real error-tracking vendor (Sentry or equivalent) is installed and configured | Carlo Marini | 🟡 | Sentry SDK, privacy-safe driver, and verification command are code-complete. A real project DSN, production activation, test event, and received notification remain operational acceptance steps. |
-| A deliberately-thrown test exception in production appears in the error tracker within minutes | | ⬜ | |
+| A real error-tracking vendor (Sentry or equivalent) is installed and configured | Carlo Marini | ✅ | Sentry is active in production with the privacy-safe driver; controlled event `ATLAS-1` and its email alert were received on 2026-07-28. |
+| A deliberately-thrown test exception in production appears in the error tracker within minutes | Carlo Marini | ✅ | Verified with `atlas:verify-error-tracking --send`; Sentry grouped the event as `ATLAS-1`. |
 | `failed_jobs` visibility and Retry/Discard recovery workflow | | ✅ | Code-complete: `FailedJobResource` Filament panel (`/admin/failed-jobs`), superadmin-gated |
 | Uptime monitoring configured against a real health endpoint (`/api/health`, `/api/ready`, `/api/live`), polling ~every 60s | Carlo Marini | 🟡 | AWS-native Route 53/CloudWatch/SNS artifact is code-complete in `infrastructure/cloudformation/atlas-uptime-monitor.yml`; stack creation, SNS confirmation, and live alert drill remain operator steps. |
 | A test alert has been deliberately triggered and actually received | | ⬜ | |
-| A named person (not "the team") owns responding to alerts | | ⬜ | |
+| A named person (not "the team") owns responding to alerts | Carlo Marini | ✅ | Ownership, alert routes, acknowledgement target, customer-update target, and escalation path are defined in [Incident-Response.md](../operations/Incident-Response.md). A backup owner remains a documented expansion gate. |
 | Someone checks the error tracker at least once daily during the beta | | ⬜ | Ongoing, per [Private-Beta-Execution.md](../plans/Private-Beta-Execution.md) §3 |
 
 ## 9. Transactional email / outbound messaging
