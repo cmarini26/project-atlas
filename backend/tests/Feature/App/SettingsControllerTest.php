@@ -160,7 +160,10 @@ class SettingsControllerTest extends TestCase
         [$user, $company] = $this->userWithCompany();
 
         $publisher = Mockery::mock(WordPressPublisher::class);
-        $publisher->shouldReceive('ping')->once()->andReturn(new PingResult(reachable: true));
+        $publisher->shouldReceive('pingConnection')
+            ->once()
+            ->with('https://blog.cbb-auctions.example', 'atlas', 'xxxx xxxx xxxx xxxx')
+            ->andReturn(new PingResult(reachable: true));
         $this->app->instance(WordPressPublisher::class, $publisher);
 
         $this->actingAs($user)
@@ -191,7 +194,10 @@ class SettingsControllerTest extends TestCase
         [$user, $company] = $this->userWithCompany();
 
         $publisher = Mockery::mock(WordPressPublisher::class);
-        $publisher->shouldReceive('ping')->once()->andReturn(new PingResult(reachable: false, error: 'Invalid application password'));
+        $publisher->shouldReceive('pingConnection')
+            ->once()
+            ->with('https://blog.cbb-auctions.example', 'atlas', 'wrong-password')
+            ->andReturn(new PingResult(reachable: false, error: 'Invalid application password'));
         $this->app->instance(WordPressPublisher::class, $publisher);
 
         $this->actingAs($user)
@@ -202,12 +208,56 @@ class SettingsControllerTest extends TestCase
             ])
             ->assertSessionHasErrors(['app_password']);
 
-        $this->assertDatabaseHas('channel_credentials', [
+        $this->assertDatabaseMissing('channels', [
+            'company_id' => $company->id,
+            'type' => 'blog',
+        ]);
+        $this->assertDatabaseMissing('channel_credentials', [
+            'company_id' => $company->id,
+            'channel_type' => 'blog',
+        ]);
+    }
+
+    public function test_failed_wordpress_reconnect_preserves_the_last_known_good_connection(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+
+        $channel = Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'blog',
+            'name' => 'working.example',
+            'config' => ['site_url' => 'https://working.example'],
+            'is_active' => true,
+        ]);
+        $credentials = ChannelCredentials::withoutGlobalScopes()->create([
             'company_id' => $company->id,
             'channel_type' => 'blog',
             'provider_type' => 'wordpress',
-            'status' => 'error',
+            'credentials' => json_encode(['username' => 'working-user', 'app_password' => 'working-password']),
+            'status' => 'active',
         ]);
+
+        $publisher = Mockery::mock(WordPressPublisher::class);
+        $publisher->shouldReceive('pingConnection')
+            ->once()
+            ->with('https://broken.example', 'wrong-user', 'wrong-password')
+            ->andReturn(new PingResult(reachable: false, error: 'Invalid application password'));
+        $this->app->instance(WordPressPublisher::class, $publisher);
+
+        $this->actingAs($user)
+            ->post('/app/settings/wordpress/connect', [
+                'site_url' => 'https://broken.example',
+                'username' => 'wrong-user',
+                'app_password' => 'wrong-password',
+            ])
+            ->assertSessionHasErrors(['app_password']);
+
+        $this->assertSame('https://working.example', $channel->fresh()->config['site_url']);
+        $this->assertSame('active', $credentials->fresh()->status);
+        $this->assertSame(
+            ['username' => 'working-user', 'app_password' => 'working-password'],
+            json_decode((string) $credentials->fresh()->credentials, true),
+        );
     }
 
     public function test_connect_wordpress_requires_valid_input(): void

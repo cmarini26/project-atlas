@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Northwind Skin Studio</title>
+  <style>
+    :root {
+      --bg: #f7f3ef;
+      --surface: #fffdfa;
+      --ink: #2a2421;
+      --muted: #6b615b;
+      --accent: #8d6e63;
+      --accent-dark: #6f544b;
+      --line: #e9ddd4;
+      --card: #fdf8f4;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.6;
+    }
+    a { color: inherit; text-decoration: none; }
+    .container { width: min(1100px, calc(100% - 32px)); margin: 0 auto; }
+    header {
+      position: sticky; top: 0; z-index: 10;
+      backdrop-filter: blur(12px);
+      background: rgba(247, 243, 239, 0.9);
+      border-bottom: 1px solid var(--line);
+    }
+    nav {
+      display: flex; align-items: center; justify-content: space-between;
+      min-height: 72px;
+      gap: 20px;
+    }
+    .brand { font-weight: 700; letter-spacing: 0.02em; }
+    .nav-links { display: flex; gap: 18px; color: var(--muted); font-size: 0.95rem; }
+    .button {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 12px 18px; border-radius: 999px; font-weight: 600;
+      border: 1px solid transparent;
+    }
+    .button.primary { background: var(--accent); color: white; }
+    .button.secondary { border-color: var(--line); background: white; color: var(--ink); }
+    .hero {
+      padding: 72px 0 48px;
+      display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 40px; align-items: center;
+    }
+    .eyebrow { color: var(--accent-dark); font-size: 0.8rem; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 700; }
+    h1, h2, h3 { line-height: 1.15; margin: 0 0 16px; }
+    h1 { font-size: clamp(2.5rem, 5vw, 4.5rem); }
+    h2 { font-size: clamp(1.7rem, 3vw, 2.6rem); }
+    p.lead { font-size: 1.1rem; color: var(--muted); max-width: 56ch; }
+    .hero-card, .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: 0 10px 30px rgba(80, 57, 40, 0.06);
+    }
+    .trust-strip {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 24px 0 0;
+    }
+    .trust-pill {
+      background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+      padding: 14px 16px; font-size: 0.92rem; color: var(--muted);
+    }
+    section { padding: 28px 0 36px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+    .service-card h3, .testimonial-card h3 { margin-bottom: 10px; font-size: 1.1rem; }
+    .service-card p, .testimonial-card p, .muted { color: var(--muted); }
+    .soft-banner {
+      background: linear-gradient(135deg, #efe3d9, #f8efea);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 28px;
+    }
+    .footer-signup {
+      display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 24px; align-items: center;
+      background: var(--surface); border: 1px solid var(--line); border-radius: 24px; padding: 28px;
+    }
+    input {
+      width: 100%; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; font: inherit; background: white;
+    }
+    .input-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; }
+    footer {
+      padding: 36px 0 60px; color: var(--muted);
+    }
+    .footer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    @media (max-width: 900px) {
+      .hero, .grid-3, .grid-2, .trust-strip, .footer-signup, .footer-grid { grid-template-columns: 1fr; }
+      .nav-links { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <nav>
+        <div class="brand">Northwind Skin Studio</div>
+        <div class="nav-links">
+          <a href="#about">About</a>
+          <a href="#services">Services</a>
+          <a href="#memberships">Memberships</a>
+          <a href="#blog">Blog</a>
+          <a href="#contact">Contact</a>
+        </div>
+        <a class="button secondary" href="#contact">Book a Consultation</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="container hero">
+      <div>
+        <div class="eyebrow">Scottsdale Med Spa</div>
+        <h1>Feel like yourself — refreshed, confident, and cared for.</h1>
+        <p class="lead">Northwind Skin Studio offers personalized skin treatments and subtle aesthetic care in Scottsdale, with treatment plans designed around your goals, comfort, and long-term confidence.</p>
+        <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:24px;">
+          <a class="button secondary" href="#contact">Book a Consultation</a>
+          <a class="button secondary" href="#services">Explore Treatments</a>
+        </div>
+        <div class="trust-strip">
+          <div class="trust-pill">11+ years of aesthetic nursing experience</div>
+          <div class="trust-pill">Scottsdale-based care</div>
+          <div class="trust-pill">Natural-looking treatment planning</div>
+          <div class="trust-pill">Personalized, no-pressure guidance</div>
+        </div>
+      </div>
+      <div class="hero-card">
+        <div class="eyebrow">Consultation Focus</div>
+        <h3>Start with a treatment plan that fits your goals.</h3>
+        <p class="muted">Whether you're considering a facial, microneedling, injectables, or a longer-term skincare plan, Northwind helps you understand what makes sense for your skin, timeline, and comfort level.</p>
+        <ul class="muted" style="padding-left:18px; margin:16px 0 0;">
+          <li>Custom facials and skin treatments</li>
+          <li>Microneedling and texture support</li>
+          <li>Subtle injectable planning</li>
+          <li>Membership options for ongoing care</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="about">
+      <div class="container grid-2">
+        <div>
+          <div class="eyebrow">Why clients choose Northwind</div>
+          <h2>Modern skincare guidance without the pressure.</h2>
+        </div>
+        <div class="card">
+          <p class="muted">We believe great results start with trust. Every treatment plan at Northwind is designed around your goals, comfort level, timeline, and lifestyle. Whether you want to address texture, acne, dullness, or early signs of aging, we guide you toward the right next step — not the biggest possible treatment.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="services" class="container">
+      <div class="eyebrow">Featured Services</div>
+      <h2>Support for your skin now — and a plan for what comes next.</h2>
+      <div class="grid-3" style="margin-top:20px;">
+        <div class="card service-card"><h3>Complimentary Consultation</h3><p>Talk through your goals, timeline, and comfort level before choosing your next step.</p></div>
+        <div class="card service-card"><h3>Custom Facials</h3><p>Personalized treatments designed around hydration, texture, clarity, and maintenance.</p></div>
+        <div class="card service-card"><h3>Microneedling</h3><p>An advanced option for clients focused on texture, tone, and skin renewal.</p></div>
+        <div class="card service-card"><h3>Botox / Wrinkle Relaxers</h3><p>Subtle injectable planning focused on refreshed, natural-looking results.</p></div>
+        <div class="card service-card"><h3>Laser Resurfacing Consults</h3><p>Explore whether cooler months are the right time for deeper treatment planning.</p></div>
+        <div class="card service-card"><h3>Monthly Membership</h3><p>A simple way to stay consistent with skincare support and ongoing guidance.</p></div>
+      </div>
+    </section>
+
+    <section class="container" style="padding-top:12px;">
+      <div class="soft-banner">
+        <div class="eyebrow">Seasonal Highlight</div>
+        <h2>Planning a skin reset this season?</h2>
+        <p class="lead" style="max-width:48ch;">Cooler months can be a great time to revisit your skincare routine and plan treatments that support tone, texture, and long-term skin health.</p>
+        <a class="button secondary" href="#contact">Book a Consultation</a>
+      </div>
+    </section>
+
+    <section id="memberships" class="container">
+      <div class="grid-2">
+        <div>
+          <div class="eyebrow">Memberships</div>
+          <h2>Simple monthly care for clients who want consistency.</h2>
+          <p class="lead">Our membership is designed for clients who want a more structured way to stay on top of skincare, maintenance treatments, and long-term results.</p>
+        </div>
+        <div class="card">
+          <h3>Included benefits</h3>
+          <ul class="muted" style="padding-left:18px;">
+            <li>monthly treatment credit</li>
+            <li>preferred member pricing</li>
+            <li>priority booking access</li>
+            <li>guidance on long-term planning</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="container">
+      <div class="eyebrow">Client Feedback</div>
+      <h2>What clients appreciate most</h2>
+      <div class="grid-3" style="margin-top:20px;">
+        <div class="card testimonial-card"><h3>Thoughtful guidance</h3><p>“I never felt rushed or pressured. Ava walked me through every option and helped me choose a treatment plan that felt right for me.”</p></div>
+        <div class="card testimonial-card"><h3>Noticeable but subtle</h3><p>“I wanted subtle results, and that’s exactly what I got. I look more rested, not different.”</p></div>
+        <div class="card testimonial-card"><h3>Personalized care</h3><p>“My skin looked healthier and brighter after just a few visits. The whole experience feels calm, clean, and really personalized.”</p></div>
+      </div>
+    </section>
+
+    <section id="blog" class="container">
+      <div class="eyebrow">From the Blog</div>
+      <h2>Skincare guidance from Northwind</h2>
+      <div class="grid-3" style="margin-top:20px;">
+        <div class="card"><div class="eyebrow">3 weeks ago</div><h3>How to know if microneedling is right for your skin goals</h3><p class="muted">A closer look at texture, scarring, and when advanced treatment planning makes sense.</p></div>
+        <div class="card"><div class="eyebrow">4 months ago</div><h3>What to expect from your first med spa consultation</h3><p class="muted">Questions, comfort, planning, and what a calm first visit should actually feel like.</p></div>
+        <div class="card"><div class="eyebrow">9 months ago</div><h3>Fall skin reset: why cooler months are ideal for treatment planning</h3><p class="muted">A seasonal approach to texture, tone, and planning your next treatment phase.</p></div>
+      </div>
+    </section>
+
+    <section class="container">
+      <div class="footer-signup">
+        <div>
+          <div class="eyebrow">Stay Updated</div>
+          <h2 style="margin-bottom:10px;">Occasional skincare tips and studio news.</h2>
+          <p class="muted">A simple signup form lives here, but it intentionally lacks a strong incentive or lead magnet.</p>
+        </div>
+        <div>
+          <div class="input-row">
+            <input type="email" placeholder="Email address" />
+            <a class="button primary" href="#">Sign Up</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="contact" class="container">
+      <div class="grid-2">
+        <div>
+          <div class="eyebrow">Book a Consultation</div>
+          <h2>Not sure where to begin?</h2>
+          <p class="lead">Start with a consultation and we’ll help you understand which treatments fit your goals and comfort level.</p>
+        </div>
+        <div class="card">
+          <p><strong>Phone:</strong> (480) 555-0142</p>
+          <p><strong>Email:</strong> hello@northwindskinstudio.com</p>
+          <p><strong>Address:</strong> 7142 E. Mercer Lane, Scottsdale, AZ 85254</p>
+          <p class="muted">Mon 9–5 · Tue 9–6 · Wed 10–6 · Thu 9–6 · Fri 9–4 · Sat 9–2</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container footer-grid">
+      <div>
+        <div class="brand" style="margin-bottom:8px;">Northwind Skin Studio</div>
+        <div>Boutique skincare and aesthetic care in Scottsdale.</div>
+      </div>
+      <div>
+        <div>Designed as a synthetic staging business for Atlas validation.</div>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
