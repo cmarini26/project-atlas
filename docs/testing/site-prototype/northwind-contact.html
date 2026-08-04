@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Northwind Contact</title>
+  <style>
+    body { margin:0; font-family: Inter, system-ui, sans-serif; background:#f7f3ef; color:#2a2421; }
+    .container { width:min(980px, calc(100% - 32px)); margin:0 auto; padding:40px 0 64px; }
+    .card { background:#fffdfa; border:1px solid #e9ddd4; border-radius:22px; padding:24px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .muted { color:#6b615b; }
+    .eyebrow { color:#6f544b; font-size:.8rem; letter-spacing:.14em; text-transform:uppercase; font-weight:700; }
+    input, textarea, select { width:100%; margin-top:8px; padding:12px 14px; border:1px solid #e9ddd4; border-radius:14px; font:inherit; }
+    .field { margin-top:14px; }
+    @media (max-width:800px){ .grid{ grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="eyebrow">Book a Consultation</div>
+    <h1>Talk through your goals with Northwind Skin Studio</h1>
+    <p class="muted">Whether you’re ready to schedule or just want help understanding your options, we’d love to hear from you.</p>
+
+    <div class="grid" style="margin-top:24px;">
+      <div class="card">
+        <h2>Consultation form</h2>
+        <div class="field"><label>First name<input placeholder="First name"></label></div>
+        <div class="field"><label>Last name<input placeholder="Last name"></label></div>
+        <div class="field"><label>Email<input placeholder="Email"></label></div>
+        <div class="field"><label>Phone<input placeholder="Phone"></label></div>
+        <div class="field"><label>Preferred appointment day<select><option>Tuesday</option><option>Thursday</option><option>Saturday</option></select></label></div>
+        <div class="field"><label>Primary concern<textarea rows="4" placeholder="Tell us what you'd like help with"></textarea></label></div>
+      </div>
+      <div class="card">
+        <h2>Studio details</h2>
+        <p><strong>Phone:</strong> (480) 555-0142</p>
+        <p><strong>Email:</strong> hello@northwindskinstudio.com</p>
+        <p><strong>Address:</strong> 7142 E. Mercer Lane, Scottsdale, AZ 85254</p>
+        <p class="muted"><strong>Hours:</strong><br>Mon 9–5<br>Tue 9–6<br>Wed 10–6<br>Thu 9–6<br>Fri 9–4<br>Sat 9–2<br>Sun closed</p>
+        <h3>What to expect</h3>
+        <p class="muted">Your first conversation should feel informative, calm, and collaborative. We’ll talk through your goals, concerns, timing, and comfort level before recommending next steps.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

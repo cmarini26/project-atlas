@@ -1,0 +1,119 @@
+{
+  "company": {
+    "name": "Northwind Skin Studio",
+    "industry": "Med Spa / Skincare Clinic",
+    "description": "Northwind Skin Studio is a Scottsdale med spa focused on natural-looking cosmetic treatments, customized skincare plans, and long-term client relationships. The studio emphasizes education, subtle results, and approachable expert guidance."
+  },
+  "onboarding": {
+    "goals": [
+      "generate_leads",
+      "increase_sales",
+      "increase_website_traffic",
+      "improve_seo"
+    ],
+    "assets": {
+      "enabled": [
+        "website",
+        "email",
+        "instagram",
+        "facebook",
+        "google_business_profile"
+      ],
+      "primary": [
+        "website",
+        "email",
+        "instagram"
+      ],
+      "details": {
+        "website": {
+          "url": "https://northwindskinstudio.com",
+          "platform": "WordPress"
+        }
+      }
+    },
+    "preferences": {
+      "marketing_frequency": "weekly",
+      "marketing_owner": "me",
+      "is_seasonal": true,
+      "seasonal_months": [9, 10, 11],
+      "primary_cta": "book"
+    }
+  },
+  "business_profile": {
+    "tagline": "Personalized skin treatments for confident, natural results.",
+    "phone": "(480) 555-0142",
+    "primary_email": "hello@northwindskinstudio.com",
+    "booking_email": "book@northwindskinstudio.com",
+    "address": "7142 E. Mercer Lane, Scottsdale, AZ 85254",
+    "service_area": [
+      "Scottsdale",
+      "Paradise Valley",
+      "North Phoenix"
+    ],
+    "hours": {
+      "monday": "9:00 AM - 5:00 PM",
+      "tuesday": "9:00 AM - 6:00 PM",
+      "wednesday": "10:00 AM - 6:00 PM",
+      "thursday": "9:00 AM - 6:00 PM",
+      "friday": "9:00 AM - 4:00 PM",
+      "saturday": "9:00 AM - 2:00 PM",
+      "sunday": "Closed"
+    }
+  },
+  "offers": [
+    {
+      "slug": "new-client-consultation",
+      "headline": "Complimentary 20-minute consultation for first-time clients",
+      "goal": "bookings"
+    },
+    {
+      "slug": "first-facial-offer",
+      "headline": "15% off your first custom facial",
+      "goal": "new client conversion"
+    },
+    {
+      "slug": "fall-skin-reset",
+      "headline": "Seasonal facial + peel planning consult",
+      "goal": "timely campaign recommendation"
+    },
+    {
+      "slug": "membership-launch",
+      "headline": "Discounted first month for new members",
+      "goal": "retention"
+    }
+  ],
+  "intentional_gaps": [
+    "weak hero CTA prominence",
+    "stale blog cadence",
+    "uneven proof distribution",
+    "underdeveloped lead capture",
+    "thin objection handling",
+    "seasonal offer buried"
+  ],
+  "seed_subscribers": [
+    {
+      "name": "Mia Carter",
+      "email": "mia.carter@example.test",
+      "segment": "new_leads",
+      "status": "never_booked"
+    },
+    {
+      "name": "Elena Brooks",
+      "email": "elena.brooks@example.test",
+      "segment": "facial_clients",
+      "status": "last_visit_90_days_ago"
+    },
+    {
+      "name": "Jasmine Patel",
+      "email": "jasmine.patel@example.test",
+      "segment": "membership_prospects",
+      "status": "clicked_prior_offer"
+    },
+    {
+      "name": "Hannah Flores",
+      "email": "hannah.flores@example.test",
+      "segment": "reactivation_candidates",
+      "status": "no_visit_6_months"
+    }
+  ]
+}

@@ -101,6 +101,15 @@ class WordPressPublisher implements ChannelPublisher
             return new PingResult(reachable: false, error: 'No site URL is configured.');
         }
 
+        return $this->pingConnection($siteUrl, $username, $appPassword);
+    }
+
+    /**
+     * Verify candidate connection details before a Channel or
+     * ChannelCredentials row is created or changed.
+     */
+    public function pingConnection(string $siteUrl, string $username, string $appPassword): PingResult
+    {
         try {
             $response = $this->http->get(rtrim($siteUrl, '/').'/wp-json/wp/v2/users/me', [
                 'auth' => [$username, $appPassword],

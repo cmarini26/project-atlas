@@ -364,40 +364,37 @@ class SettingsController extends Controller
 
         $siteUrl = rtrim($validated['site_url'], '/');
 
-        Channel::withoutGlobalScopes()->updateOrCreate(
-            ['company_id' => $company->id, 'type' => 'blog'],
-            ['name' => (string) parse_url($siteUrl, PHP_URL_HOST), 'config' => ['site_url' => $siteUrl], 'is_active' => true],
-        );
-
-        // Ping the site with the submitted credentials before ever reporting
-        // "connected" — WordPressPublisher::ping() only needs company_id and
-        // the raw credentials, not a persisted row, so we validate first and
-        // decide the stored status from a real result instead of assuming
-        // success (see docs/reviews/Channel-Publishing-Reality-Audit.md).
-        $candidateCredentials = new ChannelCredentials([
-            'company_id' => $company->id,
-            'channel_type' => 'blog',
-            'credentials' => json_encode([
-                'username' => $validated['username'],
-                'app_password' => $validated['app_password'],
-            ]),
-        ]);
-
-        $ping = $this->wordPressPublisher->ping($candidateCredentials);
-
-        ChannelCredentials::withoutGlobalScopes()->updateOrCreate(
-            ['company_id' => $company->id, 'channel_type' => 'blog'],
-            [
-                'provider_type' => 'wordpress',
-                'credentials' => $candidateCredentials->credentials,
-                'status' => $ping->reachable ? 'active' : 'error',
-                'expires_at' => null,
-            ],
+        // Validate the candidate site and credentials before changing either
+        // persisted row. A typo during first connect must not create a false
+        // connection, and a failed credential rotation must not destroy the
+        // company's last known-good WordPress configuration.
+        $ping = $this->wordPressPublisher->pingConnection(
+            $siteUrl,
+            $validated['username'],
+            $validated['app_password'],
         );
 
         if (! $ping->reachable) {
             return back()->withErrors(['app_password' => "Couldn't connect to WordPress with those credentials: {$ping->error}"]);
         }
+
+        Channel::withoutGlobalScopes()->updateOrCreate(
+            ['company_id' => $company->id, 'type' => 'blog'],
+            ['name' => (string) parse_url($siteUrl, PHP_URL_HOST), 'config' => ['site_url' => $siteUrl], 'is_active' => true],
+        );
+
+        ChannelCredentials::withoutGlobalScopes()->updateOrCreate(
+            ['company_id' => $company->id, 'channel_type' => 'blog'],
+            [
+                'provider_type' => 'wordpress',
+                'credentials' => json_encode([
+                    'username' => $validated['username'],
+                    'app_password' => $validated['app_password'],
+                ]),
+                'status' => 'active',
+                'expires_at' => null,
+            ],
+        );
 
         return back()->with('success', 'WordPress connected.');
     }
