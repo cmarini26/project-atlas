@@ -149,7 +149,9 @@ class SeedStagingProfile extends Command
             );
         }
 
-        return $company->fresh();
+        $company->refresh();
+
+        return $company;
     }
 
     /**
