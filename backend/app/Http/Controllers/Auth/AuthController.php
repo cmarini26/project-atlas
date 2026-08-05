@@ -60,7 +60,7 @@ class AuthController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->route('onboarding');
+        return redirect()->intended(route('onboarding'));
     }
 
     public function logout(Request $request): RedirectResponse

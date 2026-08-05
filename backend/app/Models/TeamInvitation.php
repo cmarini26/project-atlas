@@ -9,31 +9,42 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
- * @property Carbon|null $joined_at
+ * @property Carbon $expires_at
+ * @property Carbon|null $accepted_at
+ * @property Carbon|null $revoked_at
+ * @property-read Company $company
  */
-class CompanyMembership extends Model
+class TeamInvitation extends Model
 {
     use BelongsToCompany, HasUlids;
 
     protected $fillable = [
         'company_id',
-        'user_id',
+        'email',
+        'normalized_email',
         'role',
         'invited_by',
-        'joined_at',
+        'token_hash',
+        'expires_at',
+        'accepted_at',
+        'revoked_at',
     ];
+
+    protected $hidden = ['token_hash'];
 
     protected function casts(): array
     {
         return [
-            'joined_at' => 'datetime',
+            'expires_at' => 'datetime',
+            'accepted_at' => 'datetime',
+            'revoked_at' => 'datetime',
         ];
     }
 
-    /** @return BelongsTo<User, $this> */
-    public function user(): BelongsTo
+    /** @return BelongsTo<Company, $this> */
+    public function company(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Company::class);
     }
 
     /** @return BelongsTo<User, $this> */

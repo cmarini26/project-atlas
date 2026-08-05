@@ -20,9 +20,11 @@ use App\Http\Controllers\App\PublishingController;
 use App\Http\Controllers\App\RecommendationController;
 use App\Http\Controllers\App\SettingsController;
 use App\Http\Controllers\App\SourceAssetController;
+use App\Http\Controllers\App\TeamController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\OnboardingController;
+use App\Http\Controllers\TeamInvitationAcceptanceController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -48,6 +50,13 @@ Route::middleware('guest')->group(function (): void {
 });
 
 Route::middleware('auth')->post('/logout', [AuthController::class, 'logout'])->name('logout');
+
+Route::middleware('auth')->group(function (): void {
+    Route::get('/team-invitations/{token}', [TeamInvitationAcceptanceController::class, 'show'])->name('team-invitations.show');
+    Route::post('/team-invitations/{token}', [TeamInvitationAcceptanceController::class, 'accept'])
+        ->middleware('throttle:10,1')
+        ->name('team-invitations.accept');
+});
 
 // ── Onboarding ────────────────────────────────────────────────────────────────
 // Business Discovery Onboarding (see docs/specs/Business-Discovery-Onboarding.md).
@@ -122,6 +131,11 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
     // Settings
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings');
     Route::patch('/settings', [SettingsController::class, 'update'])->name('settings.update');
+    Route::get('/settings/team', [TeamController::class, 'index'])->name('settings.team.index');
+    Route::post('/settings/team/invitations', [TeamController::class, 'invite'])->middleware('throttle:10,1')->name('settings.team.invitations.store');
+    Route::delete('/settings/team/invitations/{invitation}', [TeamController::class, 'revoke'])->name('settings.team.invitations.destroy');
+    Route::patch('/settings/team/members/{membership}', [TeamController::class, 'update'])->name('settings.team.members.update');
+    Route::delete('/settings/team/members/{membership}', [TeamController::class, 'remove'])->name('settings.team.members.destroy');
     Route::post('/settings/integrations/{integration}/sync', [SettingsController::class, 'syncIntegration'])->name('settings.integrations.sync');
     Route::post('/settings/integrations/instagram', [SettingsController::class, 'connectInstagram'])->name('settings.integrations.instagram.connect');
     Route::post('/settings/integrations/shopify', [SettingsController::class, 'connectShopify'])->name('settings.integrations.shopify.connect');

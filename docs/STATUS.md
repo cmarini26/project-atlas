@@ -34,6 +34,24 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
+**SCRUM-69 — Company team members — implemented locally**
+*Completed locally: 2026-08-05*
+
+Company owners and admins can manage a Team page under Settings using Atlas's
+existing `company_memberships` tenant model. The feature adds seven-day,
+single-use email invitations whose plaintext tokens are never persisted,
+requires the accepting account's normalized email to match, returns new users
+to the invitation after registration, and selects the invited company after
+acceptance. Owners can manage non-owner roles; admins are limited to members
+and viewers. Owner access is immutable in this MVP, preventing accidental loss
+of workspace ownership. Cross-company membership and invitation mutations are
+explicitly rejected.
+
+Verification: 1,438 PHP tests passed (3 skipped), all 199 Vitest tests passed,
+Vue TypeScript validation passed, Pint passed, and the production bundle built
+successfully. The broader existing-route role authorization audit remains a
+separate release gate before `viewer` can be advertised as globally read-only.
+
 **SCRUM-13 — Production error tracking with Sentry — complete**
 *Started: 2026-07-28*
 

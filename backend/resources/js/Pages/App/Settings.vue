@@ -310,6 +310,19 @@ function retakeTour(): void {
       </div>
     </div>
 
+    <!-- Team -->
+    <div v-if="['owner', 'admin'].includes(membership_role)" class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5 mb-6">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <h2 class="text-sm font-semibold text-[var(--color-text-primary)] mb-1">Team</h2>
+          <p class="text-xs text-[var(--color-text-muted)]">Invite colleagues and manage their access to this workspace.</p>
+        </div>
+        <Link href="/app/settings/team" class="shrink-0 py-1.5 px-3 text-xs font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)]">
+          Manage →
+        </Link>
+      </div>
+    </div>
+
     <!-- Marketing Presence -->
     <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5 mb-6">
       <div class="flex items-center justify-between gap-3">
