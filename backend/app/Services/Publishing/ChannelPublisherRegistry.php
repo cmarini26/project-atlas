@@ -26,6 +26,17 @@ class ChannelPublisherRegistry
         throw new UnknownChannelException($channelType);
     }
 
+    public function simulatorFor(string $channelType): ?ChannelPublisher
+    {
+        foreach ($this->publishers as $publisher) {
+            if ($publisher instanceof LogChannelPublisher && $publisher->supports($channelType)) {
+                return $publisher;
+            }
+        }
+
+        return null;
+    }
+
     /** @return list<ChannelPublisher> */
     public function all(): array
     {

@@ -72,6 +72,7 @@ class ExecutionService
         $execution->update([
             'status' => 'completed',
             'completed_at' => now(),
+            'last_error' => null,
             'result' => $result->toArray(),
         ]);
 
