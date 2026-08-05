@@ -70,7 +70,7 @@ class VerifyStagingProfile extends Command
             ->where('company_id', $company->id)
             ->where('type', 'website')
             ->first();
-        if ($website === null || $website->handle_or_url !== 'https://northwindskinstudio.com') {
+        if ($website === null || $website->handle_or_url !== 'https://cmarini26.github.io/project-atlas/') {
             $failures[] = 'Website marketing channel is missing the expected northwind URL.';
         }
 

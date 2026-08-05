@@ -39,7 +39,7 @@ Mark these as primary assets:
 Current code requires details only for `website`.
 
 #### Website asset details
-- **URL:** `https://northwindskinstudio.com`
+- **Controlled test URL:** `https://cmarini26.github.io/project-atlas/`
 - **Platform:** `WordPress`
 
 ### Step 6 — Marketing Preferences
