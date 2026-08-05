@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Channel;
 use App\Models\Execution;
+use App\Models\MarketingChannel;
 use App\Services\Publishing\ChannelPublisherRegistry;
 use App\Services\Publishing\Exceptions\PublishingException;
 use App\Services\Publishing\ExecutionService;
@@ -57,7 +58,19 @@ class PublishContent implements ShouldQueue
         $execution->update(['status' => 'executing', 'executed_at' => now()]);
 
         $channel = Channel::withoutGlobalScopes()->findOrFail($execution->channel_id);
-        $publisher = $registry->for($channel->type);
+        $publishingEnabled = MarketingChannel::withoutGlobalScopes()
+            ->where('company_id', $execution->company_id)
+            ->where('channel_id', $channel->id)
+            ->where('supports_publishing', true)
+            ->exists();
+
+        // A technical Channel can exist before a provider connection has been
+        // verified. In that draft-only state the UI promises an internal
+        // simulation, so route explicitly to the log publisher rather than
+        // allowing a live publisher to fail while looking for credentials.
+        $publisher = $publishingEnabled
+            ? $registry->for($channel->type)
+            : ($registry->simulatorFor($channel->type) ?? $registry->for($channel->type));
 
         try {
             $result = $publisher->publish($execution);

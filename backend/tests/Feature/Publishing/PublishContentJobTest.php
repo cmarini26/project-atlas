@@ -20,6 +20,7 @@ use App\Services\Publishing\Exceptions\ContentPolicyViolationException;
 use App\Services\Publishing\Exceptions\RateLimitException;
 use App\Services\Publishing\ExecutionService;
 use App\Services\Publishing\FakeChannelPublisher;
+use App\Services\Publishing\LogChannelPublisher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
@@ -128,6 +129,7 @@ class PublishContentJobTest extends TestCase
         Event::fake([ExecutionCompleted::class, CampaignPublished::class]);
 
         $execution = $this->makeExecution();
+        $execution->update(['last_error' => 'A previous attempt failed.']);
 
         $job = new PublishContent($execution);
         $job->handle(
@@ -137,6 +139,7 @@ class PublishContentJobTest extends TestCase
 
         $execution->refresh();
         $this->assertEquals('completed', $execution->status);
+        $this->assertNull($execution->last_error);
     }
 
     public function test_success_path_logs_attempt(): void
@@ -170,6 +173,29 @@ class PublishContentJobTest extends TestCase
         );
 
         $this->fakePublisher->assertPublished(1);
+    }
+
+    public function test_draft_only_channel_uses_log_publisher_without_credentials(): void
+    {
+        Event::fake([ExecutionCompleted::class, CampaignPublished::class]);
+
+        $execution = $this->makeExecution();
+        $this->channel->update(['type' => 'blog']);
+        ContentAsset::withoutGlobalScopes()->whereKey($execution->content_asset_id)->update([
+            'type' => 'blog_post',
+            'title' => 'Draft-only article',
+        ]);
+        $registry = new ChannelPublisherRegistry();
+        $registry->register($this->app->make(LogChannelPublisher::class));
+
+        (new PublishContent($execution))->handle(
+            $registry,
+            $this->app->make(ExecutionService::class),
+        );
+
+        $execution->refresh();
+        $this->assertSame('completed', $execution->status);
+        $this->assertSame('log', $execution->result['metadata']['publisher'] ?? null);
     }
 
     public function test_non_retryable_failure_marks_execution_failed_immediately(): void
