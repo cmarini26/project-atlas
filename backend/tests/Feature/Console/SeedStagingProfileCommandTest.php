@@ -25,7 +25,7 @@ class SeedStagingProfileCommandTest extends TestCase
         $company = Company::withoutGlobalScopes()->where('name', 'Northwind Skin Studio')->first();
         $this->assertNotNull($company);
         $this->assertSame('Med Spa / Skincare Clinic', $company->industry);
-        $this->assertSame('https://northwindskinstudio.com', $company->website_url);
+        $this->assertSame('https://cmarini26.github.io/project-atlas/', $company->website_url);
 
         $owner = User::withoutGlobalScopes()->where('email', 'northwind-owner@atlas.test')->first();
         $this->assertNotNull($owner);
@@ -45,7 +45,7 @@ class SeedStagingProfileCommandTest extends TestCase
         $this->assertDatabaseHas('marketing_channels', [
             'company_id' => $company->id,
             'type' => 'website',
-            'handle_or_url' => 'https://northwindskinstudio.com',
+            'handle_or_url' => 'https://cmarini26.github.io/project-atlas/',
         ]);
 
         $this->assertSame(4, EmailAudience::withoutGlobalScopes()->where('company_id', $company->id)->count());

@@ -109,6 +109,11 @@ The verification command checks:
 
 If `--start-discovery` is passed, Atlas immediately starts Business Discovery after seeding.
 
+> **External-request boundary:** the Northwind profile declares the controlled
+> GitHub Pages test site at `https://cmarini26.github.io/project-atlas/`. Using
+> `--start-discovery` schedules a real HTTP crawl of that public synthetic site;
+> it never serves files directly from `docs/testing/site-prototype/`.
+
 Use this when you want to test:
 - observation orchestration
 - discovery progress/status
@@ -138,9 +143,10 @@ Those are still part of the later staging setup work.
 
 ## 7. Recommended use for SCRUM-66
 
-1. run `php artisan atlas:seed-staging --start-discovery` in staging
-2. verify onboarding/discovery state in the app
-3. connect the beta-critical real channels next:
+1. confirm `https://cmarini26.github.io/project-atlas/` serves the current synthetic prototype
+2. run `php artisan atlas:seed-staging --start-discovery` in staging
+3. verify onboarding/discovery state in the app
+4. connect the beta-critical real channels next:
    - WordPress
    - email provider
-4. use the Northwind website/content package as the external observation target
+5. use the Northwind website/content package as the external observation target
