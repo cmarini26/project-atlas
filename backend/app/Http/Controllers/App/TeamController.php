@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\TeamInvitation;
+use App\Models\User;
 use App\Notifications\TeamInvitationCreated;
 use App\Services\Team\TeamInvitationService;
 use Illuminate\Http\RedirectResponse;
@@ -27,14 +28,19 @@ class TeamController extends Controller
             ->where('company_id', $company->id)
             ->orderByRaw("CASE role WHEN 'owner' THEN 1 WHEN 'admin' THEN 2 WHEN 'member' THEN 3 ELSE 4 END")
             ->get()
-            ->map(fn (CompanyMembership $membership): array => [
-                'id' => $membership->id,
-                'name' => $membership->user->name,
-                'email' => $membership->user->email,
-                'role' => $membership->role,
-                'joined_at' => $membership->joined_at?->toIso8601String(),
-                'can_manage' => $this->canManageRole($actor->role, $membership->role),
-            ]);
+            ->map(function (CompanyMembership $membership) use ($actor): array {
+                $user = $membership->user;
+                abort_unless($user instanceof User, 500);
+
+                return [
+                    'id' => $membership->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => $membership->role,
+                    'joined_at' => $membership->joined_at?->toIso8601String(),
+                    'can_manage' => $this->canManageRole($actor->role, $membership->role),
+                ];
+            });
 
         $pending = TeamInvitation::withoutGlobalScopes()
             ->where('company_id', $company->id)
@@ -62,13 +68,15 @@ class TeamController extends Controller
     public function invite(Request $request, TeamInvitationService $invitations): RedirectResponse
     {
         [$company, $actor] = $this->managerContext($request);
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
         $allowedRoles = $actor->role === 'owner' ? ['admin', 'member', 'viewer'] : ['member', 'viewer'];
         $validated = $request->validate([
             'email' => ['required', 'email:rfc', 'max:255'],
             'role' => ['required', Rule::in($allowedRoles)],
         ]);
 
-        $result = $invitations->create($company, $request->user(), $validated['email'], $validated['role']);
+        $result = $invitations->create($company, $user, $validated['email'], $validated['role']);
         $result['invitation']->load('company');
 
         Notification::route('mail', $result['invitation']->email)

@@ -6,7 +6,14 @@ use App\Domain\Shared\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property Carbon $expires_at
+ * @property Carbon|null $accepted_at
+ * @property Carbon|null $revoked_at
+ * @property-read Company $company
+ */
 class TeamInvitation extends Model
 {
     use BelongsToCompany, HasUlids;

@@ -6,7 +6,11 @@ use App\Domain\Shared\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property Carbon|null $joined_at
+ */
 class CompanyMembership extends Model
 {
     use BelongsToCompany, HasUlids;
