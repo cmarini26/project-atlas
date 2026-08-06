@@ -53,7 +53,9 @@ class ChannelPublishingCapabilityResolver
             return null;
         }
 
-        $siteUrl = $channel->config['site_url'] ?? null;
+        /** @var array<string, mixed> $channelConfig */
+        $channelConfig = (array) $channel->config;
+        $siteUrl = $channelConfig['site_url'] ?? null;
 
         return is_string($siteUrl) && $siteUrl !== '' ? rtrim($siteUrl, '/') : null;
     }
