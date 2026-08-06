@@ -35,6 +35,9 @@ Route::get('/', fn () => auth()->check()
     ? redirect()->route('app.dashboard')
     : Inertia::render('Marketing/Landing'))->name('home');
 
+Route::get('/privacy', fn () => Inertia::render('Legal/Privacy'))->name('privacy');
+Route::get('/terms', fn () => Inertia::render('Legal/Terms'))->name('terms');
+
 // ── Auth ─────────────────────────────────────────────────────────────────────
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');

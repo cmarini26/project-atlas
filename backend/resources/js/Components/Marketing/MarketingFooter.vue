@@ -5,7 +5,7 @@ import { Link } from '@inertiajs/vue3'
 <template>
   <footer class="border-t border-[var(--color-border)] px-4 sm:px-8 py-14">
     <div class="mx-auto max-w-[1280px] grid grid-cols-1 sm:grid-cols-2 gap-10">
-      <div>
+      <div class="sm:justify-self-end sm:min-w-64">
         <span class="text-heading-2 font-semibold text-[var(--color-text-primary)]">The Clear Move</span>
         <p class="mt-2 max-w-xs text-body-sm text-[var(--color-text-muted)]">
           AI marketing for independent businesses. Not a tool that waits for you.
@@ -28,6 +28,16 @@ import { Link } from '@inertiajs/vue3'
           <li>
             <Link href="/login" class="text-body text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]">
               Sign In
+            </Link>
+          </li>
+          <li>
+            <Link href="/privacy" class="text-body text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]">
+              Privacy Policy
+            </Link>
+          </li>
+          <li>
+            <Link href="/terms" class="text-body text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]">
+              Terms of Service
             </Link>
           </li>
         </ul>
