@@ -2,9 +2,12 @@
 
 namespace Tests\Feature\Analytics;
 
+use App\Enums\EmailRecipientSnapshotStatus;
 use App\Jobs\RetrieveExecutionMetrics;
 use App\Models\ContentAsset;
+use App\Models\EmailRecipientSnapshot;
 use App\Models\Execution;
+use App\Models\ExecutionMetric;
 use App\Services\Analytics\AnalyticsProviderRegistry;
 use App\Services\Analytics\CampaignKpiService;
 use App\Services\Analytics\FakeAnalyticsProvider;
@@ -90,6 +93,48 @@ class RetrieveExecutionMetricsTest extends AnalyticsTestCase
         $this->handle($execution->id);
 
         $this->assertDatabaseCount('execution_metrics', 1);
+    }
+
+    public function test_audience_execution_pulls_and_aggregates_recipient_message_ids(): void
+    {
+        Queue::fake();
+        $this->fakeProvider->queueMetrics(
+            ['delivered' => 1, 'open_rate' => 1.0, 'normalised_reach' => 1, 'normalised_engagement' => 1],
+            ['delivered' => 1, 'open_rate' => 0.0, 'normalised_reach' => 1, 'normalised_engagement' => 0],
+        );
+        $this->fakeProvider->setWindowClosed(true);
+
+        $execution = $this->makeExecution(result: ['platform_id' => 'audience:'.$this->campaign->id]);
+
+        foreach ([['one@example.com', 'postmark-1'], ['two@example.com', 'postmark-2']] as [$email, $messageId]) {
+            EmailRecipientSnapshot::withoutGlobalScopes()->create([
+                'company_id' => $this->company->id,
+                'campaign_id' => $this->campaign->id,
+                'execution_id' => $execution->id,
+                'email' => $email,
+                'status' => EmailRecipientSnapshotStatus::Sent,
+                'provider_message_id' => $messageId,
+            ]);
+        }
+
+        $this->handle($execution->id);
+
+        $this->fakeProvider->assertPulled(2);
+        $this->assertSame(
+            ['postmark-1', 'postmark-2'],
+            array_column($this->fakeProvider->pulledItems(), 'platform_id'),
+        );
+
+        $metric = ExecutionMetric::withoutGlobalScopes()->where('execution_id', $execution->id)->sole();
+
+        $this->assertSame(2, $metric->metrics['delivered']);
+        $this->assertSame(2, $metric->metrics['normalised_reach']);
+        $this->assertSame(1, $metric->metrics['normalised_engagement']);
+        $this->assertSame(0.5, $metric->metrics['open_rate']);
+        $this->assertSame(
+            ['postmark-1', 'postmark-2'],
+            array_keys($metric->raw['messages']),
+        );
     }
 
     public function test_appends_failure_log_and_rethrows(): void
