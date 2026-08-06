@@ -11,6 +11,7 @@ use App\Models\SourceAsset;
 use App\Services\Brain\BusinessBrainService;
 use App\Services\Decision\DecisionContext;
 use App\Services\Decision\DecisionService;
+use App\Services\Publishing\ChannelPublishingCapabilityResolver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -20,6 +21,7 @@ class CustomCampaignService
     public function __construct(
         private readonly BusinessBrainService $brainService,
         private readonly DecisionService $decisionService,
+        private readonly ChannelPublishingCapabilityResolver $publishingCapabilities,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -58,7 +60,16 @@ class CustomCampaignService
             default => 'featured_item',
         };
 
-        [, $opportunity] = DB::transaction(function () use ($company, $data, $assetIds, $channelIds, $campaignType): array {
+        $publishingTargets = $channels
+            ->map(function (Channel $channel) use ($company): ?string {
+                $target = $this->publishingCapabilities->publishingTarget($company, $channel);
+
+                return $target !== null ? "{$channel->name}: {$target}" : null;
+            })
+            ->filter()
+            ->implode(', ');
+
+        [, $opportunity] = DB::transaction(function () use ($company, $data, $assetIds, $channelIds, $campaignType, $publishingTargets): array {
             $brief = CampaignBrief::withoutGlobalScopes()->create([
                 'company_id' => $company->id,
                 'title' => $data['title'],
@@ -79,7 +90,7 @@ class CustomCampaignService
                 'subject_id' => $brief->id,
                 'type' => $campaignType === 're_engagement' ? 're_engagement' : 'featured_item',
                 'title' => $brief->title,
-                'description' => $this->opportunityDescription($brief->load('sourceAssets')),
+                'description' => $this->opportunityDescription($brief->load('sourceAssets'), $publishingTargets),
                 'relevance_score' => 100,
                 'timing_score' => $brief->ends_at !== null ? 95 : 85,
                 'confidence_score' => 100,
@@ -107,7 +118,7 @@ class CustomCampaignService
         }
     }
 
-    private function opportunityDescription(CampaignBrief $brief): string
+    private function opportunityDescription(CampaignBrief $brief, string $publishingTargets): string
     {
         $assets = $brief->sourceAssets
             ->map(fn (SourceAsset $asset): string => "{$asset->title} ({$asset->type})")
@@ -117,6 +128,7 @@ class CustomCampaignService
             "Customer objective: {$brief->objective}",
             $brief->audience ? "Audience: {$brief->audience}" : null,
             $brief->guidance ? "Additional guidance: {$brief->guidance}" : null,
+            $publishingTargets !== '' ? "Verified publishing targets: {$publishingTargets}" : null,
             "Selected Asset Library sources: {$assets}",
         ]));
     }

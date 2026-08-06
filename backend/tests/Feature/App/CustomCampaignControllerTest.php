@@ -8,11 +8,13 @@ use App\Events\RecommendationApproved;
 use App\Models\Campaign;
 use App\Models\CampaignBrief;
 use App\Models\Channel;
+use App\Models\ChannelCredentials;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\ContentAsset;
 use App\Models\Decision;
 use App\Models\DigitalTwin;
+use App\Models\Opportunity;
 use App\Models\Recommendation;
 use App\Models\SourceAsset;
 use App\Models\User;
@@ -149,6 +151,45 @@ class CustomCampaignControllerTest extends TestCase
                 ->where('source_assets.0.id', $offer->id)
                 ->where('source_assets.1.id', $proof->id)
             );
+    }
+
+    public function test_custom_campaign_context_names_the_verified_wordpress_target(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        DigitalTwin::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'status' => 'active',
+            'health_score' => 80,
+        ]);
+        $asset = $this->asset($company);
+        $channel = $this->channel($company, [
+            'type' => 'blog',
+            'name' => 'Northwind WordPress',
+            'config' => ['site_url' => 'https://northwind.example/'],
+        ]);
+        ChannelCredentials::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'channel_type' => 'blog',
+            'provider_type' => 'wordpress',
+            'credentials' => json_encode(['username' => 'atlas', 'app_password' => 'secret']),
+            'status' => 'active',
+        ]);
+        $this->fake
+            ->queueFixture('rationale-generation')
+            ->queueFixture('campaign-blueprint')
+            ->queueFixture('blog-content');
+
+        $this->actingAs($user)->post('/app/campaigns', [
+            ...$this->validPayload(),
+            'source_asset_ids' => [$asset->id],
+            'channel_ids' => [$channel->id],
+        ])->assertRedirect();
+
+        $description = Opportunity::withoutGlobalScopes()->firstOrFail()->description;
+        $this->assertStringContainsString(
+            'Verified publishing targets: Northwind WordPress: https://northwind.example',
+            $description,
+        );
     }
 
     /** @return array<string, mixed> */

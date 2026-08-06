@@ -4,6 +4,7 @@ namespace Tests\Feature\App;
 
 use App\Models\Campaign;
 use App\Models\Channel;
+use App\Models\ChannelCredentials;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\ContentAsset;
@@ -106,6 +107,41 @@ class RecommendationControllerTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->where('content_assets.0.title', 'Rare finds this week')
                 ->where('content_assets.0.channel.type', 'blog')
+            );
+    }
+
+    public function test_show_marks_blog_connected_when_wordpress_credentials_are_active(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $channel = Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'blog',
+            'name' => 'WordPress Blog',
+            'config' => ['site_url' => 'https://northwind.example'],
+            'is_active' => true,
+        ]);
+        ChannelCredentials::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'channel_type' => 'blog',
+            'provider_type' => 'wordpress',
+            'credentials' => json_encode(['username' => 'atlas', 'app_password' => 'secret']),
+            'status' => 'active',
+        ]);
+        $rec = $this->pendingRecommendation($company, [$channel->id]);
+        ContentAsset::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_id' => $rec->campaign_id,
+            'channel_id' => $channel->id,
+            'type' => 'blog_post',
+            'body' => 'Body copy',
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs($user)
+            ->get("/app/recommendations/{$rec->id}")
+            ->assertInertia(fn ($page) => $page
+                ->where('content_assets.0.channel.marketing_channel.supports_publishing', true)
+                ->where('channel_mix.supporting.0.marketing_channel.supports_publishing', true)
             );
     }
 

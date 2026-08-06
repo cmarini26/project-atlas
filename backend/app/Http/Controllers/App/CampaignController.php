@@ -11,6 +11,7 @@ use App\Models\EmailRecipientSnapshot;
 use App\Models\Execution;
 use App\Models\MarketingChannel;
 use App\Services\Campaign\CampaignChannelSelectionService;
+use App\Services\Publishing\ChannelPublishingCapabilityResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -20,6 +21,7 @@ class CampaignController extends Controller
 {
     public function __construct(
         private readonly CampaignChannelSelectionService $channelSelection,
+        private readonly ChannelPublishingCapabilityResolver $publishingCapabilities,
     ) {}
 
     public function index(Request $request): Response
@@ -70,11 +72,10 @@ class CampaignController extends Controller
         // Built once per request and keyed by channel_id so each content
         // asset/execution below is an O(1) lookup, not a per-row query — see
         // RecommendationController::show() for the same established pattern.
-        $linkedMarketingChannelsByChannelId = MarketingChannel::withoutGlobalScopes()
-            ->where('company_id', $company->id)
-            ->whereNotNull('channel_id')
-            ->get()
-            ->keyBy('channel_id');
+        $publishingCapabilities = $this->publishingCapabilities->forChannels(
+            $company,
+            $contentAssets->pluck('channel')->merge($executions->pluck('channel'))->filter()->unique('id')->values(),
+        );
 
         $kpiSnapshot = $campaign->kpiSnapshots()
             ->where('snapshot_type', 'final')
@@ -147,9 +148,7 @@ class CampaignController extends Controller
                 ->values()
                 ->all(),
             'can_edit_channel_selection' => $canEditChannelSelection,
-            'content_assets' => $contentAssets->map(function (ContentAsset $a) use ($linkedMarketingChannelsByChannelId) {
-                $linked = $a->channel !== null ? $linkedMarketingChannelsByChannelId->get($a->channel->id) : null;
-
+            'content_assets' => $contentAssets->map(function (ContentAsset $a) use ($publishingCapabilities) {
                 return [
                     'id' => $a->id,
                     'type' => $a->type,
@@ -160,15 +159,11 @@ class CampaignController extends Controller
                     'metadata' => $a->metadata ?? [],
                     'channel' => $a->channel ? [
                         'type' => $a->channel->type,
-                        'marketing_channel' => $linked !== null
-                            ? ['supports_publishing' => (bool) $linked->supports_publishing]
-                            : null,
+                        'marketing_channel' => ['supports_publishing' => $publishingCapabilities->get($a->channel->id, false)],
                     ] : null,
                 ];
             })->values()->all(),
-            'executions' => $executions->map(function (Execution $e) use ($linkedMarketingChannelsByChannelId) {
-                $linked = $e->channel !== null ? $linkedMarketingChannelsByChannelId->get($e->channel->id) : null;
-
+            'executions' => $executions->map(function (Execution $e) use ($publishingCapabilities) {
                 return [
                     'id' => $e->id,
                     'status' => $e->status,
@@ -178,9 +173,7 @@ class CampaignController extends Controller
                     'last_error' => $e->last_error,
                     'channel' => $e->channel ? [
                         'type' => $e->channel->type,
-                        'marketing_channel' => $linked !== null
-                            ? ['supports_publishing' => (bool) $linked->supports_publishing]
-                            : null,
+                        'marketing_channel' => ['supports_publishing' => $publishingCapabilities->get($e->channel->id, false)],
                     ] : null,
                 ];
             })->values()->all(),

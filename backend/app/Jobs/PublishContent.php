@@ -4,8 +4,8 @@ namespace App\Jobs;
 
 use App\Models\Channel;
 use App\Models\Execution;
-use App\Models\MarketingChannel;
 use App\Services\Publishing\ChannelPublisherRegistry;
+use App\Services\Publishing\ChannelPublishingCapabilityResolver;
 use App\Services\Publishing\Exceptions\PublishingException;
 use App\Services\Publishing\ExecutionService;
 use Illuminate\Bus\Queueable;
@@ -35,6 +35,7 @@ class PublishContent implements ShouldQueue
     public function handle(
         ChannelPublisherRegistry $registry,
         ExecutionService $executionService,
+        ?ChannelPublishingCapabilityResolver $capabilityResolver = null,
     ): void {
         // Re-load from DB for current status (idempotency check)
         $execution = Execution::withoutGlobalScopes()->findOrFail($this->execution->id);
@@ -58,11 +59,8 @@ class PublishContent implements ShouldQueue
         $execution->update(['status' => 'executing', 'executed_at' => now()]);
 
         $channel = Channel::withoutGlobalScopes()->findOrFail($execution->channel_id);
-        $publishingEnabled = MarketingChannel::withoutGlobalScopes()
-            ->where('company_id', $execution->company_id)
-            ->where('channel_id', $channel->id)
-            ->where('supports_publishing', true)
-            ->exists();
+        $publishingEnabled = ($capabilityResolver ?? app(ChannelPublishingCapabilityResolver::class))
+            ->supportsPublishing($execution->company_id, $channel);
 
         // A technical Channel can exist before a provider connection has been
         // verified. In that draft-only state the UI promises an internal
