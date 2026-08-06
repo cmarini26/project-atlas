@@ -41,7 +41,12 @@ class PublishingController extends Controller
                         'scheduled_at' => $e->scheduled_at?->toIso8601String(),
                         'executed_at' => $e->executed_at?->toIso8601String(),
                         'completed_at' => $e->completed_at?->toIso8601String(),
+                        'attempts' => $e->attempts,
                         'last_error' => $e->last_error,
+                        'result' => $e->result ? [
+                            'platform_id' => $e->result['platform_id'] ?? null,
+                            'url' => $e->result['url'] ?? null,
+                        ] : null,
                         'channel' => $e->channel ? [
                             'type' => $e->channel->type,
                             'marketing_channel' => ['supports_publishing' => $publishingCapabilities->get($e->channel->id, false)],

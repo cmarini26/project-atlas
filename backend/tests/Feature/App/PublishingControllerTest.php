@@ -128,6 +128,76 @@ class PublishingControllerTest extends TestCase
             );
     }
 
+    public function test_reports_the_published_url_attempts_and_actionable_failure(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $channel = Channel::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'type' => 'blog',
+            'name' => 'Blog',
+        ]);
+        $campaign = $this->createCampaign($company);
+        $asset = ContentAsset::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_id' => $campaign->id,
+            'channel_id' => $channel->id,
+            'type' => 'blog_post',
+            'body' => 'Published article',
+            'status' => 'published',
+        ]);
+
+        $publishedExecution = Execution::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_id' => $campaign->id,
+            'content_asset_id' => $asset->id,
+            'channel_id' => $channel->id,
+            'status' => 'completed',
+            'attempts' => 1,
+            'idempotency_key' => 'published-'.uniqid(),
+            'result' => [
+                'platform_id' => '8',
+                'url' => 'https://northwind.example/atlas-test-post/',
+                'published_at' => now()->toIso8601String(),
+                'metadata' => ['publisher' => 'wordpress'],
+            ],
+        ]);
+        $publishedExecution->forceFill(['created_at' => now()->subMinute()])->save();
+
+        $retryingAsset = ContentAsset::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_id' => $campaign->id,
+            'channel_id' => $channel->id,
+            'type' => 'blog_post',
+            'body' => 'Retrying article',
+            'status' => 'scheduled',
+        ]);
+
+        Execution::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_id' => $campaign->id,
+            'content_asset_id' => $retryingAsset->id,
+            'channel_id' => $channel->id,
+            'status' => 'queued',
+            'attempts' => 2,
+            'last_error' => 'WordPress is temporarily unavailable. Atlas will retry automatically.',
+            'idempotency_key' => 'retrying-'.uniqid(),
+        ]);
+
+        $this->actingAs($user)
+            ->get('/app/publishing')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('executions.data', 2)
+                ->where('executions.data.0.status', 'queued')
+                ->where('executions.data.0.attempts', 2)
+                ->where('executions.data.0.last_error', 'WordPress is temporarily unavailable. Atlas will retry automatically.')
+                ->where('executions.data.1.status', 'completed')
+                ->where('executions.data.1.attempts', 1)
+                ->where('executions.data.1.result.platform_id', '8')
+                ->where('executions.data.1.result.url', 'https://northwind.example/atlas-test-post/')
+            );
+    }
+
     /** @return array{User, Company} */
     private function userWithCompany(string $role = 'owner'): array
     {
