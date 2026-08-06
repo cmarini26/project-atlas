@@ -168,6 +168,22 @@ class EmailRendererTest extends TestCase
         $this->assertEquals('', $payload->data['preview_text']);
     }
 
+    public function test_sender_falls_back_to_connected_channel_config(): void
+    {
+        $this->channel->update(['config' => [
+            'from_name' => 'Northwind Skin Studio',
+            'from_email' => 'admin@theclearmove.com',
+        ]]);
+        $asset = $this->makeAsset([
+            'metadata' => ['subject_line' => 'My Subject'],
+        ]);
+
+        $payload = $this->renderer->render($asset, $this->channel->fresh());
+
+        $this->assertSame('Northwind Skin Studio', $payload->data['from_name']);
+        $this->assertSame('admin@theclearmove.com', $payload->data['from_email']);
+    }
+
     public function test_recipient_comes_from_the_channels_own_config_not_the_asset(): void
     {
         $this->channel->update(['config' => ['to_email' => 'collector@example.com', 'to_name' => 'Jamie Collector']]);
