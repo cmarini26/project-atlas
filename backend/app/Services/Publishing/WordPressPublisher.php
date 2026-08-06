@@ -162,15 +162,31 @@ class WordPressPublisher implements ChannelPublisher
             $decoded = json_decode((string) $response->getBody(), true) ?? [];
 
             return $decoded;
+        } catch (ConnectException) {
+            throw new PublishingException(
+                'Atlas could not reach the WordPress site. Check that the site is online and the connected URL is still correct, then retry.',
+                retryable: true,
+            );
         } catch (RequestException $e) {
             $status = $e->getResponse()?->getStatusCode();
-            $message = $e->hasResponse() ? (string) $e->getResponse()?->getBody() : $e->getMessage();
 
             throw new PublishingException(
-                "WordPress post request failed: {$message}",
+                $this->publishFailureMessage($status),
                 retryable: $status === null || $status >= 500 || $status === 429,
             );
         }
+    }
+
+    private function publishFailureMessage(?int $status): string
+    {
+        return match (true) {
+            $status === 401 || $status === 403 => 'WordPress rejected the publishing credentials. Reconnect WordPress in Settings, then retry.',
+            $status === 404 => 'Atlas could not find the WordPress publishing endpoint. Check the connected site URL and WordPress REST API configuration.',
+            $status === 429 => 'WordPress is rate limiting publishing. Atlas will retry automatically.',
+            $status !== null && $status >= 500 => 'WordPress is temporarily unavailable. Atlas will retry automatically.',
+            $status !== null && $status >= 400 => 'WordPress rejected the post. Review the site configuration and content, then retry.',
+            default => 'Atlas could not complete the WordPress request. Check the connection and retry.',
+        };
     }
 
     /** @return array{0: string, 1: string} */

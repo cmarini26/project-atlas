@@ -17,7 +17,9 @@ interface ExecutionItem {
   scheduled_at: string | null
   executed_at: string | null
   completed_at: string | null
+  attempts: number
   last_error: string | null
+  result: { platform_id: string | null; url: string | null } | null
   channel: { type: string; marketing_channel: { supports_publishing: boolean } | null } | null
   content_asset: { type: string; body: string } | null
 }
@@ -39,6 +41,8 @@ const statusVariants: Record<string, 'success' | 'warning' | 'muted' | 'default'
   failed: 'warning',
   pending: 'muted',
   scheduled: 'default',
+  queued: 'default',
+  executing: 'default',
 }
 
 const statusLabels: Record<string, string> = {
@@ -48,6 +52,7 @@ const statusLabels: Record<string, string> = {
   pending: 'Pending',
   scheduled: 'Scheduled',
   executing: 'Executing',
+  queued: 'Retry scheduled',
 }
 
 function formatDate(date: string | null): string {
@@ -98,10 +103,26 @@ function formatDate(date: string | null): string {
               <p v-if="execution.content_asset?.body" class="text-sm text-[var(--color-text-secondary)] line-clamp-2">
                 {{ execution.content_asset.body }}
               </p>
-              <p v-if="execution.last_error" class="text-xs text-rose-600 mt-1">{{ execution.last_error }}</p>
+              <div v-if="execution.last_error" class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                <p class="text-xs font-medium text-amber-900">
+                  {{ execution.status === 'queued' ? `Publishing issue — retry scheduled after attempt ${execution.attempts}` : `Publishing failed after ${execution.attempts} attempt${execution.attempts === 1 ? '' : 's'}` }}
+                </p>
+                <p class="mt-0.5 text-xs text-amber-800">{{ execution.last_error }}</p>
+              </div>
+              <a
+                v-if="execution.status === 'completed' && execution.result?.url"
+                :href="execution.result.url"
+                target="_blank"
+                rel="noreferrer"
+                class="mt-2 inline-flex text-xs font-medium text-[var(--color-accent)] hover:underline"
+              >
+                View published post
+              </a>
             </div>
           </div>
-          <p class="text-xs text-[var(--color-text-muted)]">{{ formatDate(execution.scheduled_at) }}</p>
+          <p class="text-xs text-[var(--color-text-muted)]">
+            {{ formatDate(execution.completed_at ?? execution.executed_at ?? execution.scheduled_at) }}
+          </p>
         </div>
       </div>
 

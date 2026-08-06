@@ -63,7 +63,7 @@ class WordPressPublisherTest extends TestCase
     }
 
     /**
-     * @param  list<Response>  $postResponses
+     * @param  list<Response|\Throwable>  $postResponses
      * @param  list<Response>  $uploadResponses
      */
     private function makePublisher(array $postResponses, array $uploadResponses = []): WordPressPublisher
@@ -212,6 +212,49 @@ class WordPressPublisherTest extends TestCase
         $this->expectException(PublishingException::class);
 
         $publisher->publish($execution);
+    }
+
+    public function test_publish_surfaces_an_actionable_non_retryable_credentials_error(): void
+    {
+        $execution = $this->makeExecution(media: null);
+        $publisher = $this->makePublisher([
+            new Response(401, [], json_encode(['code' => 'rest_cannot_create', 'message' => 'Invalid application password'])),
+        ]);
+
+        try {
+            $publisher->publish($execution);
+            $this->fail('Expected publishing to fail.');
+        } catch (PublishingException $exception) {
+            $this->assertFalse($exception->isRetryable());
+            $this->assertSame(
+                'WordPress rejected the publishing credentials. Reconnect WordPress in Settings, then retry.',
+                $exception->getMessage(),
+            );
+            $this->assertStringNotContainsString('Invalid application password', $exception->getMessage());
+        }
+    }
+
+    public function test_publish_surfaces_an_actionable_retryable_connectivity_error(): void
+    {
+        $execution = $this->makeExecution(media: null);
+        $publisher = $this->makePublisher([
+            new ConnectException(
+                'Connection refused for atlas:super-secret@example.test',
+                new Request('POST', 'https://blog.cbb-auctions.example/wp-json/wp/v2/posts'),
+            ),
+        ]);
+
+        try {
+            $publisher->publish($execution);
+            $this->fail('Expected publishing to fail.');
+        } catch (PublishingException $exception) {
+            $this->assertTrue($exception->isRetryable());
+            $this->assertSame(
+                'Atlas could not reach the WordPress site. Check that the site is online and the connected URL is still correct, then retry.',
+                $exception->getMessage(),
+            );
+            $this->assertStringNotContainsString('super-secret', $exception->getMessage());
+        }
     }
 
     public function test_ping_succeeds_when_credentials_are_valid(): void
