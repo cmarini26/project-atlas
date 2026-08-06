@@ -33,8 +33,8 @@ class EmailRenderer implements ChannelRenderer
             channelType: 'email',
             data: [
                 'subject' => $subject,
-                'from_name' => (string) ($metadata['from_name'] ?? ''),
-                'from_email' => (string) ($metadata['from_email'] ?? ''),
+                'from_name' => (string) ($metadata['from_name'] ?? $channelConfig['from_name'] ?? ''),
+                'from_email' => (string) ($metadata['from_email'] ?? $channelConfig['from_email'] ?? ''),
                 'body' => (string) ($asset->body ?? ''),
                 'preview_text' => (string) ($metadata['preview_text'] ?? ''),
                 // Recipient comes from the channel's own config (e.g. the
