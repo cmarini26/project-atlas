@@ -8,11 +8,11 @@ use App\Models\CampaignBrief;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\ContentAsset;
-use App\Models\MarketingChannel;
 use App\Models\Recommendation;
 use App\Models\SourceAsset;
 use App\Models\User;
 use App\Services\Campaign\CampaignChannelSelectionService;
+use App\Services\Publishing\ChannelPublishingCapabilityResolver;
 use App\Services\Recommendation\ApprovalService;
 use App\Services\Recommendation\ChannelMixPresenter;
 use Illuminate\Http\RedirectResponse;
@@ -26,6 +26,7 @@ class RecommendationController extends Controller
         private readonly ApprovalService $approvalService,
         private readonly CampaignChannelSelectionService $channelSelection,
         private readonly ChannelMixPresenter $channelMixPresenter,
+        private readonly ChannelPublishingCapabilityResolver $publishingCapabilities,
     ) {}
 
     public function index(Request $request): Response
@@ -69,11 +70,10 @@ class RecommendationController extends Controller
 
         $contentAssets = $recommendation->campaign !== null ? $recommendation->campaign->contentAssets : collect();
 
-        $linkedMarketingChannelsByChannelId = MarketingChannel::withoutGlobalScopes()
-            ->where('company_id', $company->id)
-            ->whereNotNull('channel_id')
-            ->get()
-            ->keyBy('channel_id');
+        $publishingCapabilities = $this->publishingCapabilities->forChannels(
+            $company,
+            $contentAssets->pluck('channel')->filter()->unique('id')->values(),
+        );
 
         return Inertia::render('App/Recommendations/Show', [
             'recommendation' => $this->formatRecommendation($recommendation),
@@ -98,9 +98,7 @@ class RecommendationController extends Controller
                 ->pluck('id')
                 ->values()
                 ->all(),
-            'content_assets' => $contentAssets->map(function (ContentAsset $a) use ($linkedMarketingChannelsByChannelId) {
-                $linked = $a->channel !== null ? $linkedMarketingChannelsByChannelId->get($a->channel->id) : null;
-
+            'content_assets' => $contentAssets->map(function (ContentAsset $a) use ($publishingCapabilities) {
                 return [
                     'id' => $a->id,
                     'type' => $a->type,
@@ -111,9 +109,7 @@ class RecommendationController extends Controller
                     'metadata' => $a->metadata ?? [],
                     'channel' => $a->channel ? [
                         'type' => $a->channel->type,
-                        'marketing_channel' => $linked !== null
-                            ? ['supports_publishing' => (bool) $linked->supports_publishing]
-                            : null,
+                        'marketing_channel' => ['supports_publishing' => $publishingCapabilities->get($a->channel->id, false)],
                     ] : null,
                 ];
             })->values()->all(),

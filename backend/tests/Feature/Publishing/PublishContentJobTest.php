@@ -8,6 +8,7 @@ use App\Events\ExecutionFailed;
 use App\Jobs\PublishContent;
 use App\Models\Campaign;
 use App\Models\Channel;
+use App\Models\ChannelCredentials;
 use App\Models\Company;
 use App\Models\ContentAsset;
 use App\Models\Decision;
@@ -196,6 +197,34 @@ class PublishContentJobTest extends TestCase
         $execution->refresh();
         $this->assertSame('completed', $execution->status);
         $this->assertSame('log', $execution->result['metadata']['publisher'] ?? null);
+    }
+
+    public function test_active_wordpress_credentials_route_blog_to_the_live_publisher(): void
+    {
+        Event::fake([ExecutionCompleted::class, CampaignPublished::class]);
+
+        $execution = $this->makeExecution();
+        $this->channel->update(['type' => 'blog']);
+        ContentAsset::withoutGlobalScopes()->whereKey($execution->content_asset_id)->update([
+            'type' => 'blog_post',
+            'title' => 'Connected article',
+        ]);
+        ChannelCredentials::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id,
+            'channel_type' => 'blog',
+            'provider_type' => 'wordpress',
+            'credentials' => json_encode(['username' => 'atlas', 'app_password' => 'secret']),
+            'status' => 'active',
+        ]);
+
+        $registry = new ChannelPublisherRegistry();
+        $registry->register($this->fakePublisher);
+        $registry->register($this->app->make(LogChannelPublisher::class));
+
+        (new PublishContent($execution))->handle($registry, $this->app->make(ExecutionService::class));
+
+        $this->fakePublisher->assertPublished();
+        $this->assertSame('fake', $execution->fresh()->result['metadata']['publisher'] ?? null);
     }
 
     public function test_non_retryable_failure_marks_execution_failed_immediately(): void

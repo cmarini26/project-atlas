@@ -11,9 +11,9 @@ use App\Models\Fact;
 use App\Models\Integration;
 use App\Models\Knowledge;
 use App\Models\Learning;
-use App\Models\MarketingChannel;
 use App\Models\Opportunity;
 use App\Models\Recommendation;
+use App\Services\Publishing\ChannelPublishingCapabilityResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -21,6 +21,8 @@ use Inertia\Response;
 
 class DashboardController extends Controller
 {
+    public function __construct(private readonly ChannelPublishingCapabilityResolver $publishingCapabilities) {}
+
     public function index(Request $request): Response|RedirectResponse
     {
         /** @var Company $company */
@@ -73,11 +75,10 @@ class DashboardController extends Controller
         // Built once per request and keyed by channel_id so each execution
         // below is an O(1) lookup, not a per-row query — see
         // RecommendationController::show() for the same established pattern.
-        $linkedMarketingChannelsByChannelId = MarketingChannel::withoutGlobalScopes()
-            ->where('company_id', $company->id)
-            ->whereNotNull('channel_id')
-            ->get()
-            ->keyBy('channel_id');
+        $publishingCapabilities = $this->publishingCapabilities->forChannels(
+            $company,
+            $recentExecutions->pluck('channel')->filter()->unique('id')->values(),
+        );
 
         $health = [
             'twin_status' => $twin !== null ? $twin->status : 'initializing',
@@ -119,9 +120,7 @@ class DashboardController extends Controller
                 'status' => $c->status,
                 'created_at' => $c->created_at?->toIso8601String() ?? '',
             ])->values()->all(),
-            'recent_executions' => $recentExecutions->map(function (Execution $e) use ($linkedMarketingChannelsByChannelId) {
-                $linked = $e->channel !== null ? $linkedMarketingChannelsByChannelId->get($e->channel->id) : null;
-
+            'recent_executions' => $recentExecutions->map(function (Execution $e) use ($publishingCapabilities) {
                 return [
                     'id' => $e->id,
                     'status' => $e->status,
@@ -129,9 +128,7 @@ class DashboardController extends Controller
                     'completed_at' => $e->completed_at?->toIso8601String(),
                     'channel' => $e->channel ? [
                         'type' => $e->channel->type,
-                        'marketing_channel' => $linked !== null
-                            ? ['supports_publishing' => (bool) $linked->supports_publishing]
-                            : null,
+                        'marketing_channel' => ['supports_publishing' => $publishingCapabilities->get($e->channel->id, false)],
                     ] : null,
                 ];
             })->values()->all(),

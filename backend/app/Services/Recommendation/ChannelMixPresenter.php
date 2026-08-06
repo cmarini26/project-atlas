@@ -8,6 +8,7 @@ use App\Models\Channel;
 use App\Models\Company;
 use App\Models\Decision;
 use App\Models\MarketingChannel;
+use App\Services\Publishing\ChannelPublishingCapabilityResolver;
 
 /**
  * Assembles the "channel mix" shown on a Recommendation's detail page: which
@@ -25,6 +26,8 @@ use App\Models\MarketingChannel;
  */
 class ChannelMixPresenter
 {
+    public function __construct(private readonly ChannelPublishingCapabilityResolver $publishingCapabilities) {}
+
     /** @return array{primary: list<array<string, mixed>>, supporting: list<array<string, mixed>>, draft_only: list<array<string, mixed>>, unavailable: list<array<string, mixed>>} */
     public function present(Company $company, ?Decision $decision): array
     {
@@ -42,13 +45,14 @@ class ChannelMixPresenter
             ->get();
 
         $linkedByChannelId = $marketingChannels->whereNotNull('channel_id')->keyBy('channel_id');
+        $publishingCapabilities = $this->publishingCapabilities->forChannels($company, $executableChannels);
 
         $primary = [];
         $supporting = [];
 
         foreach ($executableChannels as $channel) {
             $linked = $linkedByChannelId->get($channel->id);
-            $entry = $this->executableEntry($channel, $linked);
+            $entry = $this->executableEntry($channel, $linked, $publishingCapabilities->get($channel->id, false));
 
             if ($linked !== null && $linked->importance === MarketingChannelImportance::Primary) {
                 $primary[] = $entry;
@@ -92,13 +96,13 @@ class ChannelMixPresenter
     }
 
     /** @return array<string, mixed> */
-    private function executableEntry(Channel $channel, ?MarketingChannel $linked): array
+    private function executableEntry(Channel $channel, ?MarketingChannel $linked, bool $supportsPublishing): array
     {
         return [
             'type' => $channel->type,
             'name' => $linked->display_name ?? $channel->name ?? $channel->type,
-            'marketing_channel' => $linked !== null
-                ? ['supports_publishing' => (bool) $linked->supports_publishing]
+            'marketing_channel' => $linked !== null || $supportsPublishing
+                ? ['supports_publishing' => $supportsPublishing]
                 : null,
         ];
     }

@@ -23,7 +23,7 @@ class ChannelMixPresenterTest extends TestCase
     {
         parent::setUp();
 
-        $this->presenter = new ChannelMixPresenter();
+        $this->presenter = $this->app->make(ChannelMixPresenter::class);
         $this->company = Company::withoutGlobalScopes()->create(['name' => 'Acme', 'slug' => 'acme']);
     }
 
