@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Execution;
 use App\Models\ExecutionMetric;
+use App\Models\EmailRecipientSnapshot;
 use App\Models\MetricRetrievalLog;
 use App\Services\Analytics\AnalyticsProviderRegistry;
 use App\Services\Analytics\CampaignKpiService;
@@ -69,8 +70,29 @@ class RetrieveExecutionMetrics implements ShouldQueue
         $provider = $providerRegistry->for($credentials->provider_type);
 
         try {
-            $raw = $provider->pull((string) $platformId, $credentials);
-            $normalized = $provider->normalize($raw);
+            $providerMessageIds = EmailRecipientSnapshot::withoutGlobalScopes()
+                ->where('execution_id', $execution->id)
+                ->whereNotNull('provider_message_id')
+                ->pluck('provider_message_id')
+                ->filter()
+                ->values();
+
+            if ($providerMessageIds->isEmpty()) {
+                $raw = $provider->pull((string) $platformId, $credentials);
+                $normalized = $provider->normalize($raw);
+            } else {
+                $rawMessages = [];
+                $normalizedMessages = [];
+
+                foreach ($providerMessageIds as $providerMessageId) {
+                    $messageRaw = $provider->pull((string) $providerMessageId, $credentials);
+                    $rawMessages[(string) $providerMessageId] = $messageRaw;
+                    $normalizedMessages[] = $provider->normalize($messageRaw);
+                }
+
+                $raw = ['messages' => $rawMessages];
+                $normalized = $this->aggregateRecipientMetrics($normalizedMessages);
+            }
             $windowClosed = $provider->isWindowClosed($execution);
 
             ExecutionMetric::withoutGlobalScopes()->updateOrCreate(
@@ -115,5 +137,40 @@ class RetrieveExecutionMetrics implements ShouldQueue
 
             throw $e;
         }
+    }
+
+    /**
+     * Collapse per-recipient provider metrics into the execution-level shape
+     * consumed by CampaignKpiService. Count metrics are additive; rate
+     * metrics are averaged across recipient messages so a two-recipient
+     * audience with one open reports 50%, not 100% or 200%.
+     *
+     * @param  list<array<string, mixed>>  $metricSets
+     * @return array<string, mixed>
+     */
+    private function aggregateRecipientMetrics(array $metricSets): array
+    {
+        $aggregated = [];
+        $rateCounts = [];
+
+        foreach ($metricSets as $metrics) {
+            foreach ($metrics as $key => $value) {
+                if (! is_int($value) && ! is_float($value)) {
+                    continue;
+                }
+
+                $aggregated[$key] = ($aggregated[$key] ?? 0) + $value;
+
+                if (str_ends_with($key, '_rate')) {
+                    $rateCounts[$key] = ($rateCounts[$key] ?? 0) + 1;
+                }
+            }
+        }
+
+        foreach ($rateCounts as $key => $count) {
+            $aggregated[$key] /= $count;
+        }
+
+        return $aggregated;
     }
 }
