@@ -2,9 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Models\EmailRecipientSnapshot;
 use App\Models\Execution;
 use App\Models\ExecutionMetric;
-use App\Models\EmailRecipientSnapshot;
 use App\Models\MetricRetrievalLog;
 use App\Services\Analytics\AnalyticsProviderRegistry;
 use App\Services\Analytics\CampaignKpiService;

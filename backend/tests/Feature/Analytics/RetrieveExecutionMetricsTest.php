@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\Analytics;
 
-use App\Jobs\RetrieveExecutionMetrics;
 use App\Enums\EmailRecipientSnapshotStatus;
+use App\Jobs\RetrieveExecutionMetrics;
 use App\Models\ContentAsset;
 use App\Models\EmailRecipientSnapshot;
 use App\Models\Execution;
