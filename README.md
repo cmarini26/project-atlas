@@ -8,5 +8,7 @@ At the center of every company is a **Business Brain**: a structured knowledge b
 
 Atlas does not wait for prompts. It identifies opportunities, prepares everything for approval, and executes once a human says yes.
 
+The primary Laravel and Vue application lives in [`backend/`](backend/).
+
 Working product name: MarketingOS
 Internal project name: Project Atlas
