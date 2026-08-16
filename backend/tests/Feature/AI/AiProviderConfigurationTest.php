@@ -4,6 +4,7 @@ namespace Tests\Feature\AI;
 
 use App\AI\Providers\AnthropicProvider;
 use App\AI\Providers\LocalAiProvider;
+use App\AI\Providers\OllamaAiProvider;
 use App\AI\Testing\FakeAiProvider;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\Process\Process;
@@ -88,18 +89,16 @@ class AiProviderConfigurationTest extends TestCase
         );
     }
 
-    public function test_ollama_provider_reports_its_pending_implementation(): void
+    public function test_explicit_ollama_provider_resolves_without_environment_inference(): void
     {
         $process = $this->resolveProvider([
             'APP_ENV' => 'staging',
             'AI_PROVIDER' => 'ollama',
+            'ANTHROPIC_API_KEY' => 'present-but-should-not-control-selection',
         ]);
 
-        $this->assertFalse($process->isSuccessful());
-        $this->assertStringContainsString(
-            'AI_PROVIDER=ollama requires OllamaAiProvider from SCRUM-82.',
-            $process->getErrorOutput(),
-        );
+        $this->assertTrue($process->isSuccessful(), $process->getErrorOutput());
+        $this->assertSame(OllamaAiProvider::class, trim($process->getOutput()));
     }
 
     #[DataProvider('blankProviderValues')]

@@ -41,6 +41,14 @@ return [
         'base_url' => env('ANTHROPIC_BASE_URL', 'https://api.anthropic.com'),
     ],
 
+    'ollama' => [
+        // Ollama remains private: the provider rejects non-loopback base URLs.
+        'base_url' => env('OLLAMA_BASE_URL', 'http://127.0.0.1:11434'),
+        'model' => env('OLLAMA_MODEL', 'qwen3:14b'),
+        'context_length' => (int) env('OLLAMA_CONTEXT_LENGTH', 8192),
+        'think' => (bool) env('OLLAMA_THINK', false),
+    ],
+
     // Meta Graph API (Instagram/Facebook publishing OAuth). No Meta App is
     // registered yet — these are config stubs only, unusable until real
     // values are set.

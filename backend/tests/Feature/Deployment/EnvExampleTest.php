@@ -39,6 +39,10 @@ class EnvExampleTest extends TestCase
 
         foreach ([
             'AI_PROVIDER=',
+            'OLLAMA_BASE_URL=',
+            'OLLAMA_MODEL=',
+            'OLLAMA_CONTEXT_LENGTH=',
+            'OLLAMA_THINK=',
             'TRUSTED_PROXIES=',
             'ERROR_TRACKING_DRIVER=',
             'ERROR_TRACKING_DSN=',
