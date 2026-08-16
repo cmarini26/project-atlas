@@ -12,6 +12,7 @@
         "laravel/framework": "^13.8",
         "laravel/sanctum": "^4.3",
         "laravel/tinker": "^3.0",
+        "opis/json-schema": "^2.4",
         "sentry/sentry-laravel": "^4.27",
         "symfony/dom-crawler": "^7.4",
         "symfony/http-client": "^7.4",
