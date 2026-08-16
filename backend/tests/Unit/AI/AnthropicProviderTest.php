@@ -468,7 +468,7 @@ class AnthropicProviderTest extends TestCase
 
     public function test_container_binds_fake_provider_in_testing_environment(): void
     {
-        // The test environment is 'testing', so FakeAiProvider must be bound.
+        // phpunit.xml explicitly selects the fake provider for test isolation.
         $resolved = $this->app->make(AiProvider::class);
 
         $this->assertInstanceOf(FakeAiProvider::class, $resolved);

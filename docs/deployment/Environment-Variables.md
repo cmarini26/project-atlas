@@ -46,9 +46,10 @@ Every variable below is either a secret, a value with no safe generic default, o
 
 ### AI provider (already in production use pre-launch)
 
-| Variable | Required production value |
-|---|---|
-| `ANTHROPIC_API_KEY` | Real key — every observation/recommendation call depends on this |
+| Variable | Required production value | Why |
+|---|---|---|
+| `AI_PROVIDER` | `anthropic` | Provider selection is explicit and never inferred from API-key presence. `local` is restricted to local development, `fake` to tests, and `ollama` remains unavailable until `SCRUM-82`. |
+| `ANTHROPIC_API_KEY` | Real key | Required when `AI_PROVIDER=anthropic`; every observation/recommendation call depends on this. |
 
 ### Error tracking (activation still pending — see §2)
 

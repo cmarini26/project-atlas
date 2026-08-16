@@ -38,6 +38,7 @@ class EnvExampleTest extends TestCase
         $contents = $this->envExampleContents();
 
         foreach ([
+            'AI_PROVIDER=',
             'TRUSTED_PROXIES=',
             'ERROR_TRACKING_DRIVER=',
             'ERROR_TRACKING_DSN=',
