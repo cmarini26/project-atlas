@@ -65,19 +65,34 @@ class AppServiceProvider extends ServiceProvider
         // All listeners are registered explicitly in boot(). Disable auto-discovery
         // to prevent duplicate registrations when both mechanisms run together.
         EventServiceProvider::disableEventDiscovery();
-        // Bind the AI provider appropriate for each environment.
-        // - testing: FakeAiProvider — test-controlled via queueFixture().
-        // - local without ANTHROPIC_API_KEY: LocalAiProvider — deterministic stubs,
-        //   no API key needed. Combine with QUEUE_CONNECTION=sync so the full
-        //   pipeline runs end-to-end in a single HTTP request without queue workers.
-        // - local with ANTHROPIC_API_KEY, production/staging: AnthropicProvider.
-        if ($this->app->environment('testing')) {
-            $this->app->singleton(AiProvider::class, FakeAiProvider::class);
-        } elseif ($this->app->environment('local') && empty(config('services.anthropic.api_key'))) {
-            $this->app->singleton(AiProvider::class, LocalAiProvider::class);
-        } else {
-            $this->app->singleton(AiProvider::class, AnthropicProvider::class);
-        }
+        // AI provider selection is explicit and does not depend on credential
+        // presence. Environment safety restrictions are enforced per provider.
+        $this->app->singleton(AiProvider::class, function ($app): AiProvider {
+            $provider = config('ai.provider');
+
+            if (! is_string($provider) || trim($provider) === '') {
+                throw new InvalidArgumentException(
+                    'AI_PROVIDER must be configured. Supported values: anthropic, local, fake, ollama.'
+                );
+            }
+
+            return match ($provider) {
+                'anthropic' => $app->make(AnthropicProvider::class),
+                'local' => $app->environment('local')
+                    ? $app->make(LocalAiProvider::class)
+                    : throw new InvalidArgumentException('AI_PROVIDER=local is only supported in the local environment.'),
+                'fake' => $app->environment('testing')
+                    ? $app->make(FakeAiProvider::class)
+                    : throw new InvalidArgumentException('AI_PROVIDER=fake is only supported in the testing environment.'),
+                'ollama' => throw new InvalidArgumentException(
+                    'AI_PROVIDER=ollama requires OllamaAiProvider from SCRUM-82.'
+                ),
+                default => throw new InvalidArgumentException(sprintf(
+                    'Unsupported AI_PROVIDER value [%s]. Supported values: anthropic, local, fake, ollama.',
+                    $provider,
+                )),
+            };
+        });
 
         // Resolves the right Analyst per Observation source_type — mirrors
         // ConnectorServiceProvider's ConnectorRegistry binding. Adding a new
