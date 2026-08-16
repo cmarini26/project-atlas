@@ -133,17 +133,36 @@ class AiProviderConfigurationTest extends TestCase
      */
     private function resolveProvider(array $environment): Process
     {
+        $environmentPath = null;
+
+        if (($environment['AI_PROVIDER'] ?? null) === false) {
+            $environmentPath = sys_get_temp_dir().'/atlas-ai-provider-'.bin2hex(random_bytes(8));
+            mkdir($environmentPath, 0700);
+            $environment['ATLAS_TEST_ENV_PATH'] = $environmentPath;
+        }
+
         $script = <<<'PHP'
 require 'vendor/autoload.php';
 
 $app = require 'bootstrap/app.php';
+
+if ($environmentPath = getenv('ATLAS_TEST_ENV_PATH')) {
+    $app->useEnvironmentPath($environmentPath);
+}
+
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
 echo $app->make(App\AI\Contracts\AiProvider::class)::class;
 PHP;
 
-        $process = new Process([PHP_BINARY, '-r', $script], base_path(), $environment);
-        $process->run();
+        try {
+            $process = new Process([PHP_BINARY, '-r', $script], base_path(), $environment);
+            $process->run();
+        } finally {
+            if ($environmentPath !== null) {
+                rmdir($environmentPath);
+            }
+        }
 
         return $process;
     }
