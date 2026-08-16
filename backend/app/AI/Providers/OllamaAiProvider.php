@@ -9,6 +9,9 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
 use InvalidArgumentException;
 use JsonException;
+use Opis\JsonSchema\Errors\ErrorFormatter;
+use Opis\JsonSchema\Errors\ValidationError;
+use Opis\JsonSchema\Validator;
 use RuntimeException;
 
 final class OllamaAiProvider implements AiProvider
@@ -22,6 +25,8 @@ final class OllamaAiProvider implements AiProvider
     private readonly int $contextLength;
 
     private readonly bool $think;
+
+    private readonly Validator $schemaValidator;
 
     public function __construct(
         ?Client $http = null,
@@ -52,6 +57,7 @@ final class OllamaAiProvider implements AiProvider
         $this->model = trim($configuredModel);
         $this->contextLength = $configuredContextLength;
         $this->think = $think ?? (bool) config('services.ollama.think', false);
+        $this->schemaValidator = new Validator(null, 10, false);
 
         $this->http = $http ?? new Client([
             'timeout' => 120,
@@ -61,6 +67,8 @@ final class OllamaAiProvider implements AiProvider
 
     public function complete(Prompt $prompt): AiResponse
     {
+        $schema = $prompt->schema();
+
         $payload = [
             'model' => $this->model,
             'messages' => [
@@ -68,16 +76,16 @@ final class OllamaAiProvider implements AiProvider
                 ['role' => 'user', 'content' => $prompt->user()],
             ],
             'stream' => false,
-            'think' => $this->think,
+            'think' => $schema === null ? $this->think : false,
             'options' => [
-                'temperature' => $prompt->temperature(),
+                'temperature' => $schema === null ? $prompt->temperature() : 0.0,
                 'num_predict' => $prompt->maxTokens(),
                 'num_ctx' => $this->contextLength,
             ],
         ];
 
-        if ($prompt->schema() !== null) {
-            $payload['format'] = $prompt->schema();
+        if ($schema !== null) {
+            $payload['format'] = $schema;
         }
 
         try {
@@ -124,6 +132,14 @@ final class OllamaAiProvider implements AiProvider
             throw new RuntimeException('Ollama API returned a malformed response.');
         }
 
+        if ($schema !== null && ($data['done_reason'] ?? null) === 'length') {
+            throw new RuntimeException('Ollama schema-bound response was truncated (done_reason=length).');
+        }
+
+        if ($schema !== null) {
+            $this->validateSchemaBoundContent($data['message']['content'], $schema);
+        }
+
         return new AiResponse(
             content: $data['message']['content'],
             model: $data['model'],
@@ -131,6 +147,47 @@ final class OllamaAiProvider implements AiProvider
             outputTokens: $data['eval_count'],
             stopReason: $data['done_reason'] ?? null,
         );
+    }
+
+    /** @param array<string, mixed> $schema */
+    private function validateSchemaBoundContent(string $content, array $schema): void
+    {
+        try {
+            $data = json_decode($content, false, 512, JSON_THROW_ON_ERROR);
+            $schemaObject = json_decode(
+                json_encode($schema, JSON_THROW_ON_ERROR),
+                false,
+                512,
+                JSON_THROW_ON_ERROR,
+            );
+        } catch (JsonException $exception) {
+            throw new RuntimeException(
+                'Ollama schema-bound response is not valid JSON: '.$exception->getMessage(),
+                previous: $exception,
+            );
+        }
+
+        $result = $this->schemaValidator->validate($data, $schemaObject);
+
+        if ($result->isValid()) {
+            return;
+        }
+
+        $error = $result->error();
+
+        if ($error === null) {
+            throw new RuntimeException('Ollama response failed JSON Schema validation.');
+        }
+
+        $details = (new ErrorFormatter())->formatKeyed(
+            $error,
+            static fn (ValidationError $validationError): string => $validationError->keyword(),
+        );
+
+        throw new RuntimeException(sprintf(
+            'Ollama response failed JSON Schema validation: %s',
+            json_encode($details, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
+        ));
     }
 
     private function isLoopbackHttpUrl(string $url): bool

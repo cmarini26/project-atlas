@@ -53,7 +53,9 @@ Every variable below is either a secret, a value with no safe generic default, o
 | `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Required when `AI_PROVIDER=ollama`; only bare loopback HTTP origins are accepted. |
 | `OLLAMA_MODEL` | Installed local model name, initially `qwen3:14b` | Required when `AI_PROVIDER=ollama`. |
 | `OLLAMA_CONTEXT_LENGTH` | `8192` initially | Passed to Ollama as `num_ctx`; increase only after memory and latency validation. |
-| `OLLAMA_THINK` | `false` initially | Keeps structured Atlas work deterministic and prevents separate thinking output. |
+| `OLLAMA_THINK` | `false` initially | Controls thinking for plain prompts. Schema-bound prompts always force `think=false` and temperature `0` for deterministic structured output. |
+
+When an Ollama prompt supplies `Prompt::schema()`, Atlas passes that schema through Ollama's native `format` field and then independently validates the decoded response against the same schema. Malformed JSON, token-limit truncation, or schema-invalid output fails loudly with JSON Pointer paths and failing keywords; diagnostics do not include model-produced values.
 
 ### Error tracking (activation still pending — see §2)
 

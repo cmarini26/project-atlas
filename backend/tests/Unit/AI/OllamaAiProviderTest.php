@@ -3,6 +3,7 @@
 namespace Tests\Unit\AI;
 
 use App\AI\AiResponse;
+use App\AI\Prompts\FactExtractionPrompt;
 use App\AI\Prompts\Prompt;
 use App\AI\Providers\OllamaAiProvider;
 use GuzzleHttp\Client;
@@ -204,6 +205,127 @@ class OllamaAiProviderTest extends TestCase
         $this->assertSame($this->schemaPrompt()->schema(), $body['format']);
     }
 
+    public function test_forces_deterministic_generation_settings_for_schema_bound_prompts(): void
+    {
+        $history = [];
+        $provider = $this->makeProvider([
+            new Response(200, [], json_encode([
+                'model' => 'qwen3:14b',
+                'message' => ['role' => 'assistant', 'content' => '{"name":"Atlas"}'],
+                'done' => true,
+                'done_reason' => 'stop',
+                'prompt_eval_count' => 12,
+                'eval_count' => 4,
+            ], JSON_THROW_ON_ERROR)),
+        ], $history, think: true);
+
+        $provider->complete($this->schemaPrompt());
+
+        $body = json_decode((string) $history[0]['request']->getBody(), true, 512, JSON_THROW_ON_ERROR);
+
+        $this->assertFalse($body['think']);
+        $this->assertEquals(0.0, $body['options']['temperature']);
+    }
+
+    public function test_rejects_truncated_schema_bound_responses(): void
+    {
+        $provider = $this->makeProvider([
+            new Response(200, [], json_encode([
+                'model' => 'qwen3:14b',
+                'message' => ['role' => 'assistant', 'content' => '{"name":"Atlas"}'],
+                'done' => true,
+                'done_reason' => 'length',
+                'prompt_eval_count' => 12,
+                'eval_count' => 2048,
+            ], JSON_THROW_ON_ERROR)),
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Ollama schema-bound response was truncated (done_reason=length).');
+
+        $provider->complete($this->schemaPrompt());
+    }
+
+    public function test_rejects_schema_bound_content_that_does_not_match_the_prompt_schema(): void
+    {
+        $provider = $this->makeProvider([
+            new Response(200, [], json_encode([
+                'model' => 'qwen3:14b',
+                'message' => ['role' => 'assistant', 'content' => '{"name":42}'],
+                'done' => true,
+                'done_reason' => 'stop',
+                'prompt_eval_count' => 12,
+                'eval_count' => 4,
+            ], JSON_THROW_ON_ERROR)),
+        ]);
+
+        try {
+            $provider->complete($this->schemaPrompt());
+            $this->fail('Schema-invalid content was accepted.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('Ollama response failed JSON Schema validation', $exception->getMessage());
+            $this->assertStringContainsString('/name', $exception->getMessage());
+            $this->assertStringContainsString('type', $exception->getMessage());
+            $this->assertStringNotContainsString('42', $exception->getMessage());
+        }
+    }
+
+    public function test_rejects_malformed_json_for_schema_bound_responses(): void
+    {
+        $provider = $this->makeProvider([
+            new Response(200, [], json_encode([
+                'model' => 'qwen3:14b',
+                'message' => ['role' => 'assistant', 'content' => '{"name":'],
+                'done' => true,
+                'done_reason' => 'stop',
+                'prompt_eval_count' => 12,
+                'eval_count' => 4,
+            ], JSON_THROW_ON_ERROR)),
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Ollama schema-bound response is not valid JSON:');
+
+        $provider->complete($this->schemaPrompt());
+    }
+
+    public function test_validates_nested_arrays_enums_and_bounds_from_real_atlas_schema(): void
+    {
+        $provider = $this->makeProvider([
+            new Response(200, [], json_encode([
+                'model' => 'qwen3:14b',
+                'message' => [
+                    'role' => 'assistant',
+                    'content' => json_encode([
+                        'facts' => [[
+                            'key' => 'business.name',
+                            'value' => 'Atlas',
+                            'data_type' => 'unsupported',
+                            'confidence' => 101,
+                        ]],
+                    ], JSON_THROW_ON_ERROR),
+                ],
+                'done' => true,
+                'done_reason' => 'stop',
+                'prompt_eval_count' => 20,
+                'eval_count' => 12,
+            ], JSON_THROW_ON_ERROR)),
+        ]);
+
+        $prompt = new FactExtractionPrompt('https://example.com', 'Example', 'Example page.');
+
+        try {
+            $provider->complete($prompt);
+            $this->fail('Schema-invalid fact extraction content was accepted.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('/facts/0/data_type', $exception->getMessage());
+            $this->assertStringContainsString('enum', $exception->getMessage());
+            $this->assertStringContainsString('/facts/0/confidence', $exception->getMessage());
+            $this->assertStringContainsString('maximum', $exception->getMessage());
+            $this->assertStringNotContainsString('unsupported', $exception->getMessage());
+        }
+    }
+
     public function test_wraps_ollama_http_errors_with_status_and_api_error(): void
     {
         $provider = $this->makeProvider([
@@ -273,7 +395,7 @@ class OllamaAiProviderTest extends TestCase
      * @param  Response[]  $responses
      * @param  array<int, mixed>  $history
      */
-    private function makeProvider(array $responses, array &$history = []): OllamaAiProvider
+    private function makeProvider(array $responses, array &$history = [], bool $think = false): OllamaAiProvider
     {
         $stack = HandlerStack::create(new MockHandler($responses));
         $stack->push(Middleware::history($history));
@@ -285,7 +407,7 @@ class OllamaAiProviderTest extends TestCase
             model: 'qwen3:14b',
             baseUrl: 'http://127.0.0.1:11434',
             contextLength: 8192,
-            think: false,
+            think: $think,
         );
     }
 
