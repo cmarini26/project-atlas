@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\AI\Contracts\AiProvider;
 use App\AI\Providers\AnthropicProvider;
 use App\AI\Providers\LocalAiProvider;
+use App\AI\Providers\OllamaAiProvider;
 use App\AI\Testing\FakeAiProvider;
 use App\ErrorTracking\Contracts\ErrorTracker;
 use App\ErrorTracking\NullErrorTracker;
@@ -84,9 +85,7 @@ class AppServiceProvider extends ServiceProvider
                 'fake' => $app->environment('testing')
                     ? $app->make(FakeAiProvider::class)
                     : throw new InvalidArgumentException('AI_PROVIDER=fake is only supported in the testing environment.'),
-                'ollama' => throw new InvalidArgumentException(
-                    'AI_PROVIDER=ollama requires OllamaAiProvider from SCRUM-82.'
-                ),
+                'ollama' => $app->make(OllamaAiProvider::class),
                 default => throw new InvalidArgumentException(sprintf(
                     'Unsupported AI_PROVIDER value [%s]. Supported values: anthropic, local, fake, ollama.',
                     $provider,

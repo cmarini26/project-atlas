@@ -48,8 +48,12 @@ Every variable below is either a secret, a value with no safe generic default, o
 
 | Variable | Required production value | Why |
 |---|---|---|
-| `AI_PROVIDER` | `anthropic` | Provider selection is explicit and never inferred from API-key presence. `local` is restricted to local development, `fake` to tests, and `ollama` remains unavailable until `SCRUM-82`. |
+| `AI_PROVIDER` | `anthropic` for the current hosted path; `ollama` only when the app and private Ollama daemon are intentionally colocated | Provider selection is explicit and never inferred from API-key presence. `local` is restricted to local development and `fake` to tests. `ollama` is implemented by SCRUM-82 but its base URL is restricted to loopback, so it cannot target a public or remote daemon. |
 | `ANTHROPIC_API_KEY` | Real key | Required when `AI_PROVIDER=anthropic`; every observation/recommendation call depends on this. |
+| `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Required when `AI_PROVIDER=ollama`; only bare loopback HTTP origins are accepted. |
+| `OLLAMA_MODEL` | Installed local model name, initially `qwen3:14b` | Required when `AI_PROVIDER=ollama`. |
+| `OLLAMA_CONTEXT_LENGTH` | `8192` initially | Passed to Ollama as `num_ctx`; increase only after memory and latency validation. |
+| `OLLAMA_THINK` | `false` initially | Keeps structured Atlas work deterministic and prevents separate thinking output. |
 
 ### Error tracking (activation still pending — see §2)
 
