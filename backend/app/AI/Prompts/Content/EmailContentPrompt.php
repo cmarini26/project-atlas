@@ -13,11 +13,12 @@ class EmailContentPrompt extends Prompt
         private readonly Channel $channel,
         private readonly CampaignBlueprint $blueprint,
         private readonly BusinessBrain $brain,
+        private readonly ?string $preferenceGuidance = null,
     ) {}
 
     public function version(): string
     {
-        return '1.0';
+        return '1.1';
     }
 
     public function temperature(): float
@@ -58,6 +59,9 @@ SYSTEM;
 
         $strategy = $bp->channelStrategy[$channelType] ?? [];
         $format = is_array($strategy) ? (string) ($strategy['format'] ?? 'standard email') : 'standard email';
+        $preferenceGuidance = $this->preferenceGuidance !== null
+            ? "\n\nPreference guidance:\n{$this->preferenceGuidance}"
+            : '';
 
         return <<<TEXT
 Company: {$company->name}
@@ -75,6 +79,7 @@ Blueprint:
 - Voice: {$voice} / {$modifier}
 - Avoid: {$avoidList}
 - Format: {$format}
+{$preferenceGuidance}
 
 Write a complete marketing email for this campaign. Include subject line, body, and call to action.
 TEXT;

@@ -13,11 +13,12 @@ class SocialContentPrompt extends Prompt
         private readonly Channel $channel,
         private readonly CampaignBlueprint $blueprint,
         private readonly BusinessBrain $brain,
+        private readonly ?string $preferenceGuidance = null,
     ) {}
 
     public function version(): string
     {
-        return '1.0';
+        return '1.1';
     }
 
     public function temperature(): float
@@ -60,6 +61,9 @@ SYSTEM;
         $strategy = $bp->channelStrategy[$channelType] ?? [];
         $format = is_array($strategy) ? (string) ($strategy['format'] ?? 'standard post') : 'standard post';
         $angle = is_array($strategy) ? (string) ($strategy['angle'] ?? '') : '';
+        $preferenceGuidance = $this->preferenceGuidance !== null
+            ? "\n\nPreference guidance:\n{$this->preferenceGuidance}"
+            : '';
 
         return <<<TEXT
 Company: {$company->name}
@@ -77,6 +81,7 @@ Blueprint:
 - Avoid: {$avoidList}
 - Format: {$format}
 - Angle: {$angle}
+{$preferenceGuidance}
 
 Write a social media post for this campaign. Match the brand voice. Lead with the hook.
 TEXT;

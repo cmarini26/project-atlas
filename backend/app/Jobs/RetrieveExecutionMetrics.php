@@ -117,14 +117,20 @@ class RetrieveExecutionMetrics implements ShouldQueue
                 'status' => 'success',
             ]);
 
+            // CampaignKpiService deliberately supports both interim and
+            // final snapshots. Refresh it after every successful pull so
+            // customers can see early delivery/engagement data while the
+            // provider's measurement window remains open.
+            $kpiService->snapshotIfReady($execution->campaign_id);
+
             if ($windowClosed) {
-                $kpiService->snapshotIfReady($execution->campaign_id);
-            } else {
-                $delay = $provider->repollingIntervalHours($execution);
-                $pending = self::dispatch($this->executionId)->onQueue('observations');
-                if ($delay > 0) {
-                    $pending->delay(now()->addHours($delay));
-                }
+                return;
+            }
+
+            $delay = $provider->repollingIntervalHours($execution);
+            $pending = self::dispatch($this->executionId)->onQueue('observations');
+            if ($delay > 0) {
+                $pending->delay(now()->addHours($delay));
             }
         } catch (\Throwable $e) {
             MetricRetrievalLog::create([

@@ -13,11 +13,12 @@ class BlogContentPrompt extends Prompt
         private readonly Channel $channel,
         private readonly CampaignBlueprint $blueprint,
         private readonly BusinessBrain $brain,
+        private readonly ?string $preferenceGuidance = null,
     ) {}
 
     public function version(): string
     {
-        return '1.0';
+        return '1.1';
     }
 
     public function temperature(): float
@@ -63,6 +64,9 @@ SYSTEM;
 
         $strategy = $bp->channelStrategy[$channelType] ?? [];
         $angle = is_array($strategy) ? (string) ($strategy['angle'] ?? '') : '';
+        $preferenceGuidance = $this->preferenceGuidance !== null
+            ? "\n\nPreference guidance:\n{$this->preferenceGuidance}"
+            : '';
 
         return <<<TEXT
 Company: {$company->name}
@@ -77,6 +81,7 @@ Blueprint:
 - Voice: {$voice} / {$modifier}
 - Avoid: {$avoidList}
 - Angle: {$angle}
+{$preferenceGuidance}
 
 Write a complete blog post for this campaign. Use the supporting points as sections.
 TEXT;

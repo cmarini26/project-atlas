@@ -49,6 +49,7 @@ services:
     user: "33:33"
     volumes:
       - wordpress-data:/var/www/html
+      - ./site:/opt/northwind-site:ro
 
 volumes:
   database-data:

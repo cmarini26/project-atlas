@@ -5,26 +5,28 @@
  * stage source of truth this file must stay in sync with, and
  * docs/reviews/Channel-Publishing-Reality-Audit.md for how this evolved.
  *
- * `blog` (WordPress), `facebook`/`instagram` (Meta), and `email` (Postmark)
- * each have a real connect flow with live ping-before-persist verification
- * (SettingsController::connectWordPress()/connectEmail(), MetaOAuthController)
- * and a real publisher — these are genuinely live once a company connects
- * them, not simulated.
+ * `blog` (WordPress), `facebook`/`instagram` (Meta), `email` (Postmark/
+ * SendGrid), and `sms` (Twilio) each have a real connect flow with live
+ * ping-before-persist verification (SettingsController::connectWordPress()/
+ * connectEmail()/connectSms(), MetaOAuthController) and a real publisher —
+ * these are genuinely live once a company connects them, not simulated.
  *
  * This map is a *global fallback* used only when no company-specific link
  * data is available (see resolveChannelCapability()). `facebook`/`instagram`/
  * `email` are per-company-overridable — a linked MarketingChannel's
  * supports_publishing flag (kept in sync with real connect/health state by
  * MetaOAuthController/SettingsController::connectEmail() and
- * CheckChannelHealth) always wins over this default. `blog` is NOT
- * overridable this way today: WordPress has no MarketingChannelType
- * equivalent (App\Enums\MarketingChannelType has no Blog/WordPress case), so
- * there is no per-company link path for it, and `blog` here is deliberately
- * left at the conservative 'draft_only' default even though a specific
- * company's WordPress connection may in fact be live — see Settings.vue's
- * own `wordpress_channel.status`, which is the accurate per-company source
- * of truth Publishing.vue/Dashboard.vue/Campaigns/Show.vue don't yet surface
- * for WordPress specifically (follow-up, not fixed here).
+ * CheckChannelHealth) always wins over this default. `blog` and `sms` are
+ * NOT overridable this way today: neither WordPress nor SMS has a
+ * MarketingChannelType equivalent (App\Enums\MarketingChannelType has no
+ * Blog/WordPress or Sms case), so there is no per-company link path for
+ * either, and both stay at their conservative global default — `draft_only`
+ * for `blog`, `not_configured` for `sms` — even though a specific company's
+ * connection may in fact be live. See Settings.vue's own
+ * `wordpress_channel.status`/`sms_channel.status`, which are the accurate
+ * per-company source of truth Publishing.vue/Dashboard.vue/Campaigns/Show.vue
+ * don't yet surface for WordPress or SMS specifically (follow-up, not fixed
+ * here).
  */
 
 export type ChannelCapability = 'connected' | 'draft_only' | 'coming_later' | 'not_configured'
@@ -54,9 +56,9 @@ export const CHANNEL_CAPABILITY: Record<string, ChannelCapability> = {
   email: 'draft_only',
   facebook: 'not_configured',
   instagram: 'not_configured',
+  sms: 'not_configured',
   linkedin: 'coming_later',
   x: 'coming_later',
-  sms: 'coming_later',
   landing_page: 'coming_later',
 }
 
