@@ -179,5 +179,11 @@ This document is now primarily useful as **history**. The current source of trut
 What has **not** changed:
 
 - No provider in this codebase has yet been verified against a real live third-party account in production.
-- Generic capability-badge truth still lags for channel types that lack a `MarketingChannelType` equivalent (`blog`, `sms`). Settings remains the accurate per-company source of truth for those channel connections.
+- Generic capability-badge truth still lags for channel types that lack a `MarketingChannelType` equivalent (`blog`, `sms`) — neither can show a per-company `'connected'` state via the badge system. Settings remains the accurate per-company source of truth for those channel connections.
 - LinkedIn, X, and landing-page execution are still simulated-only.
+
+---
+
+## Addendum — 2026-08-05: `channelCapability.ts` global fallback for `sms` corrected
+
+A distinct, smaller bug from the 2026-07-20 addendum above: `channelCapability.ts`'s global-fallback table still tagged `sms` as `coming_later` — "no way to create or publish to this channel type yet, for any company" — a claim the 2026-07-20 addendum had already shown was false (`SettingsController::connectSms()` and `SmsPublisher` are real). Fixed today to `not_configured`, the same category `facebook`/`instagram` already use for a real-connect-flow type with no per-company override path yet. Two Vitest suites (`channelCapability.spec.ts`, `ChannelCapabilityBadge.spec.ts`) asserted the old, wrong value and were updated alongside the fix. This does not change the still-true "not changed" bullet above about `sms` lacking a per-company override path — it only corrects which of the two *global-default* categories `sms` falls into.

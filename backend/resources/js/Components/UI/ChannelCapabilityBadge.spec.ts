@@ -27,7 +27,7 @@ describe('ChannelCapabilityBadge', () => {
 
   it('gives "Manual action required" a distinct color from "Not configured", not the same muted gray', () => {
     const manualAction = mount(ChannelCapabilityBadge, { props: { channelType: 'instagram' } })
-    const notConfigured = mount(ChannelCapabilityBadge, { props: { channelType: 'sms' } })
+    const notConfigured = mount(ChannelCapabilityBadge, { props: { channelType: 'linkedin' } })
 
     const manualActionClasses = manualAction.find('span').classes().join(' ')
     const notConfiguredClasses = notConfigured.find('span').classes().join(' ')
@@ -36,9 +36,15 @@ describe('ChannelCapabilityBadge', () => {
   })
 
   it('renders "Not configured" for a channel type with no connect flow for any company', () => {
-    const wrapper = mount(ChannelCapabilityBadge, { props: { channelType: 'sms' } })
+    const wrapper = mount(ChannelCapabilityBadge, { props: { channelType: 'linkedin' } })
 
     expect(wrapper.text()).toBe('Not configured')
+  })
+
+  it('renders "Manual action required" for sms, since SettingsController::connectSms() is a real connect path', () => {
+    const wrapper = mount(ChannelCapabilityBadge, { props: { channelType: 'sms' } })
+
+    expect(wrapper.text()).toBe('Manual action required')
   })
 
   it('exposes the full description as a title attribute for every state', () => {

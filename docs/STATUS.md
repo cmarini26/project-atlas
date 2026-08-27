@@ -58,6 +58,13 @@ Design/documentation only — no application code changed in this slice. These a
 
 **Previous milestone:**
 
+**Channel-truth doc/code audit — `channelCapability.ts` SMS badge fix**
+*Completed locally: 2026-08-05*
+
+A full audit of channel-capability documentation against current code found one live bug: `channelCapability.ts`'s global-fallback table still tagged `sms` as `coming_later` ("no way to create or publish to this channel type yet, for any company"), even though the 2026-07-20 Twilio SMS connect/publish slice made that false — `SettingsController::connectSms()` and `SmsPublisher` are real. Fixed to `not_configured` (real connect flow exists, a given company just hasn't used it yet), the same category `facebook`/`instagram` already use. Two Vitest suites (`channelCapability.spec.ts`, `ChannelCapabilityBadge.spec.ts`) asserted the old value and were updated; all 25 tests in the three affected suites pass. `docs/product/Channel-Capability-Matrix.md` and `docs/reviews/Channel-Publishing-Reality-Audit.md` updated to record the correction. No other doc in `docs/` (Connector-Test-Plan.md, Customer-1-Launch-Runbook.md, Production-Readiness-Checklist.md, PRD.md) was found describing SMS capability incorrectly — all already correctly describe it as real-but-narrow (single-destination, no analytics/learn loop).
+
+**Previous milestone:**
+
 **SCRUM-69 — Company team members — implemented locally**
 *Completed locally: 2026-08-05*
 

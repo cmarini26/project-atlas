@@ -13,10 +13,13 @@ describe('channelCapability', () => {
     expect(channelCapability('instagram')).toBe('not_configured')
   })
 
+  it('reports sms as not_configured, not coming_later, since SettingsController::connectSms() is a real connect path', () => {
+    expect(channelCapability('sms')).toBe('not_configured')
+  })
+
   it('still reports channel types with no creation path at all as coming_later', () => {
     expect(channelCapability('linkedin')).toBe('coming_later')
     expect(channelCapability('x')).toBe('coming_later')
-    expect(channelCapability('sms')).toBe('coming_later')
     expect(channelCapability('landing_page')).toBe('coming_later')
   })
 
