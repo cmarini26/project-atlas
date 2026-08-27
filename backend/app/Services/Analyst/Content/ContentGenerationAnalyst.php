@@ -16,6 +16,7 @@ use App\Models\Campaign;
 use App\Models\Channel;
 use App\Models\Observation;
 use App\Services\Analyst\Contracts\Analyst;
+use App\Services\Imaging\GeneratedImageService;
 use App\Services\Learning\ContentPreferenceGuide;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
@@ -26,6 +27,7 @@ class ContentGenerationAnalyst implements Analyst
         private readonly AiProvider $ai,
         private readonly StructuredResponseParser $parser,
         private readonly ContentPreferenceGuide $contentPreferenceGuide,
+        private readonly GeneratedImageService $generatedImages,
     ) {}
 
     public function analyze(Campaign $campaign, Channel $channel, BusinessBrain $brain): ContentAssetData
@@ -56,11 +58,30 @@ class ContentGenerationAnalyst implements Analyst
             type: $type,
             body: (string) ($data['body'] ?? ''),
             title: isset($data['title']) ? (string) $data['title'] : null,
-            media: $this->resolveMediaFallback($campaign, $brain),
+            media: $this->resolveMedia($campaign, $channel, $brain),
             metadata: isset($data['metadata']) && is_array($data['metadata']) ? $data['metadata'] : null,
             promptName: $prompt->name(),
             promptVersion: $prompt->version(),
         );
+    }
+
+    /**
+     * Prefer an AI-generated image proposal for eligible visual channels
+     * (SCRUM-71), then fall back to a real crawled/source image. The generated
+     * path is off by default and returns null unless explicitly enabled, so
+     * behaviour is unchanged until a real image provider is configured.
+     *
+     * @return list<array<string, mixed>>|null
+     */
+    private function resolveMedia(Campaign $campaign, Channel $channel, BusinessBrain $brain): ?array
+    {
+        $generated = $this->generatedImages->proposeFor($campaign, $channel, $brain);
+
+        if ($generated !== null) {
+            return $generated;
+        }
+
+        return $this->resolveMediaFallback($campaign, $brain);
     }
 
     /**
