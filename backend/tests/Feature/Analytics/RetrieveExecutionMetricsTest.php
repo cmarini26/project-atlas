@@ -78,6 +78,10 @@ class RetrieveExecutionMetricsTest extends AnalyticsTestCase
         Queue::assertPushed(RetrieveExecutionMetrics::class, function (RetrieveExecutionMetrics $job) use ($execution): bool {
             return $job->executionId === $execution->id;
         });
+        $this->assertDatabaseHas('campaign_kpi_snapshots', [
+            'campaign_id' => $execution->campaign_id,
+            'snapshot_type' => 'interim',
+        ]);
     }
 
     public function test_does_not_create_duplicate_execution_metric_on_repeat(): void
