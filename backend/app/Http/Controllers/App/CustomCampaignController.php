@@ -62,12 +62,15 @@ class CustomCampaignController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'title' => ['required', 'string', 'min:3', 'max:255'],
+            'title' => ['nullable', 'string', 'min:3', 'max:255'],
             'goal' => ['required', Rule::in(['awareness', 'conversion', 're_engagement'])],
             'objective' => ['required', 'string', 'min:20', 'max:2000'],
             'audience' => ['nullable', 'string', 'max:1000'],
             'guidance' => ['nullable', 'string', 'max:2000'],
-            'source_asset_ids' => ['required', 'array', 'min:1', 'max:20'],
+            // Source assets are optional enrichment: a prompt alone is enough to
+            // compose a campaign. Any IDs supplied are still ownership-checked in
+            // CustomCampaignService::compose().
+            'source_asset_ids' => ['nullable', 'array', 'max:20'],
             'source_asset_ids.*' => ['required', 'string', 'distinct'],
             'channel_ids' => ['required', 'array', 'min:1', 'max:8'],
             'channel_ids.*' => ['required', 'string', 'distinct'],

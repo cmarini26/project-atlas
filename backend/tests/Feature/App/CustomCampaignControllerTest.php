@@ -32,7 +32,7 @@ class CustomCampaignControllerTest extends TestCase
     {
         parent::setUp();
 
-        $this->fake = new FakeAiProvider();
+        $this->fake = new FakeAiProvider;
         $this->app->instance(AiProvider::class, $this->fake);
     }
 
@@ -190,6 +190,107 @@ class CustomCampaignControllerTest extends TestCase
             'Verified publishing targets: Northwind WordPress: https://northwind.example',
             $description,
         );
+    }
+
+    public function test_store_composes_a_prompt_only_campaign_without_any_assets(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        DigitalTwin::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'status' => 'active',
+            'health_score' => 80,
+        ]);
+        $channel = $this->channel($company);
+
+        $this->fake
+            ->queueFixture('rationale-generation')
+            ->queueFixture('campaign-blueprint')
+            ->queueFixture('email-content');
+
+        $response = $this->actingAs($user)->post('/app/campaigns', [
+            ...$this->validPayload(),
+            'source_asset_ids' => [],
+            'channel_ids' => [$channel->id],
+        ]);
+
+        $brief = CampaignBrief::withoutGlobalScopes()->with('sourceAssets')->firstOrFail();
+        $recommendation = Recommendation::withoutGlobalScopes()->firstOrFail();
+
+        $response->assertRedirect(route('app.recommendations.show', $recommendation));
+        $this->assertCount(0, $brief->sourceAssets);
+        $this->assertSame('Fall customer appreciation', $brief->title);
+        $this->assertStringContainsString(
+            'No source assets supplied',
+            Opportunity::withoutGlobalScopes()->firstOrFail()->description,
+        );
+    }
+
+    public function test_store_derives_a_title_from_the_objective_when_title_is_omitted(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        DigitalTwin::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'status' => 'active',
+            'health_score' => 80,
+        ]);
+        $channel = $this->channel($company);
+
+        $this->fake
+            ->queueFixture('rationale-generation')
+            ->queueFixture('campaign-blueprint')
+            ->queueFixture('email-content');
+
+        $payload = $this->validPayload();
+        unset($payload['title']);
+
+        $this->actingAs($user)->post('/app/campaigns', [
+            ...$payload,
+            'objective' => 'Invite current customers to book the strategy intensive this fall. Emphasise the year-end availability.',
+            'source_asset_ids' => [],
+            'channel_ids' => [$channel->id],
+        ])->assertRedirect();
+
+        $brief = CampaignBrief::withoutGlobalScopes()->firstOrFail();
+        $this->assertSame('Invite current customers to book the strategy intensive this fall', $brief->title);
+    }
+
+    public function test_store_rejects_a_submission_without_an_objective_prompt(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        DigitalTwin::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'status' => 'active',
+            'health_score' => 80,
+        ]);
+        $asset = $this->asset($company);
+        $channel = $this->channel($company);
+
+        $payload = $this->validPayload();
+        unset($payload['objective']);
+
+        $this->actingAs($user)->post('/app/campaigns', [
+            ...$payload,
+            'source_asset_ids' => [$asset->id],
+            'channel_ids' => [$channel->id],
+        ])->assertSessionHasErrors('objective');
+
+        $this->assertDatabaseCount('campaign_briefs', 0);
+    }
+
+    public function test_store_fails_cleanly_without_an_asset_or_business_brain(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $channel = $this->channel($company);
+
+        $this->actingAs($user)->post('/app/campaigns', [
+            ...$this->validPayload(),
+            'source_asset_ids' => [],
+            'channel_ids' => [$channel->id],
+        ])->assertSessionHasErrors('objective');
+
+        $this->assertDatabaseCount('campaign_briefs', 0);
+        $this->assertDatabaseCount('decisions', 0);
+        $this->fake->assertNothingSent();
     }
 
     /** @return array<string, mixed> */
