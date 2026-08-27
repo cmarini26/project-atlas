@@ -11,7 +11,7 @@ These are ordered by what Atlas should do **next**, not by which Adobe product s
 | Proposed ID | Priority | Ticket | Outcome |
 |---|---|---|---|
 | SCRUM-70 | ✅ Complete locally | Close the edit-pattern learning loop | Atlas's existing approval-edit learning now influences future content drafts when consistent channel-specific patterns exist. |
-| SCRUM-71 | Slice A ✅ local | Add visual asset generation to social/blog drafts | Provider abstraction + fake provider + storage + gating + guardrails shipped locally 2026-08-27; real vendor provider pending the vendor decision. |
+| SCRUM-71 | Slices A+B ✅ local | Add visual asset generation to social/blog drafts | Provider abstraction + fake provider + storage + gating + guardrails + AI-generated preview labelling shipped locally 2026-08-27; real vendor provider pending the vendor decision. |
 | SCRUM-72 | Next | Website Measure/Learn source decision | Choose the smallest honest website measurement source before coding. |
 | SCRUM-73 | Later (after SCRUM-72) | Website Measure/Learn MVP implementation | Website stops being observation-only and gains a real feedback path. |
 | SCRUM-74 | Strategic exploration | On-site conversational agent spec | Decide whether a customer-facing site agent belongs in Atlas at all. |

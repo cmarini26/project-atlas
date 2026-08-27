@@ -102,6 +102,28 @@ class ContentGenerationAnalystGeneratedImageTest extends TestCase
         $this->assertStringNotContainsString('example.com/hero.jpg', $data->media[0]['url']);
     }
 
+    public function test_generated_image_marks_asset_metadata_so_the_ui_can_label_it(): void
+    {
+        $this->fake->queueFixture('social-content');
+
+        $data = $this->analyst->analyze($this->campaign, $this->instagram, $this->makeBrain(collect()));
+
+        $this->assertIsArray($data->metadata);
+        $this->assertTrue($data->metadata['generated_image']);
+        $this->assertSame('1.0', $data->metadata['image_prompt_version']);
+    }
+
+    public function test_crawl_fallback_image_does_not_mark_metadata_as_generated(): void
+    {
+        config()->set('imaging.enabled', false);
+        $this->fake->queueFixture('social-content');
+        $crawl = $this->makeCrawlObservation(['https://example.com/hero.jpg']);
+
+        $data = $this->analyst->analyze($this->campaign, $this->instagram, $this->makeBrain(collect([$crawl])));
+
+        $this->assertArrayNotHasKey('generated_image', (array) $data->metadata);
+    }
+
     public function test_unsupported_channel_still_falls_back_to_crawl_image(): void
     {
         $this->fake->queueFixture('email-content');

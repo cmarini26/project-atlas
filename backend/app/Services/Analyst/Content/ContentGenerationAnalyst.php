@@ -54,15 +54,38 @@ class ContentGenerationAnalyst implements Analyst
             'landing_page' => 'landing_page',
         };
 
+        $media = $this->resolveMedia($campaign, $channel, $brain);
+
         return new ContentAssetData(
             type: $type,
             body: (string) ($data['body'] ?? ''),
             title: isset($data['title']) ? (string) $data['title'] : null,
-            media: $this->resolveMedia($campaign, $channel, $brain),
-            metadata: isset($data['metadata']) && is_array($data['metadata']) ? $data['metadata'] : null,
+            media: $media,
+            metadata: $this->resolveMetadata($data, $media),
             promptName: $prompt->name(),
             promptVersion: $prompt->version(),
         );
+    }
+
+    /**
+     * Merge the model's own metadata with an explicit marker when Atlas
+     * attached an AI-generated image, so the approval UI can label the image
+     * as generated rather than sourced from real inventory (SCRUM-71).
+     *
+     * @param  array<string, mixed>  $data
+     * @param  list<array<string, mixed>>|null  $media
+     * @return array<string, mixed>|null
+     */
+    private function resolveMetadata(array $data, ?array $media): ?array
+    {
+        $metadata = isset($data['metadata']) && is_array($data['metadata']) ? $data['metadata'] : [];
+
+        if ($media !== null && ($media[0]['source'] ?? null) === 'ai_generated') {
+            $metadata['generated_image'] = true;
+            $metadata['image_prompt_version'] = (string) ($media[0]['prompt_version'] ?? GeneratedImageService::PROMPT_VERSION);
+        }
+
+        return $metadata === [] ? null : $metadata;
     }
 
     /**

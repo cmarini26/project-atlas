@@ -82,6 +82,10 @@ export interface DecisionDetail {
 // ContentAsset as returned by controllers (uses 'type' not 'asset_type')
 export interface ContentAssetMedia {
     url: string
+    // 'ai_generated' when Atlas produced the image from a prompt (SCRUM-71);
+    // absent for real crawled/source imagery.
+    source?: string
+    prompt_version?: string
 }
 
 export interface ContentAsset {
