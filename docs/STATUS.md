@@ -34,6 +34,30 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
+**SCRUM-70 — Edit-pattern learning loop ✅ Implemented locally**
+*Completed locally: 2026-08-10*
+
+Atlas now feeds prior edited-approval learning back into future content generation instead of only recording it. The new `ContentPreferenceGuide` reads historical `recommendation_edited_and_approved` `Learning` rows per company and channel, looks for consistent edit-pattern signals with a minimum-occurrence threshold, and emits prompt guidance only when a real preference is established — specifically for shorter/longer copy, hashtag usage, and price inclusion. This closes the concrete gap identified in the Adobe comparison: Atlas was already detecting `length_preference`, `hashtag_preference`, and `price_inclusion` during edited approvals, but `ContentGenerationAnalyst` never consulted them.
+
+`ContentGenerationAnalyst` now injects this learned guidance into every content prompt type (social, email, SMS, blog, landing page) without changing behavior for companies that lack enough edit history. The prompt classes were bumped from version `1.0` to `1.1` so generated assets can truthfully report which prompt family incorporated learned preferences. Three new feature tests prove: (1) consistent edited-approval patterns show up in future generation prompts, (2) a single one-off edit does not overfit later drafts, and (3) learning stays scoped to the channel where the edits were observed.
+
+Follow-up fix (2026-08-27): `ApprovalService::primaryChannel()` was persisting the Decision's channel **id** into `Learning.value['channel']`, while `ContentPreferenceGuide` matches on channel **type** (`email`, `instagram`, …). In production the guide's channel filter never matched, so the loop was a silent no-op — the original three tests passed only because they hand-wrote `Learning` rows with a type string. `primaryChannel()` now resolves the id to `Channel::type`. Two added tests cover it: one asserts the persisted value is the channel type, one drives two real edited approvals through `ApprovalService` end-to-end and asserts `ContentPreferenceGuide` then returns guidance.
+
+Verification: `php artisan test` → SCRUM-70 + Learning/Campaign/Recommendation suites green (151 feature tests in those dirs); PHPStan level max → 0 errors; `npm run build` → passed.
+
+**Previous milestone:**
+
+**Adobe competitive analysis + gap plan 📐 Designed (not implemented)**
+*Completed locally: 2026-08-05*
+
+Documented a comparison of Atlas against Adobe's AI marketing stack (Firefly, GenStudio, Experience Platform AI Assistant, Journey Optimizer/Journey Agent, Agent Orchestrator) in the new [Competitors.md](product/Competitors.md), grounded in Adobe's public announcements plus a direct read of Atlas's own code (`ContentGenerationAnalyst.php`, `Channel-Capability-Matrix.md`, `EditPatternDetector.php`, `ApprovalService.php`) rather than assumption. Confirmed one concrete, previously-undocumented gap while researching: `EditPatternDetector` already detects and stores length/hashtag/price-inclusion edit patterns as `Learning` rows, but nothing reads them back into content generation — the feedback loop is built but never closes.
+
+Turned the identified gaps into a scoped plan, [Adobe-Competitive-Gaps-Plan.md](plans/Adobe-Competitive-Gaps-Plan.md): (1) feed edit-pattern learning back into content generation — smallest, highest-confidence, no schema change; (2) a Website Measure/Learn loop, gated on a product decision about data source before implementation; (3) visual asset generation for content drafts, Atlas's largest content-completeness gap versus Firefly; (4) an on-site conversational agent (Adobe's "Brand Concierge" pattern) — deliberately left unscoped as a strategic product decision, not an implementation ticket.
+
+Design/documentation only — no application code changed in this slice. These are proposed backlog items without real tracker IDs yet, unlike the `SCRUM-NN` work items elsewhere in this file.
+
+**Previous milestone:**
+
 **SCRUM-69 — Company team members — implemented locally**
 *Completed locally: 2026-08-05*
 

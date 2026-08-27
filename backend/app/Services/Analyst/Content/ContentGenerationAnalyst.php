@@ -16,6 +16,7 @@ use App\Models\Campaign;
 use App\Models\Channel;
 use App\Models\Observation;
 use App\Services\Analyst\Contracts\Analyst;
+use App\Services\Learning\ContentPreferenceGuide;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
 
@@ -24,18 +25,20 @@ class ContentGenerationAnalyst implements Analyst
     public function __construct(
         private readonly AiProvider $ai,
         private readonly StructuredResponseParser $parser,
+        private readonly ContentPreferenceGuide $contentPreferenceGuide,
     ) {}
 
     public function analyze(Campaign $campaign, Channel $channel, BusinessBrain $brain): ContentAssetData
     {
         $blueprint = $this->resolveBlueprint($campaign);
+        $preferenceGuidance = $this->contentPreferenceGuide->guidanceFor($brain->company, $channel->type);
 
         $prompt = match ($channel->type) {
-            'instagram', 'facebook', 'linkedin', 'x' => new SocialContentPrompt($channel, $blueprint, $brain),
-            'email' => new EmailContentPrompt($channel, $blueprint, $brain),
-            'sms' => new SmsContentPrompt($blueprint, $brain),
-            'blog' => new BlogContentPrompt($channel, $blueprint, $brain),
-            'landing_page' => new LandingPageContentPrompt($channel, $blueprint, $brain),
+            'instagram', 'facebook', 'linkedin', 'x' => new SocialContentPrompt($channel, $blueprint, $brain, $preferenceGuidance),
+            'email' => new EmailContentPrompt($channel, $blueprint, $brain, $preferenceGuidance),
+            'sms' => new SmsContentPrompt($blueprint, $brain, $preferenceGuidance),
+            'blog' => new BlogContentPrompt($channel, $blueprint, $brain, $preferenceGuidance),
+            'landing_page' => new LandingPageContentPrompt($channel, $blueprint, $brain, $preferenceGuidance),
         };
 
         $response = $this->ai->complete($prompt);

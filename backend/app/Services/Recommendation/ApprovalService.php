@@ -6,6 +6,7 @@ use App\Events\RecommendationApproved;
 use App\Events\RecommendationRejected;
 use App\Models\Approval;
 use App\Models\Campaign;
+use App\Models\Channel;
 use App\Models\ContentAsset;
 use App\Models\Decision;
 use App\Models\Learning;
@@ -222,6 +223,12 @@ class ApprovalService
         ]);
     }
 
+    /**
+     * The channel *type* (e.g. `email`, `instagram`) of the recommendation's
+     * primary channel, not the channel row id. Downstream learning consumers
+     * (ContentPreferenceGuide, FactMutator channel keys) key off channel type,
+     * so persist the type here rather than the opaque id stored on the Decision.
+     */
     private function primaryChannel(Recommendation $recommendation): ?string
     {
         if ($recommendation->decision_id === null) {
@@ -236,8 +243,15 @@ class ApprovalService
 
         /** @var list<string> $channelIds */
         $channelIds = $decision->channel_ids ?? [];
+        $primaryId = $channelIds[0] ?? null;
 
-        return $channelIds[0] ?? null;
+        if ($primaryId === null) {
+            return null;
+        }
+
+        $channel = Channel::withoutGlobalScopes()->find($primaryId);
+
+        return $channel->type ?? $primaryId;
     }
 
     private function approveLinkedCampaign(Recommendation $recommendation): void
