@@ -21,6 +21,18 @@ ngrok http 8090
 The ngrok process and the local containers must remain running while Atlas
 connects to or publishes to the fixture.
 
+## Build the demo site
+
+After WordPress is installed, create or refresh the realistic Northwind pages,
+static homepage, Blog index, and navigation with:
+
+```bash
+docker-compose -f infrastructure/testing/northwind-wordpress/compose.yml run --rm cli \
+  wp eval-file /opt/northwind-site/bootstrap.php
+```
+
+The bootstrap is idempotent and preserves posts published by Atlas.
+
 ## Stop
 
 ```bash
