@@ -5,6 +5,7 @@ namespace App\Http\Controllers\App;
 use App\Http\Controllers\Controller;
 use App\Models\Campaign;
 use App\Models\CampaignBrief;
+use App\Models\CampaignImageGeneration;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\ContentAsset;
@@ -65,6 +66,7 @@ class RecommendationController extends Controller
         $recommendation->load([
             'decision.opportunity.subject',
             'campaign.brief.sourceAssets',
+            'campaign.brief.imageGenerations',
             'campaign.contentAssets.channel',
         ]);
 
@@ -92,6 +94,7 @@ class RecommendationController extends Controller
             ] : null,
             'campaign_brief' => $this->campaignBriefFor($recommendation),
             'source_assets' => $this->sourceAssetsFor($recommendation),
+            'generated_imagery' => $this->generatedImageryFor($recommendation),
             'channel_mix' => $this->channelMixPresenter->present($company, $recommendation->decision),
             'selected_content_asset_ids' => $contentAssets
                 ->filter(fn (ContentAsset $asset): bool => $asset->status !== 'archived')
@@ -132,6 +135,32 @@ class RecommendationController extends Controller
             'audience' => $brief->audience,
             'guidance' => $brief->guidance,
         ];
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function generatedImageryFor(Recommendation $recommendation): array
+    {
+        $brief = $recommendation->campaign?->brief;
+
+        if (! $brief instanceof CampaignBrief) {
+            return [];
+        }
+
+        return $brief->imageGenerations
+            ->sortBy('created_at')
+            ->map(fn (CampaignImageGeneration $g): array => [
+                'id' => $g->id,
+                'status' => $g->status,
+                'url' => $g->mediaUrl(),
+                'width' => $g->width,
+                'height' => $g->height,
+                'provider' => $g->provider,
+                'model' => $g->model,
+                'cost_usd' => (float) $g->cost_usd,
+                'error' => $g->error,
+            ])
+            ->values()
+            ->all();
     }
 
     public function approve(Request $request, Recommendation $recommendation): RedirectResponse

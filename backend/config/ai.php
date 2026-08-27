@@ -88,6 +88,18 @@ return [
 
     'image' => [
         'provider' => env('AI_IMAGE_PROVIDER'),
+
+        // Images generated per campaign at compose time. One by default — a
+        // variant set multiplies cost with little review value.
+        'default_count' => (int) env('AI_IMAGE_DEFAULT_COUNT', 1),
+
+        // Per-company generation cap over a rolling window. Enforced before the
+        // provider is ever called; a breach fails the individual generation
+        // with an actionable message rather than raising a hard error.
+        'company_cap' => [
+            'limit' => (int) env('AI_IMAGE_COMPANY_CAP', 30),
+            'window_hours' => (int) env('AI_IMAGE_COMPANY_CAP_WINDOW_HOURS', 24),
+        ],
     ],
 
 ];

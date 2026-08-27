@@ -6,6 +6,7 @@ use App\Domain\Shared\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 
@@ -40,6 +41,12 @@ class CampaignBrief extends Model
     public function sourceAssets(): BelongsToMany
     {
         return $this->belongsToMany(SourceAsset::class, 'campaign_brief_source_asset');
+    }
+
+    /** @return HasMany<CampaignImageGeneration, $this> */
+    public function imageGenerations(): HasMany
+    {
+        return $this->hasMany(CampaignImageGeneration::class);
     }
 
     /** @return MorphOne<Opportunity, $this> */

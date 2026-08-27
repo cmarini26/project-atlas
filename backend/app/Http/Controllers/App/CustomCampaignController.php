@@ -72,6 +72,9 @@ class CustomCampaignController extends Controller
             // CustomCampaignService::compose().
             'source_asset_ids' => ['nullable', 'array', 'max:20'],
             'source_asset_ids.*' => ['required', 'string', 'distinct'],
+            // Opt in to generated imagery even when supplying your own assets.
+            // Ignored (always on) when no assets are supplied.
+            'generate_imagery' => ['nullable', 'boolean'],
             'channel_ids' => ['required', 'array', 'min:1', 'max:8'],
             'channel_ids.*' => ['required', 'string', 'distinct'],
             'starts_at' => ['nullable', 'date'],

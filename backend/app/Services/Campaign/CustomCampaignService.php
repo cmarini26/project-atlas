@@ -2,7 +2,10 @@
 
 namespace App\Services\Campaign;
 
+use App\AI\Images\ImageGenerationCap;
+use App\Jobs\GenerateCampaignImagery;
 use App\Models\CampaignBrief;
+use App\Models\CampaignImageGeneration;
 use App\Models\Channel;
 use App\Models\Company;
 use App\Models\Decision;
@@ -24,6 +27,7 @@ class CustomCampaignService
         private readonly BusinessBrainService $brainService,
         private readonly DecisionService $decisionService,
         private readonly ChannelPublishingCapabilityResolver $publishingCapabilities,
+        private readonly ImageGenerationCap $imageCap,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -81,7 +85,7 @@ class CustomCampaignService
             ->filter()
             ->implode(', ');
 
-        [, $opportunity] = DB::transaction(function () use ($company, $data, $title, $assetIds, $channelIds, $campaignType, $publishingTargets): array {
+        [$brief, $opportunity] = DB::transaction(function () use ($company, $data, $title, $assetIds, $channelIds, $campaignType, $publishingTargets): array {
             $brief = CampaignBrief::withoutGlobalScopes()->create([
                 'company_id' => $company->id,
                 'title' => $title,
@@ -118,7 +122,7 @@ class CustomCampaignService
         });
 
         try {
-            return $this->decisionService->commit(new DecisionContext(
+            $decision = $this->decisionService->commit(new DecisionContext(
                 opportunity: $opportunity,
                 brain: $this->brainService->for($company),
                 campaignType: $campaignType,
@@ -128,6 +132,50 @@ class CustomCampaignService
             $opportunity->dismiss();
             throw $exception;
         }
+
+        $this->maybeGenerateImagery(
+            $company,
+            $brief,
+            hasUserAssets: $assetIds !== [],
+            optedIn: (bool) ($data['generate_imagery'] ?? false),
+        );
+
+        return $decision;
+    }
+
+    /**
+     * Queue campaign imagery. Generation is requested automatically when the
+     * user supplied no assets, or on explicit opt-in when they did. It never
+     * blocks composition: a pending ledger row is created now and the review
+     * UI reflects its status.
+     */
+    private function maybeGenerateImagery(Company $company, CampaignBrief $brief, bool $hasUserAssets, bool $optedIn): void
+    {
+        if ($hasUserAssets && ! $optedIn) {
+            return;
+        }
+
+        // Cap is authoritatively re-checked in the job before the provider is
+        // called; this pre-check just avoids queuing a doomed generation and
+        // surfaces the reason immediately in the review UI.
+        if ($this->imageCap->wouldExceed($company->id)) {
+            CampaignImageGeneration::withoutGlobalScopes()->create([
+                'company_id' => $company->id,
+                'campaign_brief_id' => $brief->id,
+                'status' => CampaignImageGeneration::STATUS_FAILED,
+                'error' => $this->imageCap->message(),
+            ]);
+
+            return;
+        }
+
+        $generation = CampaignImageGeneration::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_brief_id' => $brief->id,
+            'status' => CampaignImageGeneration::STATUS_PENDING,
+        ]);
+
+        GenerateCampaignImagery::dispatch($generation->id);
     }
 
     private function opportunityDescription(CampaignBrief $brief, string $publishingTargets): string
