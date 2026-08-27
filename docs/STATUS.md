@@ -34,7 +34,7 @@ This is the live engineering dashboard for Project Atlas. Update it after every 
 
 ## Current Milestone
 
-**SCRUM-71 — Visual asset generation (Slices A + B) ✅ Implemented locally**
+**SCRUM-71 — Visual asset generation (Slices A + B + C) ✅ Implemented locally**
 *Completed locally: 2026-08-27*
 
 Atlas can now propose one AI-generated image alongside generated copy for visual channels (`instagram`, `facebook`, `blog`). Slice A is the honest scaffolding: a provider abstraction (`App\Services\Imaging\ImageGenerationProvider` + `ImageGenerationProviderRegistry`), a `FakeImageGenerationProvider` (deterministic 1x1 PNG, the default and only provider until a vendor is chosen), and `GeneratedImageService`, which decides *when* to generate, builds the prompt from campaign blueprint + company + channel, stores the result on the `imaging.disk` filesystem under `generated-content/{company}/{campaign}/{channel}/`, and returns the existing `ContentAssetData.media` shape the recommendation preview already renders. `ContentGenerationAnalyst` prefers a generated proposal for eligible channels, then falls back to the existing crawled/source image.
@@ -43,9 +43,11 @@ Slice B keeps the UI honest: when Atlas attaches a generated image it also sets 
 
 The feature is **off by default** (`config/imaging.php` → `imaging.enabled`, `IMAGE_GENERATION_ENABLED=false`), so no behaviour changes until it is explicitly enabled and a real provider is registered. Guardrails in place: global toggle, channel allow-list, and a per-company daily cap (`imaging.per_company_daily_limit`). Everything degrades to "no generated media" rather than throwing, so content generation never fails because image generation did.
 
-Deferred: the real hosted provider (blocked on the vendor decision in [SCRUM-71-Visual-Asset-Generation-Plan.md](plans/SCRUM-71-Visual-Asset-Generation-Plan.md) §5), and a retention/cleanup policy for rejected draft images.
+Slice C handles cleanup: `App\Jobs\PruneGeneratedImages` runs weekly on the `maintenance` queue and deletes stored generated images under `generated-content/` that no live content asset still references, once they are older than `imaging.retention_days` (default 30). Status-agnostic — rejected drafts, superseded assets, and cancelled campaigns are all covered — and a just-created file is never raced.
 
-Verification: `php artisan test` → 1506 passed, 4 skipped (5 pre-existing `AiProviderConfigurationTest` failures are unrelated and green on CI); `npm test` → 204 passed; `npm run build` → passed; PHPStan level max → 0 errors; Pint → clean. New: `GeneratedImageServiceTest`, `ContentGenerationAnalystGeneratedImageTest`, `ContentPreview.spec.ts`.
+Deferred: the real hosted provider, blocked on the vendor decision (a separate `SCRUM-71-Image-Provider-Vendor-Options.md` note works it; recommendation is OpenAI `gpt-image-1-mini`).
+
+Verification: `php artisan test` → 1511 passed, 4 skipped (5 pre-existing `AiProviderConfigurationTest` failures are unrelated and green on CI); `npm test` → 204 passed; `npm run build` → passed; PHPStan level max → 0 errors; Pint → clean. New: `GeneratedImageServiceTest`, `ContentGenerationAnalystGeneratedImageTest`, `ContentPreview.spec.ts`, `PruneGeneratedImagesTest`.
 
 **Previous milestone:**
 

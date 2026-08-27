@@ -149,10 +149,10 @@ The codebase does not yet contain an image-generation integration pattern, so th
 - [x] Feature tests cover: image generated for supported channels, no image generated for unsupported channels, failures degrade honestly, and daily-limit / disabled behaviour. (`tests/Feature/Imaging/GeneratedImageServiceTest.php`, `tests/Feature/Campaign/ContentGenerationAnalystGeneratedImageTest.php`.)
 - [x] Full verification passes: `php artisan test` (1506 passing; 5 pre-existing `AiProviderConfigurationTest` failures unrelated, green on CI), `npm test`, `npm run build`, PHPStan level max, Pint.
 - [x] Slice B — the image is marked AI-generated (`metadata.generated_image` + `metadata.image_prompt_version`, set in `ContentGenerationAnalyst`) and `ContentPreview.vue` shows an "AI-generated · draft proposal" label so it is never mistaken for real inventory (§7). Covered by `ContentPreview.spec.ts` and two `ContentGenerationAnalystGeneratedImageTest` cases.
+- [x] Slice C (retention/cleanup, §7) — `App\Jobs\PruneGeneratedImages` runs weekly on the `maintenance` queue and deletes any stored generated image under `generated-content/` that no live (non-archived, non-deleted) `ContentAsset` still references, once it is older than `imaging.retention_days` (default 30, `IMAGE_GENERATION_RETENTION_DAYS`). Status-agnostic — rejected drafts, superseded assets and cancelled campaigns are all covered without enumerating statuses, and a just-created file is never raced. Covered by `PruneGeneratedImagesTest`.
 
 ### Still open (deliberately deferred)
-- Real hosted image provider — blocked on the §5 vendor decision (Slice A's real-provider step).
-- Retention/cleanup policy for superseded or rejected generated draft images (§7).
+- Real hosted image provider — blocked on the §5 vendor decision (Slice A's real-provider step). A separate `SCRUM-71-Image-Provider-Vendor-Options.md` note works that decision.
 
 ---
 

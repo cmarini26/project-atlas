@@ -28,4 +28,10 @@ return [
     // rolling calendar day before Atlas stops proposing new ones.
     'per_company_daily_limit' => (int) env('IMAGE_GENERATION_DAILY_LIMIT', 20),
 
+    // Grace period before PruneGeneratedImages will delete a stored generated
+    // image that no live content asset references any more (rejected draft,
+    // superseded asset, cancelled campaign). Files younger than this are never
+    // pruned, so a just-created asset is never raced.
+    'retention_days' => (int) env('IMAGE_GENERATION_RETENTION_DAYS', 30),
+
 ];
