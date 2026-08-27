@@ -74,4 +74,20 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Image Provider
+    |--------------------------------------------------------------------------
+    |
+    | Provider Atlas resolves for image generation. Independent of the text
+    | provider above — per-image pricing varies by an order of magnitude
+    | across vendors, so this is kept swappable. Supported values: openai,
+    | fake. Provider credentials live in config/services.php.
+    |
+    */
+
+    'image' => [
+        'provider' => env('AI_IMAGE_PROVIDER'),
+    ],
+
 ];

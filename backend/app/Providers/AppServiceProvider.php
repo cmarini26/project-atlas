@@ -4,6 +4,9 @@ namespace App\Providers;
 
 use App\AI\AiProviderFactory;
 use App\AI\Contracts\AiProvider;
+use App\AI\Images\Contracts\ImageProvider;
+use App\AI\Images\Providers\OpenAiImageProvider;
+use App\AI\Images\Testing\FakeImageProvider;
 use App\ErrorTracking\Contracts\ErrorTracker;
 use App\ErrorTracking\NullErrorTracker;
 use App\ErrorTracking\SentryErrorTracker;
@@ -82,6 +85,30 @@ class AppServiceProvider extends ServiceProvider
                     ? $app->make(AiProviderFactory::class)->make(trim($override))
                     : $app->make(AiProvider::class);
             });
+
+        // Image generation provider selection mirrors the AI provider above:
+        // explicit config, credentials in config/services.php, fake gated to
+        // non-production so tests and local dev never hit the network.
+        $this->app->singleton(ImageProvider::class, function ($app): ImageProvider {
+            $provider = config('ai.image.provider');
+
+            if (! is_string($provider) || trim($provider) === '') {
+                throw new InvalidArgumentException(
+                    'AI_IMAGE_PROVIDER must be configured. Supported values: openai, fake.'
+                );
+            }
+
+            return match ($provider) {
+                'openai' => $app->make(OpenAiImageProvider::class),
+                'fake' => $app->environment('local', 'testing')
+                    ? $app->make(FakeImageProvider::class)
+                    : throw new InvalidArgumentException('AI_IMAGE_PROVIDER=fake is only supported in local and testing environments.'),
+                default => throw new InvalidArgumentException(sprintf(
+                    'Unsupported AI_IMAGE_PROVIDER value [%s]. Supported values: openai, fake.',
+                    $provider,
+                )),
+            };
+        });
 
         // Resolves the right Analyst per Observation source_type — mirrors
         // ConnectorServiceProvider's ConnectorRegistry binding. Adding a new
