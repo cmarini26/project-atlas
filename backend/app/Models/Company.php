@@ -87,6 +87,12 @@ class Company extends Model
         return $this->hasOne(OnboardingProfile::class);
     }
 
+    /** @return HasOne<BillingProfile, $this> */
+    public function billingProfile(): HasOne
+    {
+        return $this->hasOne(BillingProfile::class);
+    }
+
     /** @return HasMany<CompanyMembership, $this> */
     public function memberships(): HasMany
     {
