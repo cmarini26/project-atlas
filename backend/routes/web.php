@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\OnboardingStatusController;
 use App\Http\Controllers\App\AnalyticsController;
+use App\Http\Controllers\App\BillingCheckoutController;
 use App\Http\Controllers\App\BusinessBrainController;
 use App\Http\Controllers\App\CampaignController;
 use App\Http\Controllers\App\CompanySelectorController;
@@ -139,6 +140,11 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
     Route::delete('/settings/team/invitations/{invitation}', [TeamController::class, 'revoke'])->name('settings.team.invitations.destroy');
     Route::patch('/settings/team/members/{membership}', [TeamController::class, 'update'])->name('settings.team.members.update');
     Route::delete('/settings/team/members/{membership}', [TeamController::class, 'remove'])->name('settings.team.members.destroy');
+    // Billing (Stripe)
+    Route::post('/settings/billing/checkout', [BillingCheckoutController::class, 'store'])
+        ->middleware('throttle:10,1')
+        ->name('settings.billing.checkout');
+
     Route::post('/settings/integrations/{integration}/sync', [SettingsController::class, 'syncIntegration'])->name('settings.integrations.sync');
     Route::post('/settings/integrations/instagram', [SettingsController::class, 'connectInstagram'])->name('settings.integrations.instagram.connect');
     Route::post('/settings/integrations/shopify', [SettingsController::class, 'connectShopify'])->name('settings.integrations.shopify.connect');
