@@ -10,7 +10,7 @@ use RuntimeException;
  * must not treat it as a permanent failure: observations go to 'retrying'
  * instead of 'failed', and integrations are not marked 'error'.
  */
-class AiProviderOverloadedException extends RuntimeException
+class AiProviderOverloadedException extends RuntimeException implements RetryableAiException
 {
     public function __construct(
         string $message,

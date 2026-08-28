@@ -2,7 +2,8 @@
 
 namespace App\Jobs;
 
-use App\AI\Exceptions\AiProviderOverloadedException;
+use App\AI\Exceptions\LocalAiException;
+use App\AI\Exceptions\RetryableAiException;
 use App\Events\ObservationProcessed;
 use App\Models\Company;
 use App\Models\Observation;
@@ -86,8 +87,9 @@ class ProcessObservation implements ShouldQueue
             Log::info('ProcessObservation: observation processed successfully.', [
                 'observation_id' => $observation->id,
             ]);
-        } catch (AiProviderOverloadedException $e) {
-            // Transient provider overload — not a permanent failure. Queued
+        } catch (RetryableAiException $e) {
+            // Transient provider issue (hosted overload, or the local model
+            // being briefly unreachable) — not a permanent failure. Queued
             // jobs retry via $tries/$backoff; in sync mode the onboarding
             // status endpoint re-dispatches stale 'retrying' observations.
             // Only the final queued attempt downgrades to 'failed'.
@@ -96,14 +98,14 @@ class ProcessObservation implements ShouldQueue
                 && $this->attempts() >= $this->tries;
 
             if ($queuedFinalAttempt) {
-                Log::error('ProcessObservation: AI provider overloaded, retries exhausted.', [
+                Log::error('ProcessObservation: AI provider unavailable, retries exhausted.', [
                     'observation_id' => $observation->id,
                     'attempts' => $this->attempts(),
                 ]);
 
                 $observation->markFailed();
             } else {
-                Log::warning('ProcessObservation: AI provider overloaded, marked for retry.', [
+                Log::warning('ProcessObservation: AI provider unavailable, marked for retry.', [
                     'observation_id' => $observation->id,
                     'attempt' => $this->attempts(),
                 ]);
@@ -112,6 +114,19 @@ class ProcessObservation implements ShouldQueue
             }
 
             throw $e;
+        } catch (LocalAiException $e) {
+            // A permanent local-inference failure (model not pulled, out of
+            // memory, unusable output). Retrying the same prompt would only
+            // load the local model further, so fail fast — no more attempts.
+            Log::error('ProcessObservation: local AI failure, not retrying.', [
+                'observation_id' => $observation->id,
+                'failure_category' => $e->category,
+            ]);
+
+            $observation->markFailed();
+            $this->fail($e);
+
+            return;
         } catch (Throwable $e) {
             Log::error('ProcessObservation: failed.', [
                 'observation_id' => $observation->id,

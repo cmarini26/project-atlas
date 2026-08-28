@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\AI\Health\LocalAiHealthService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -31,6 +32,13 @@ final class HealthController
             'cache' => $this->checkCache(),
             'queue' => $this->checkQueue(),
         ];
+
+        // Only gate readiness on local inference when it is the active provider:
+        // a hosted-provider deployment must not go degraded because Ollama is
+        // absent, and vice versa.
+        if (config('ai.provider') === 'ollama') {
+            $checks['ollama'] = $this->checkOllama();
+        }
 
         $allOk = collect($checks)->every(fn (array $check) => $check['status'] === 'ok');
 
@@ -85,5 +93,22 @@ final class HealthController
         } catch (\Throwable $e) {
             return ['status' => 'error', 'error' => $e->getMessage()];
         }
+    }
+
+    /** @return array{status: string, detail?: string, model?: string, error?: string} */
+    private function checkOllama(): array
+    {
+        try {
+            $report = app(LocalAiHealthService::class)->check();
+        } catch (\Throwable $e) {
+            return ['status' => 'error', 'error' => $e->getMessage()];
+        }
+
+        return [
+            'status' => $report['status'] === 'ok' ? 'ok' : 'error',
+            'detail' => $report['status'],
+            'model' => $report['model'],
+            ...($report['error'] !== null ? ['error' => $report['error']] : []),
+        ];
     }
 }
