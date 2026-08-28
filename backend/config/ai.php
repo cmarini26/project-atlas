@@ -31,4 +31,23 @@ return [
         'health_timeout_seconds' => (int) env('AI_LOCAL_HEALTH_TIMEOUT', 3),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Task-level provider routing
+    |--------------------------------------------------------------------------
+    |
+    | Route a single task type to a specific provider without moving the global
+    | default above. An empty value means the task uses the default provider.
+    |
+    | CM-85 pilot: set AI_FACT_EXTRACTION_PROVIDER=ollama to run website fact
+    | extraction on the local model while every other task stays on the
+    | default. Unset it to restore the prior path — no code change.
+    | Supported values match AI_PROVIDER: anthropic, local, fake, ollama.
+    |
+    */
+
+    'task_providers' => [
+        'fact_extraction' => env('AI_FACT_EXTRACTION_PROVIDER'),
+    ],
+
 ];

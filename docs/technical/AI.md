@@ -161,6 +161,33 @@ class OpenAiProvider implements AiProvider
 }
 ```
 
+### Provider selection & task-level routing
+
+`AiProviderFactory` (`app/AI/AiProviderFactory.php`) resolves a concrete
+provider by name. Selection is **explicit** — never inferred from credential
+presence — and environment-gated (`local` stub only in `local`, `fake` only in
+`testing`).
+
+- **Global default**: `config('ai.provider')` (`AI_PROVIDER`). Bound as the
+  `AiProvider` singleton via `AiProviderFactory::default()`.
+- **Per-task override**: `config('ai.task_providers.<task>')`. Routes one task
+  to a specific provider without moving the global default. An empty value =
+  that task uses the default.
+
+Currently wired:
+
+| Task | Env var | Consumer |
+|------|---------|----------|
+| `fact_extraction` | `AI_FACT_EXTRACTION_PROVIDER` | `WebsiteAnalyst` (the only AI-backed fact-extraction path) |
+
+`WebsiteAnalyst` receives its `AiProvider` through a contextual binding
+closure: with the override set it gets `AiProviderFactory::make($override)`,
+otherwise the default singleton — so **disabling a pilot needs no code change**,
+just unset the env var. Any active routing is logged once at boot
+(`AI task routing active.`). Facts produced by a routed provider flow through
+the unchanged `StructuredResponseParser` + schema validation and keep their
+`observation_id` provenance.
+
 ---
 
 ## Prompt Class Design
