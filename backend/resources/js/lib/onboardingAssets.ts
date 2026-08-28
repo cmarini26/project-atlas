@@ -3,8 +3,8 @@
  * and the identifying-detail fields collected for each in the following
  * Asset Details step. Deliberately a curated subset of the full 12
  * MarketingChannelType values (excludes TikTok, Other) — mirrors
- * OnboardingController::ASSET_CARD_TYPES on the PHP side. See
- * docs/specs/Business-Discovery-Onboarding.md §2.4-2.5.
+ * App\Domain\Onboarding\OnboardingAssetTypes on the PHP side (a parity test
+ * guards drift). See docs/specs/Business-Discovery-Onboarding.md §2.4-2.5.
  *
  * Only Website requires details up front (2026-07-14, Workstream C.1) —
  * that's the only type Discovery can currently auto-discover from a URL
@@ -13,24 +13,47 @@
  * fields Discovery won't use yet.
  */
 
+/**
+ * What setup a channel still needs *after* onboarding — orthogonal to
+ * `requiresDetails` (which means "collect a URL inline now"):
+ *   - none    nothing further (Website — done inline)
+ *   - handle  enter a username / profile URL in Marketing Presence
+ *   - oauth   connect an account in Marketing Presence
+ *   - manual  offline channel — tracked, never integrated
+ * Mirrors App\Domain\Onboarding\OnboardingAssetTypes; a parity test guards drift.
+ */
+export type IntegrationRequirementKind = 'none' | 'handle' | 'oauth' | 'manual'
+
+export interface IntegrationRequirement {
+  kind: IntegrationRequirementKind
+  /** One line describing what is still needed. */
+  summary: string
+}
+
 export interface OnboardingAssetType {
   type: string
   label: string
   /** Types with no identifying field require nothing further in step 5. */
   requiresDetails: boolean
+  integrationRequirement: IntegrationRequirement
+}
+
+/** Whether the user still has to connect this channel from Settings. */
+export function needsChannelConnection(asset: OnboardingAssetType): boolean {
+  return asset.integrationRequirement.kind === 'handle' || asset.integrationRequirement.kind === 'oauth'
 }
 
 export const ONBOARDING_ASSET_TYPES: OnboardingAssetType[] = [
-  { type: 'website', label: 'Website', requiresDetails: true },
-  { type: 'google_business_profile', label: 'Google Business Profile', requiresDetails: false },
-  { type: 'instagram', label: 'Instagram', requiresDetails: false },
-  { type: 'facebook', label: 'Facebook', requiresDetails: false },
-  { type: 'linkedin', label: 'LinkedIn', requiresDetails: false },
-  { type: 'x', label: 'X', requiresDetails: false },
-  { type: 'youtube', label: 'YouTube', requiresDetails: false },
-  { type: 'email', label: 'Email Newsletter', requiresDetails: false },
-  { type: 'events', label: 'Events', requiresDetails: false },
-  { type: 'print', label: 'Print', requiresDetails: false },
+  { type: 'website', label: 'Website', requiresDetails: true, integrationRequirement: { kind: 'none', summary: 'Set up during onboarding — nothing more to do.' } },
+  { type: 'google_business_profile', label: 'Google Business Profile', requiresDetails: false, integrationRequirement: { kind: 'handle', summary: 'Add your Google Business Profile URL in Marketing Presence.' } },
+  { type: 'instagram', label: 'Instagram', requiresDetails: false, integrationRequirement: { kind: 'oauth', summary: 'Connect your Instagram account in Marketing Presence.' } },
+  { type: 'facebook', label: 'Facebook', requiresDetails: false, integrationRequirement: { kind: 'oauth', summary: 'Connect your Facebook Page in Marketing Presence.' } },
+  { type: 'linkedin', label: 'LinkedIn', requiresDetails: false, integrationRequirement: { kind: 'handle', summary: 'Add your LinkedIn page URL in Marketing Presence.' } },
+  { type: 'x', label: 'X', requiresDetails: false, integrationRequirement: { kind: 'handle', summary: 'Add your X handle in Marketing Presence.' } },
+  { type: 'youtube', label: 'YouTube', requiresDetails: false, integrationRequirement: { kind: 'handle', summary: 'Add your YouTube channel URL in Marketing Presence.' } },
+  { type: 'email', label: 'Email Newsletter', requiresDetails: false, integrationRequirement: { kind: 'oauth', summary: 'Connect your email sending provider in Marketing Presence.' } },
+  { type: 'events', label: 'Events', requiresDetails: false, integrationRequirement: { kind: 'manual', summary: 'Tracked as an offline channel — no connection needed.' } },
+  { type: 'print', label: 'Print', requiresDetails: false, integrationRequirement: { kind: 'manual', summary: 'Tracked as an offline channel — no connection needed.' } },
 ]
 
 export const WEBSITE_PLATFORM_OPTIONS: { value: string; label: string }[] = [

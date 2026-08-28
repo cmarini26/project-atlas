@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Onboarding\AssetDetailRequirements;
+use App\Domain\Onboarding\OnboardingAssetTypes;
 use App\Enums\BusinessGoal;
 use App\Enums\MarketingChannelType;
 use App\Enums\MarketingFrequency;
@@ -36,17 +37,17 @@ use Inertia\Response;
 class OnboardingController extends Controller
 {
     /**
-     * The subset of MarketingChannelType offered as a Marketing Assets
-     * card in this wizard — deliberately narrower than the full enum
-     * (excludes TikTok, Other), matching the exact card list specified for
-     * this phase.
+     * The subset of MarketingChannelType offered as a Marketing Assets card
+     * in this wizard — deliberately narrower than the full enum (excludes
+     * TikTok, Other). The list, and each type's post-onboarding integration
+     * requirement, live in {@see OnboardingAssetTypes}.
      *
-     * @var list<string>
+     * @return list<string>
      */
-    private const ASSET_CARD_TYPES = [
-        'website', 'google_business_profile', 'instagram', 'facebook',
-        'linkedin', 'x', 'youtube', 'email', 'events', 'print',
-    ];
+    private static function assetCardTypes(): array
+    {
+        return OnboardingAssetTypes::types();
+    }
 
     public function __construct(
         private readonly CompanyService $companyService,
@@ -152,9 +153,9 @@ class OnboardingController extends Controller
 
         $validated = $request->validate([
             'enabled' => ['required', 'array', 'min:1'],
-            'enabled.*' => [Rule::in(self::ASSET_CARD_TYPES)],
+            'enabled.*' => [Rule::in(self::assetCardTypes())],
             'primary' => ['sometimes', 'array', 'max:3'],
-            'primary.*' => [Rule::in(self::ASSET_CARD_TYPES)],
+            'primary.*' => [Rule::in(self::assetCardTypes())],
         ]);
 
         $enabled = $validated['enabled'];
