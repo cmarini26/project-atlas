@@ -1,0 +1,23 @@
+{
+  "name": "exotic-car-dealer",
+  "url": "https://example-motors.test/",
+  "title": "Meridian Motorworks — Exotic & Collector Cars",
+  "body_text": "Meridian Motorworks sells and consigns exotic and collector automobiles from our showroom in Scottsdale, Arizona. Current inventory spans low-mileage modern supercars and investment-grade classics, with a rotating weekly featured vehicle. We offer white-glove nationwide enclosed transport and pre-purchase inspections. Typical listing prices range from $120,000 to well over $1,000,000. Contact our sales desk at sales@example-motors.test or 480-555-0142. We speak plainly and let the machinery do the talking.",
+  "expected_keys": [
+    "business.name",
+    "business.description",
+    "business.industry",
+    "business.location",
+    "services.primary",
+    "contact.email",
+    "contact.phone",
+    "pricing.range",
+    "brand.voice"
+  ],
+  "expected_values": {
+    "business.name": "Meridian Motorworks",
+    "contact.email": "sales@example-motors.test",
+    "business.location": "Scottsdale"
+  },
+  "notes": "Exotic-used-car vertical: dynamic inventory, featured vehicle, high-value pricing band. Synthetic."
+}

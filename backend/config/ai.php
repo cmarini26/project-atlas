@@ -50,4 +50,28 @@ return [
         'fact_extraction' => env('AI_FACT_EXTRACTION_PROVIDER'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Evaluation harness (CM-86)
+    |--------------------------------------------------------------------------
+    |
+    | Defaults for `php artisan ai:eval:fact-extraction`. The gate provider is
+    | the candidate whose metrics must clear the thresholds for the command to
+    | exit 0 — the baseline (anthropic) is measured for comparison but never
+    | gated. Thresholds are the agreed bar before local inference may become a
+    | default path; see docs/technical/Local-LLM-Evaluation.md.
+    |
+    */
+
+    'eval' => [
+        'providers' => ['anthropic', 'ollama'],
+        'gate_provider' => 'ollama',
+        'thresholds' => [
+            'min_schema_valid_rate' => (float) env('AI_EVAL_MIN_SCHEMA_VALID_RATE', 0.95),
+            'min_recall' => (float) env('AI_EVAL_MIN_RECALL', 0.80),
+            'min_f1' => (float) env('AI_EVAL_MIN_F1', 0.75),
+            'max_unsupported_claims_per_case' => (float) env('AI_EVAL_MAX_UNSUPPORTED_PER_CASE', 1.5),
+        ],
+    ],
+
 ];
