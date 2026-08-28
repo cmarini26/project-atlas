@@ -39,7 +39,20 @@ const props = defineProps<{
     description: string | null
     source_url: string | null
   }[]
+  generated_imagery?: {
+    id: string
+    status: 'pending' | 'ready' | 'failed'
+    url: string | null
+    width: number | null
+    height: number | null
+    provider: string | null
+    model: string | null
+    cost_usd: number
+    error: string | null
+  }[]
 }>()
+
+const generatedImagery = computed(() => props.generated_imagery ?? [])
 
 const editingAsset = ref<ContentAsset | null>(null)
 const selectedContentAssetIds = ref<string[]>([...props.selected_content_asset_ids])
@@ -181,6 +194,42 @@ function saveEdit(payload: { title: string; body: string }): void {
               <dd class="mt-1 text-sm text-[var(--color-text-secondary)]">{{ campaign_brief.guidance }}</dd>
             </div>
           </dl>
+        </Card>
+
+        <Card v-if="generatedImagery.length > 0" class="border-[var(--color-accent-200)]">
+          <div class="flex items-start gap-3">
+            <div class="rounded-[var(--radius-sm)] bg-[var(--color-accent-50)] p-2 text-[var(--color-accent-700)]">
+              <SparklesIcon class="size-5" />
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
+                Generated imagery
+              </p>
+              <div class="mt-3 space-y-4">
+                <div v-for="image in generatedImagery" :key="image.id">
+                  <img
+                    v-if="image.status === 'ready' && image.url"
+                    :src="image.url"
+                    alt="Generated campaign image"
+                    class="w-full max-w-md rounded-[var(--radius-md)] border border-[var(--color-border)]"
+                  />
+                  <p
+                    v-else-if="image.status === 'pending'"
+                    class="flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--color-surface-panel)] px-3 py-2 text-sm text-[var(--color-text-secondary)]"
+                  >
+                    <span class="size-2 animate-pulse rounded-full bg-[var(--color-accent-500)]" />
+                    Atlas is generating campaign imagery. You can review and approve now — the image will appear here when it is ready.
+                  </p>
+                  <p
+                    v-else
+                    class="rounded-[var(--radius-sm)] bg-amber-50 px-3 py-2 text-sm text-amber-900"
+                  >
+                    {{ image.error || 'Image generation did not complete.' }} This does not block approval.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         </Card>
 
         <Card v-if="source_assets.length > 0" class="border-[var(--color-accent-200)]">

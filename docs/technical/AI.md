@@ -194,6 +194,73 @@ covered in `docs/operations/Local-LLM-Runbook.md`.
 
 ---
 
+## Image Generation
+
+Image generation is a **separate swappable capability** from the text
+`AiProvider`. Per-image list prices vary by an order of magnitude across
+vendors and move fast, so product code depends only on the interface and the
+concrete provider is chosen in config.
+
+### ImageProvider Interface
+
+```php
+// app/AI/Images/Contracts/ImageProvider.php
+interface ImageProvider
+{
+    /** @return list<GeneratedImage> @throws ImageGenerationException */
+    public function generate(ImageGenerationRequest $request): array;
+
+    public function identifier(): string;
+}
+```
+
+- `ImageGenerationRequest` — `prompt`, `ImageAspectRatio` (Square / Portrait /
+  Landscape), `count` (1–4). Self-validating.
+- `GeneratedImage` — normalised result: raw `binary` (never a vendor URL that
+  can expire), `mimeType`, `width`/`height`, `provider`, `model`, `costUsd`.
+- `ImageGenerationException` — the only exception callers see. Vendor errors
+  are wrapped; `->retryable` distinguishes transient from permanent.
+- `ImageStorage` — persists a `GeneratedImage` to the `public` disk under
+  `campaign-images/{companyId}/…`, mirroring the Asset Library convention.
+  Returns a `StoredImage` (`path`, public `url`, provenance).
+
+### Concrete providers
+
+| Provider | Identifier | Notes |
+|----------|-----------|-------|
+| `OpenAiImageProvider` | `openai` | Default. `gpt-image-1` at `quality=low` — the cheapest tier. Bounded retries (429 / 5xx) with backoff. Structured log per generation: provider, model, latency, cost, count. |
+| `FakeImageProvider` | `fake` | Local + PHPUnit only. Solid-colour placeholder PNG sized to the request, no network. `queueException()` simulates failures. |
+
+### Configuration
+
+```
+AI_IMAGE_PROVIDER=openai          # or: fake (local/testing only)
+OPENAI_API_KEY=...
+OPENAI_IMAGE_MODEL=gpt-image-1
+OPENAI_IMAGE_QUALITY=low
+OPENAI_IMAGE_COST_USD=0.011       # list-price estimate for cost accounting
+```
+
+`config/ai.php` → `image.provider` selects the provider; credentials live in
+`config/services.php` → `openai`. The binding is in `AppServiceProvider`
+alongside the `AiProvider` binding.
+
+### Swapping providers
+
+1. Implement `ImageProvider` (e.g. `FluxImageProvider` for FLUX.1 [schnell]
+   via a compatible endpoint — roughly an order of magnitude cheaper per image).
+2. Add its credentials block to `config/services.php`.
+3. Add a `match` arm in the `ImageProvider` binding in `AppServiceProvider`.
+4. Set `AI_IMAGE_PROVIDER` to the new identifier.
+
+No call site changes — `ImageGenerationRequest` / `GeneratedImage` are the
+contract. **Verify current per-image pricing on the provider's own pricing
+page** before committing to it; third-party comparison figures disagree
+materially and `OPENAI_IMAGE_COST_USD` (and any equivalent) must be kept
+accurate for cost tracking to mean anything.
+
+---
+
 ## Prompt Class Design
 
 Every AI call is defined by a typed `Prompt` class. There are no anonymous or ad-hoc prompts anywhere in the codebase.

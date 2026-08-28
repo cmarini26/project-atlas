@@ -2,10 +2,14 @@
 
 namespace App\Services\Campaign;
 
+use App\AI\Images\ImageGenerationCap;
+use App\Jobs\GenerateCampaignImagery;
 use App\Models\CampaignBrief;
+use App\Models\CampaignImageGeneration;
 use App\Models\Channel;
 use App\Models\Company;
 use App\Models\Decision;
+use App\Models\DigitalTwin;
 use App\Models\Opportunity;
 use App\Models\SourceAsset;
 use App\Services\Brain\BusinessBrainService;
@@ -13,6 +17,7 @@ use App\Services\Decision\DecisionContext;
 use App\Services\Decision\DecisionService;
 use App\Services\Publishing\ChannelPublishingCapabilityResolver;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -22,26 +27,37 @@ class CustomCampaignService
         private readonly BusinessBrainService $brainService,
         private readonly DecisionService $decisionService,
         private readonly ChannelPublishingCapabilityResolver $publishingCapabilities,
+        private readonly ImageGenerationCap $imageCap,
     ) {}
 
     /** @param array<string, mixed> $data */
     public function compose(Company $company, array $data): Decision
     {
-        $assetIds = array_values(array_unique(array_map('strval', $data['source_asset_ids'])));
+        $assetIds = array_values(array_unique(array_map('strval', $data['source_asset_ids'] ?? [])));
         $channelIds = array_values(array_unique(array_map('strval', $data['channel_ids'])));
 
-        $assets = SourceAsset::withoutGlobalScopes()
-            ->where('company_id', $company->id)
-            ->whereNull('deleted_at')
-            ->where('status', 'ready')
-            ->whereIn('id', $assetIds)
-            ->get();
+        if ($assetIds !== []) {
+            $assets = SourceAsset::withoutGlobalScopes()
+                ->where('company_id', $company->id)
+                ->whereNull('deleted_at')
+                ->where('status', 'ready')
+                ->whereIn('id', $assetIds)
+                ->get();
 
-        if ($assets->count() !== count($assetIds)) {
+            if ($assets->count() !== count($assetIds)) {
+                throw ValidationException::withMessages([
+                    'source_asset_ids' => 'Choose ready assets from your company’s Asset Library.',
+                ]);
+            }
+        } elseif (! $this->hasBrainContext($company)) {
+            // Prompt-only path: without a single asset AND without an established
+            // Business Brain, Atlas has nothing to ground the campaign in.
             throw ValidationException::withMessages([
-                'source_asset_ids' => 'Choose ready assets from your company’s Asset Library.',
+                'objective' => 'Atlas needs either a source asset or an analyzed Business Brain before it can compose this campaign. Add an asset from your library, or finish onboarding so Atlas can learn about your business.',
             ]);
         }
+
+        $title = $this->resolveTitle($data);
 
         $channels = Channel::withoutGlobalScopes()
             ->where('company_id', $company->id)
@@ -69,10 +85,10 @@ class CustomCampaignService
             ->filter()
             ->implode(', ');
 
-        [, $opportunity] = DB::transaction(function () use ($company, $data, $assetIds, $channelIds, $campaignType, $publishingTargets): array {
+        [$brief, $opportunity] = DB::transaction(function () use ($company, $data, $title, $assetIds, $channelIds, $campaignType, $publishingTargets): array {
             $brief = CampaignBrief::withoutGlobalScopes()->create([
                 'company_id' => $company->id,
-                'title' => $data['title'],
+                'title' => $title,
                 'goal' => $data['goal'],
                 'objective' => $data['objective'],
                 'audience' => $data['audience'] ?? null,
@@ -106,7 +122,7 @@ class CustomCampaignService
         });
 
         try {
-            return $this->decisionService->commit(new DecisionContext(
+            $decision = $this->decisionService->commit(new DecisionContext(
                 opportunity: $opportunity,
                 brain: $this->brainService->for($company),
                 campaignType: $campaignType,
@@ -116,6 +132,50 @@ class CustomCampaignService
             $opportunity->dismiss();
             throw $exception;
         }
+
+        $this->maybeGenerateImagery(
+            $company,
+            $brief,
+            hasUserAssets: $assetIds !== [],
+            optedIn: (bool) ($data['generate_imagery'] ?? false),
+        );
+
+        return $decision;
+    }
+
+    /**
+     * Queue campaign imagery. Generation is requested automatically when the
+     * user supplied no assets, or on explicit opt-in when they did. It never
+     * blocks composition: a pending ledger row is created now and the review
+     * UI reflects its status.
+     */
+    private function maybeGenerateImagery(Company $company, CampaignBrief $brief, bool $hasUserAssets, bool $optedIn): void
+    {
+        if ($hasUserAssets && ! $optedIn) {
+            return;
+        }
+
+        // Cap is authoritatively re-checked in the job before the provider is
+        // called; this pre-check just avoids queuing a doomed generation and
+        // surfaces the reason immediately in the review UI.
+        if ($this->imageCap->wouldExceed($company->id)) {
+            CampaignImageGeneration::withoutGlobalScopes()->create([
+                'company_id' => $company->id,
+                'campaign_brief_id' => $brief->id,
+                'status' => CampaignImageGeneration::STATUS_FAILED,
+                'error' => $this->imageCap->message(),
+            ]);
+
+            return;
+        }
+
+        $generation = CampaignImageGeneration::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'campaign_brief_id' => $brief->id,
+            'status' => CampaignImageGeneration::STATUS_PENDING,
+        ]);
+
+        GenerateCampaignImagery::dispatch($generation->id);
     }
 
     private function opportunityDescription(CampaignBrief $brief, string $publishingTargets): string
@@ -129,7 +189,53 @@ class CustomCampaignService
             $brief->audience ? "Audience: {$brief->audience}" : null,
             $brief->guidance ? "Additional guidance: {$brief->guidance}" : null,
             $publishingTargets !== '' ? "Verified publishing targets: {$publishingTargets}" : null,
-            "Selected Asset Library sources: {$assets}",
+            $assets !== ''
+                ? "Selected Asset Library sources: {$assets}"
+                : 'No source assets supplied — Atlas will ground this campaign in the Business Brain.',
         ]));
+    }
+
+    /**
+     * Use the supplied title when present, otherwise derive a short title from
+     * the objective prompt so a prompt-only brief still reads sensibly.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function resolveTitle(array $data): string
+    {
+        $title = trim((string) ($data['title'] ?? ''));
+
+        if ($title !== '') {
+            return $title;
+        }
+
+        return $this->titleFromObjective((string) $data['objective']);
+    }
+
+    private function titleFromObjective(string $objective): string
+    {
+        $objective = trim((string) preg_replace('/\s+/', ' ', $objective));
+
+        // Take the first sentence, then trim to a headline-friendly length.
+        $firstSentence = preg_split('/(?<=[.!?])\s+/', $objective)[0] ?? $objective;
+        $candidate = rtrim($firstSentence, " .!?\u{2026}");
+
+        if (mb_strlen($candidate) > 80) {
+            $candidate = rtrim(mb_substr($candidate, 0, 80), ' ').'…';
+        }
+
+        return Str::ucfirst($candidate);
+    }
+
+    /**
+     * Whether the company has an established Business Brain to ground a
+     * prompt-only campaign in. The Digital Twin is the anchor the brain is
+     * assembled from, so its presence is the minimum bar.
+     */
+    private function hasBrainContext(Company $company): bool
+    {
+        return DigitalTwin::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->exists();
     }
 }

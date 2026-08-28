@@ -49,6 +49,21 @@ return [
         'think' => (bool) env('OLLAMA_THINK', false),
     ],
 
+    // OpenAI Images API — the default (swappable) image generation provider.
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+        'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com'),
+        'image' => [
+            'model' => env('OPENAI_IMAGE_MODEL', 'gpt-image-1'),
+            // Cheapest tier for gpt-image-1. Widen only if quality demands it.
+            'quality' => env('OPENAI_IMAGE_QUALITY', 'low'),
+            // List-price estimate in USD per generated image, used only for
+            // cost accounting. Verify against the OpenAI pricing page before
+            // relying on it — third-party comparison figures disagree.
+            'cost_usd' => (float) env('OPENAI_IMAGE_COST_USD', 0.011),
+        ],
+    ],
+
     // Meta Graph API (Instagram/Facebook publishing OAuth). No Meta App is
     // registered yet — these are config stubs only, unusable until real
     // values are set.

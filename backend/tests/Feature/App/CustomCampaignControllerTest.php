@@ -3,10 +3,14 @@
 namespace Tests\Feature\App;
 
 use App\AI\Contracts\AiProvider;
+use App\AI\Images\Contracts\ImageProvider;
+use App\AI\Images\Exceptions\ImageGenerationException;
+use App\AI\Images\Testing\FakeImageProvider;
 use App\AI\Testing\FakeAiProvider;
 use App\Events\RecommendationApproved;
 use App\Models\Campaign;
 use App\Models\CampaignBrief;
+use App\Models\CampaignImageGeneration;
 use App\Models\Channel;
 use App\Models\ChannelCredentials;
 use App\Models\Company;
@@ -20,6 +24,7 @@ use App\Models\SourceAsset;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class CustomCampaignControllerTest extends TestCase
@@ -28,12 +33,19 @@ class CustomCampaignControllerTest extends TestCase
 
     private FakeAiProvider $fake;
 
+    private FakeImageProvider $fakeImages;
+
     protected function setUp(): void
     {
         parent::setUp();
 
+        Storage::fake('public');
+
         $this->fake = new FakeAiProvider();
         $this->app->instance(AiProvider::class, $this->fake);
+
+        $this->fakeImages = new FakeImageProvider();
+        $this->app->instance(ImageProvider::class, $this->fakeImages);
     }
 
     public function test_create_requires_authentication(): void
@@ -189,6 +201,279 @@ class CustomCampaignControllerTest extends TestCase
         $this->assertStringContainsString(
             'Verified publishing targets: Northwind WordPress: https://northwind.example',
             $description,
+        );
+    }
+
+    public function test_store_composes_a_prompt_only_campaign_without_any_assets(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        DigitalTwin::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'status' => 'active',
+            'health_score' => 80,
+        ]);
+        $channel = $this->channel($company);
+
+        $this->fake
+            ->queueFixture('rationale-generation')
+            ->queueFixture('campaign-blueprint')
+            ->queueFixture('email-content');
+
+        $response = $this->actingAs($user)->post('/app/campaigns', [
+            ...$this->validPayload(),
+            'source_asset_ids' => [],
+            'channel_ids' => [$channel->id],
+        ]);
+
+        $brief = CampaignBrief::withoutGlobalScopes()->with('sourceAssets')->firstOrFail();
+        $recommendation = Recommendation::withoutGlobalScopes()->firstOrFail();
+
+        $response->assertRedirect(route('app.recommendations.show', $recommendation));
+        $this->assertCount(0, $brief->sourceAssets);
+        $this->assertSame('Fall customer appreciation', $brief->title);
+        $this->assertStringContainsString(
+            'No source assets supplied',
+            Opportunity::withoutGlobalScopes()->firstOrFail()->description,
+        );
+    }
+
+    public function test_store_derives_a_title_from_the_objective_when_title_is_omitted(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        DigitalTwin::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'status' => 'active',
+            'health_score' => 80,
+        ]);
+        $channel = $this->channel($company);
+
+        $this->fake
+            ->queueFixture('rationale-generation')
+            ->queueFixture('campaign-blueprint')
+            ->queueFixture('email-content');
+
+        $payload = $this->validPayload();
+        unset($payload['title']);
+
+        $this->actingAs($user)->post('/app/campaigns', [
+            ...$payload,
+            'objective' => 'Invite current customers to book the strategy intensive this fall. Emphasise the year-end availability.',
+            'source_asset_ids' => [],
+            'channel_ids' => [$channel->id],
+        ])->assertRedirect();
+
+        $brief = CampaignBrief::withoutGlobalScopes()->firstOrFail();
+        $this->assertSame('Invite current customers to book the strategy intensive this fall', $brief->title);
+    }
+
+    public function test_store_rejects_a_submission_without_an_objective_prompt(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        DigitalTwin::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'status' => 'active',
+            'health_score' => 80,
+        ]);
+        $asset = $this->asset($company);
+        $channel = $this->channel($company);
+
+        $payload = $this->validPayload();
+        unset($payload['objective']);
+
+        $this->actingAs($user)->post('/app/campaigns', [
+            ...$payload,
+            'source_asset_ids' => [$asset->id],
+            'channel_ids' => [$channel->id],
+        ])->assertSessionHasErrors('objective');
+
+        $this->assertDatabaseCount('campaign_briefs', 0);
+    }
+
+    public function test_store_fails_cleanly_without_an_asset_or_business_brain(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        $channel = $this->channel($company);
+
+        $this->actingAs($user)->post('/app/campaigns', [
+            ...$this->validPayload(),
+            'source_asset_ids' => [],
+            'channel_ids' => [$channel->id],
+        ])->assertSessionHasErrors('objective');
+
+        $this->assertDatabaseCount('campaign_briefs', 0);
+        $this->assertDatabaseCount('decisions', 0);
+        $this->fake->assertNothingSent();
+    }
+
+    public function test_prompt_only_campaign_generates_and_attaches_imagery(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        DigitalTwin::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'status' => 'active',
+            'health_score' => 80,
+        ]);
+        $channel = $this->channel($company);
+
+        $this->fake
+            ->queueFixture('rationale-generation')
+            ->queueFixture('campaign-blueprint')
+            ->queueFixture('email-content');
+
+        $this->actingAs($user)->post('/app/campaigns', [
+            ...$this->validPayload(),
+            'source_asset_ids' => [],
+            'channel_ids' => [$channel->id],
+        ])->assertRedirect();
+
+        $this->fakeImages->assertGenerated();
+
+        $generation = CampaignImageGeneration::withoutGlobalScopes()->firstOrFail();
+        $this->assertSame('ready', $generation->status);
+        $this->assertNotNull($generation->media_path);
+        $this->assertNotEmpty($generation->prompt);
+        Storage::disk('public')->assertExists($generation->media_path);
+
+        // Grounded prompt, not a raw passthrough of the customer objective.
+        $this->assertStringContainsString('Clear Move', $generation->prompt);
+        $this->assertStringNotContainsString($this->validPayload()['objective'], $generation->prompt);
+
+        $recommendation = Recommendation::withoutGlobalScopes()->firstOrFail();
+        $this->actingAs($user)
+            ->get(route('app.recommendations.show', $recommendation))
+            ->assertInertia(fn ($page) => $page
+                ->has('generated_imagery', 1)
+                ->where('generated_imagery.0.status', 'ready')
+            );
+    }
+
+    public function test_imagery_failure_does_not_block_the_campaign(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        DigitalTwin::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'status' => 'active',
+            'health_score' => 80,
+        ]);
+        $channel = $this->channel($company);
+
+        $this->fakeImages->queueException(ImageGenerationException::failed('fake', 'model unavailable'));
+        $this->fake
+            ->queueFixture('rationale-generation')
+            ->queueFixture('campaign-blueprint')
+            ->queueFixture('email-content');
+
+        $response = $this->actingAs($user)->post('/app/campaigns', [
+            ...$this->validPayload(),
+            'source_asset_ids' => [],
+            'channel_ids' => [$channel->id],
+        ]);
+
+        $recommendation = Recommendation::withoutGlobalScopes()->firstOrFail();
+        $response->assertRedirect(route('app.recommendations.show', $recommendation));
+
+        $this->assertSame('pending', $recommendation->status);
+        $this->assertDatabaseHas('content_assets', ['status' => 'draft']);
+
+        $generation = CampaignImageGeneration::withoutGlobalScopes()->firstOrFail();
+        $this->assertSame('failed', $generation->status);
+        $this->assertNotNull($generation->error);
+    }
+
+    public function test_generation_cap_breach_surfaces_a_message_without_a_hard_error(): void
+    {
+        config()->set('ai.image.company_cap.limit', 2);
+
+        [$user, $company] = $this->userWithCompany();
+        DigitalTwin::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'status' => 'active',
+            'health_score' => 80,
+        ]);
+        $channel = $this->channel($company);
+
+        foreach (range(1, 2) as $i) {
+            CampaignImageGeneration::withoutGlobalScopes()->create([
+                'company_id' => $company->id,
+                'status' => 'ready',
+                'media_path' => "campaign-images/{$company->id}/existing-{$i}.png",
+            ]);
+        }
+
+        $this->fake
+            ->queueFixture('rationale-generation')
+            ->queueFixture('campaign-blueprint')
+            ->queueFixture('email-content');
+
+        $recommendation = null;
+        $this->actingAs($user)->post('/app/campaigns', [
+            ...$this->validPayload(),
+            'source_asset_ids' => [],
+            'channel_ids' => [$channel->id],
+        ])->assertRedirect();
+
+        $this->fakeImages->assertNothingGenerated();
+
+        $generation = CampaignImageGeneration::withoutGlobalScopes()
+            ->whereNotNull('campaign_brief_id')
+            ->firstOrFail();
+        $this->assertSame('failed', $generation->status);
+        $this->assertStringContainsString('limit of 2 campaign images', (string) $generation->error);
+    }
+
+    public function test_supplying_own_assets_skips_generation_unless_opted_in(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        DigitalTwin::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'status' => 'active',
+            'health_score' => 80,
+        ]);
+        $asset = $this->asset($company);
+        $channel = $this->channel($company);
+
+        $this->fake
+            ->queueFixture('rationale-generation')
+            ->queueFixture('campaign-blueprint')
+            ->queueFixture('email-content');
+
+        $this->actingAs($user)->post('/app/campaigns', [
+            ...$this->validPayload(),
+            'source_asset_ids' => [$asset->id],
+            'channel_ids' => [$channel->id],
+        ])->assertRedirect();
+
+        $this->fakeImages->assertNothingGenerated();
+        $this->assertDatabaseCount('campaign_image_generations', 0);
+    }
+
+    public function test_supplying_own_assets_with_opt_in_generates_imagery(): void
+    {
+        [$user, $company] = $this->userWithCompany();
+        DigitalTwin::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'status' => 'active',
+            'health_score' => 80,
+        ]);
+        $asset = $this->asset($company);
+        $channel = $this->channel($company);
+
+        $this->fake
+            ->queueFixture('rationale-generation')
+            ->queueFixture('campaign-blueprint')
+            ->queueFixture('email-content');
+
+        $this->actingAs($user)->post('/app/campaigns', [
+            ...$this->validPayload(),
+            'source_asset_ids' => [$asset->id],
+            'channel_ids' => [$channel->id],
+            'generate_imagery' => true,
+        ])->assertRedirect();
+
+        $this->fakeImages->assertGenerated();
+        $this->assertSame(
+            'ready',
+            CampaignImageGeneration::withoutGlobalScopes()->firstOrFail()->status,
         );
     }
 
