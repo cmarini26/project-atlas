@@ -188,6 +188,10 @@ just unset the env var. Any active routing is logged once at boot
 the unchanged `StructuredResponseParser` + schema validation and keep their
 `observation_id` provenance.
 
+Operating a local model behind a routed task — install, health checks,
+localhost binding, memory profile, failure handling, rollback, upgrades — is
+covered in `docs/operations/Local-LLM-Runbook.md`.
+
 ---
 
 ## Prompt Class Design
