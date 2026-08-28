@@ -3,6 +3,7 @@
 namespace App\Billing;
 
 use App\Billing\Contracts\BillingProvider;
+use App\Billing\Data\BillingPortalSession;
 use App\Billing\Data\CheckoutRequest;
 use App\Billing\Data\CheckoutSession;
 use App\Billing\Exceptions\BillingException;
@@ -51,5 +52,22 @@ class BillingCheckoutService
             clientReferenceId: $company->id,
             metadata: ['atlas_company_id' => $company->id],
         ));
+    }
+
+    /**
+     * Open a Stripe-hosted billing management portal for a company that already
+     * has a customer.
+     *
+     * @throws BillingException when the company has no Stripe customer yet
+     */
+    public function startBillingPortal(Company $company, string $returnUrl): BillingPortalSession
+    {
+        $profile = $this->profiles->find($company);
+
+        if ($profile === null || ! $profile->hasStripeCustomer()) {
+            throw new BillingException('This company has no Stripe customer yet — start checkout first.');
+        }
+
+        return $this->billing->createBillingPortalSession($profile->stripe_customer_id, $returnUrl);
     }
 }
