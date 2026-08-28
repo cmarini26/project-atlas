@@ -1,0 +1,22 @@
+{
+  "name": "neighborhood-coffee-roaster",
+  "url": "https://example-roasters.test/our-story",
+  "title": "Kettle & Vane Coffee Roasters",
+  "body_text": "Kettle & Vane is a small-batch coffee roaster and cafe in Asheville, North Carolina. We roast single-origin beans in-house daily, run a monthly subscription, and supply wholesale accounts across the region. Retail bags are $16 to $24; the subscription starts at $18 per month. Say hello at team@example-roasters.test. Our voice is warm, unfussy, and curious about where coffee comes from.",
+  "expected_keys": [
+    "business.name",
+    "business.description",
+    "business.industry",
+    "business.location",
+    "services.primary",
+    "contact.email",
+    "pricing.range",
+    "brand.voice"
+  ],
+  "expected_values": {
+    "business.name": "Kettle & Vane",
+    "contact.email": "team@example-roasters.test",
+    "business.location": "Asheville"
+  },
+  "notes": "A denser, shorter page with no phone number — checks that the extractor does not invent contact.phone. Synthetic."
+}

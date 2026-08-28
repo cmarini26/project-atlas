@@ -1,0 +1,24 @@
+{
+  "name": "comic-auction-house",
+  "url": "https://example-comics.test/about",
+  "title": "Fable City Comics — Auction House & Marketplace",
+  "body_text": "Fable City Comics is a comic book auction house and online marketplace based in Portland, Oregon. We run monthly themed auctions of graded Golden Age and Silver Age books, host seller stores for independent dealers, and feature a curated \"ending soon\" shelf of high-value keys. Consignment fees run from 8% to 15% depending on hammer price. Reach our specialists at hello@example-comics.test or (503) 555-0180. Our tone is enthusiastic, collector-to-collector, and a little irreverent.",
+  "expected_keys": [
+    "business.name",
+    "business.description",
+    "business.industry",
+    "business.location",
+    "services.primary",
+    "contact.email",
+    "contact.phone",
+    "pricing.range",
+    "brand.voice"
+  ],
+  "expected_values": {
+    "business.name": "Fable City Comics",
+    "contact.email": "hello@example-comics.test",
+    "contact.phone": "555-0180",
+    "business.location": "Portland"
+  },
+  "notes": "Covers identity, services, contact, pricing range, and tone for the CBB-style vertical. Synthetic — no real business."
+}
