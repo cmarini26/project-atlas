@@ -23,6 +23,11 @@ class BillingProfileService
         return BillingProfile::where('company_id', $company->id)->first();
     }
 
+    public function findByStripeCustomerId(string $customerId): ?BillingProfile
+    {
+        return $customerId === '' ? null : BillingProfile::where('stripe_customer_id', $customerId)->first();
+    }
+
     public function linkCustomer(Company $company, string $customerId): BillingProfile
     {
         $profile = $this->forCompany($company);

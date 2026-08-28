@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AnalyticsWebhookController;
 use App\Http\Controllers\Api\HealthController;
+use App\Http\Controllers\Api\StripeWebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', [HealthController::class, 'health'])->name('health');
@@ -15,3 +16,10 @@ Route::get('/live', [HealthController::class, 'live'])->name('health.live');
 Route::post('/analytics/webhooks/{provider}', [AnalyticsWebhookController::class, 'receive'])
     ->middleware('throttle:analytics-webhook')
     ->name('analytics.webhooks.receive');
+
+// Stripe billing webhooks. Unauthenticated by design — the Stripe-Signature
+// header, verified in StripeWebhookController against STRIPE_WEBHOOK_SECRET,
+// is the gate. On api.php so it is CSRF-exempt and stateless.
+Route::post('/stripe/webhook', [StripeWebhookController::class, 'handle'])
+    ->middleware('throttle:60,1')
+    ->name('stripe.webhook');
