@@ -14,6 +14,7 @@
         "laravel/tinker": "^3.0",
         "opis/json-schema": "^2.4",
         "sentry/sentry-laravel": "^4.27",
+        "stripe/stripe-php": "^21.3",
         "symfony/dom-crawler": "^7.4",
         "symfony/http-client": "^7.4",
         "symfony/postmark-mailer": "^7.4"

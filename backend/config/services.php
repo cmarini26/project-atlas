@@ -64,6 +64,14 @@ return [
         ],
     ],
 
+    // Stripe billing. Test keys only until a real product/price is created in
+    // the Stripe dashboard; the app never resolves the live provider without
+    // STRIPE_SECRET set. See docs (CM-79 runbook).
+    'stripe' => [
+        'secret' => env('STRIPE_SECRET'),
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+    ],
+
     // Meta Graph API (Instagram/Facebook publishing OAuth). No Meta App is
     // registered yet — these are config stubs only, unusable until real
     // values are set.
