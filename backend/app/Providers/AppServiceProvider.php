@@ -2,11 +2,8 @@
 
 namespace App\Providers;
 
+use App\AI\AiProviderFactory;
 use App\AI\Contracts\AiProvider;
-use App\AI\Providers\AnthropicProvider;
-use App\AI\Providers\LocalAiProvider;
-use App\AI\Providers\OllamaAiProvider;
-use App\AI\Testing\FakeAiProvider;
 use App\ErrorTracking\Contracts\ErrorTracker;
 use App\ErrorTracking\NullErrorTracker;
 use App\ErrorTracking\SentryErrorTracker;
@@ -68,30 +65,23 @@ class AppServiceProvider extends ServiceProvider
         EventServiceProvider::disableEventDiscovery();
         // AI provider selection is explicit and does not depend on credential
         // presence. Environment safety restrictions are enforced per provider.
-        $this->app->singleton(AiProvider::class, function ($app): AiProvider {
-            $provider = config('ai.provider');
+        $this->app->singleton(AiProvider::class, fn ($app): AiProvider => $app->make(AiProviderFactory::class)->default());
 
-            if (! is_string($provider) || trim($provider) === '') {
-                throw new InvalidArgumentException(
-                    'AI_PROVIDER must be configured. Supported values: anthropic, local, fake, ollama.'
-                );
-            }
+        // Task-level provider routing (CM-85 pilot). WebsiteAnalyst — the only
+        // AI-backed fact-extraction path — resolves its provider through this
+        // closure so `AI_FACT_EXTRACTION_PROVIDER` can route fact extraction to
+        // a local model while every other task stays on the global default.
+        // With the override unset the closure returns the default binding, so
+        // disabling the pilot needs no code change.
+        $this->app->when(WebsiteAnalyst::class)
+            ->needs(AiProvider::class)
+            ->give(function ($app): AiProvider {
+                $override = config('ai.task_providers.fact_extraction');
 
-            return match ($provider) {
-                'anthropic' => $app->make(AnthropicProvider::class),
-                'local' => $app->environment('local')
-                    ? $app->make(LocalAiProvider::class)
-                    : throw new InvalidArgumentException('AI_PROVIDER=local is only supported in the local environment.'),
-                'fake' => $app->environment('testing')
-                    ? $app->make(FakeAiProvider::class)
-                    : throw new InvalidArgumentException('AI_PROVIDER=fake is only supported in the testing environment.'),
-                'ollama' => $app->make(OllamaAiProvider::class),
-                default => throw new InvalidArgumentException(sprintf(
-                    'Unsupported AI_PROVIDER value [%s]. Supported values: anthropic, local, fake, ollama.',
-                    $provider,
-                )),
-            };
-        });
+                return is_string($override) && trim($override) !== ''
+                    ? $app->make(AiProviderFactory::class)->make(trim($override))
+                    : $app->make(AiProvider::class);
+            });
 
         // Resolves the right Analyst per Observation source_type — mirrors
         // ConnectorServiceProvider's ConnectorRegistry binding. Adding a new
@@ -142,6 +132,18 @@ class AppServiceProvider extends ServiceProvider
             'source_asset' => SourceAsset::class,
             'campaign_brief' => CampaignBrief::class,
         ]);
+
+        // Surface any active task-level provider routing once at boot so the
+        // running configuration (and, for evals, which model produced facts)
+        // is visible in logs without inspecting env.
+        $factExtractionOverride = config('ai.task_providers.fact_extraction');
+        if (is_string($factExtractionOverride) && trim($factExtractionOverride) !== '') {
+            Log::info('AI task routing active.', [
+                'task' => 'fact_extraction',
+                'provider' => trim($factExtractionOverride),
+                'default_provider' => config('ai.provider'),
+            ]);
+        }
 
         Event::listen(FactExtracted::class, function (FactExtracted $event): void {
             BusinessBrainService::invalidate($event->fact->company_id);
