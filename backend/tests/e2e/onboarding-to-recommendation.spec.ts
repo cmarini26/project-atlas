@@ -34,9 +34,17 @@ test.describe('onboarding smoke', () => {
     await page.getByText('Increase sales').click()
     await page.getByRole('button', { name: 'Continue' }).click()
 
-    // Step 4: Marketing Assets
+    // Step 4: Marketing Assets — enable Website plus two channels that will
+    // still need connecting afterward, to exercise the post-onboarding
+    // incomplete-channel summary (CM-93).
     await expect(page.getByRole('heading', { name: 'Where can customers find your business?' })).toBeVisible()
     await page.getByText('Website', { exact: true }).click()
+    const instagramChip = page.locator('label').filter({ hasText: 'Instagram' })
+    const xChip = page.locator('label').filter({ hasText: /^X$/ })
+    await instagramChip.click()
+    await xChip.click()
+    // Enabled channels that need connecting show an inline "Needs setup" hint.
+    await expect(instagramChip.getByText('Needs setup')).toBeVisible()
     await page.getByRole('button', { name: 'Continue' }).click()
 
     // Step 5: Asset Details (current flow is website-only)
@@ -67,5 +75,23 @@ test.describe('onboarding smoke', () => {
     await expect(page).toHaveURL(/\/app\/recommendations\//)
     await expect(page.getByRole('heading', { name: /campaign/i })).toBeVisible()
     await expect(page.getByText('Pending review')).toBeVisible()
+
+    // Post-onboarding: the dashboard surfaces the channels still needing setup,
+    // each linking to Marketing Presence, and the reminder is dismissible and
+    // stays dismissed across a reload.
+    await page.goto('/app')
+    const reminder = page.getByText('Finish connecting your channels').locator('..')
+    await expect(reminder).toBeVisible()
+    await expect(reminder.getByText('Instagram')).toBeVisible()
+    await expect(reminder.getByText('X', { exact: true })).toBeVisible()
+    await expect(reminder.getByRole('link', { name: 'Connect' }).first()).toHaveAttribute(
+      'href',
+      '/app/settings/marketing-presence',
+    )
+
+    await page.getByRole('button', { name: 'Dismiss channel setup reminder' }).click()
+    await expect(page.getByText('Finish connecting your channels')).toHaveCount(0)
+    await page.reload()
+    await expect(page.getByText('Finish connecting your channels')).toHaveCount(0)
   })
 })

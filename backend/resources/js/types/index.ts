@@ -13,6 +13,7 @@ export interface AuthUser {
     email: string
     has_completed_tour: boolean
     has_dismissed_checklist: boolean
+    has_dismissed_channel_setup: boolean
 }
 
 export interface Company {
