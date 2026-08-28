@@ -323,6 +323,19 @@ function retakeTour(): void {
       </div>
     </div>
 
+    <!-- Billing -->
+    <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5 mb-6">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <h2 class="text-sm font-semibold text-[var(--color-text-primary)] mb-1">Billing</h2>
+          <p class="text-xs text-[var(--color-text-muted)]">Your Atlas subscription, handled by Stripe.</p>
+        </div>
+        <Link href="/app/settings/billing" class="shrink-0 py-1.5 px-3 text-xs font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-subtle)]">
+          Manage →
+        </Link>
+      </div>
+    </div>
+
     <!-- Marketing Presence -->
     <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-5 mb-6">
       <div class="flex items-center justify-between gap-3">

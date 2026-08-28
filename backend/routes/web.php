@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\OnboardingStatusController;
 use App\Http\Controllers\App\AnalyticsController;
 use App\Http\Controllers\App\BillingCheckoutController;
+use App\Http\Controllers\App\BillingSettingsController;
 use App\Http\Controllers\App\BusinessBrainController;
 use App\Http\Controllers\App\CampaignController;
 use App\Http\Controllers\App\CompanySelectorController;
@@ -141,9 +142,13 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
     Route::patch('/settings/team/members/{membership}', [TeamController::class, 'update'])->name('settings.team.members.update');
     Route::delete('/settings/team/members/{membership}', [TeamController::class, 'remove'])->name('settings.team.members.destroy');
     // Billing (Stripe)
+    Route::get('/settings/billing', [BillingSettingsController::class, 'index'])->name('settings.billing');
     Route::post('/settings/billing/checkout', [BillingCheckoutController::class, 'store'])
         ->middleware('throttle:10,1')
         ->name('settings.billing.checkout');
+    Route::post('/settings/billing/portal', [BillingSettingsController::class, 'portal'])
+        ->middleware('throttle:10,1')
+        ->name('settings.billing.portal');
 
     Route::post('/settings/integrations/{integration}/sync', [SettingsController::class, 'syncIntegration'])->name('settings.integrations.sync');
     Route::post('/settings/integrations/instagram', [SettingsController::class, 'connectInstagram'])->name('settings.integrations.instagram.connect');
