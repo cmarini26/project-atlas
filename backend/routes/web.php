@@ -111,8 +111,10 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
     Route::get('/recommendations', [RecommendationController::class, 'index'])->name('recommendations.index');
     Route::get('/recommendations/{recommendation}', [RecommendationController::class, 'show'])->name('recommendations.show');
     Route::patch('/recommendations/{recommendation}/channels', [RecommendationController::class, 'selectChannels'])->name('recommendations.channels.select');
-    Route::post('/recommendations/{recommendation}/approve', [RecommendationController::class, 'approve'])->name('recommendations.approve');
-    Route::post('/recommendations/{recommendation}/approve-edit', [RecommendationController::class, 'approveEdit'])->name('recommendations.approve-edit');
+    // Approving a recommendation is the paid "execute" action — gated by
+    // billing state (a no-op while billing.gate_enabled is off).
+    Route::post('/recommendations/{recommendation}/approve', [RecommendationController::class, 'approve'])->middleware('billing')->name('recommendations.approve');
+    Route::post('/recommendations/{recommendation}/approve-edit', [RecommendationController::class, 'approveEdit'])->middleware('billing')->name('recommendations.approve-edit');
     Route::post('/recommendations/{recommendation}/reject', [RecommendationController::class, 'reject'])->name('recommendations.reject');
 
     // Campaigns

@@ -28,4 +28,19 @@ return [
 
     'price_id' => env('STRIPE_PRICE_ID'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Access Gating
+    |--------------------------------------------------------------------------
+    |
+    | When false (the beta-safe default), billing state never restricts
+    | anything — every company can use every feature regardless of
+    | subscription status. Turn it on only once billing is trusted end to
+    | end. Even then, a company with billing_profiles.beta_access_override
+    | set is always allowed. See CM-78 and the billing runbook.
+    |
+    */
+
+    'gate_enabled' => (bool) env('BILLING_GATE_ENABLED', false),
+
 ];

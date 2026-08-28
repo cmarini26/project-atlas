@@ -3,6 +3,7 @@
 use App\ErrorTracking\Contracts\ErrorTracker;
 use App\Http\Middleware\EnsureCompanyMembership;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\RequireBillingAccess;
 use App\Http\Middleware\SecurityHeaders;
 use App\Services\Http\TrustedProxyResolver;
 use Illuminate\Foundation\Application;
@@ -23,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         $middleware->alias([
             'company' => EnsureCompanyMembership::class,
+            'billing' => RequireBillingAccess::class,
         ]);
 
         // Operator-configured, not hardcoded — TRUSTED_PROXIES is unset by
