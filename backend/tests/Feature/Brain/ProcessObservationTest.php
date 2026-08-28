@@ -4,6 +4,8 @@ namespace Tests\Feature\Brain;
 
 use App\AI\Contracts\AiProvider;
 use App\AI\Exceptions\AiProviderOverloadedException;
+use App\AI\Exceptions\LocalAiModelMissingException;
+use App\AI\Exceptions\LocalAiUnavailableException;
 use App\AI\Testing\FakeAiProvider;
 use App\Events\DigitalTwinActivated;
 use App\Events\ObservationProcessed;
@@ -321,6 +323,49 @@ class ProcessObservationTest extends TestCase
 
         $this->observation->refresh();
         $this->assertEquals('retrying', $this->observation->status);
+        $this->assertDatabaseCount('facts', 0);
+    }
+
+    public function test_marks_observation_retrying_when_local_ai_is_unavailable(): void
+    {
+        $this->fake->queueException(
+            new LocalAiUnavailableException('connection to Ollama failed (after 4 attempts).')
+        );
+
+        try {
+            (new ProcessObservation($this->observation))->handle(
+                $this->app->make(AnalystRegistry::class),
+                $this->app->make(FactService::class),
+                $this->app->make(KnowledgeService::class),
+                $this->app->make(MarketingHealthService::class),
+            );
+            $this->fail('Expected LocalAiUnavailableException was not thrown.');
+        } catch (LocalAiUnavailableException) {
+            // expected — rethrown so queued workers can retry
+        }
+
+        $this->observation->refresh();
+        $this->assertEquals('retrying', $this->observation->status);
+        $this->assertDatabaseCount('facts', 0);
+    }
+
+    public function test_permanent_local_ai_failure_marks_failed_without_rethrowing(): void
+    {
+        $this->fake->queueException(
+            new LocalAiModelMissingException('qwen3:14b', 'model "qwen3:14b" not found')
+        );
+
+        // A permanent local failure fails fast: no retry, no propagated
+        // exception (the job is failed via $this->fail()).
+        (new ProcessObservation($this->observation))->handle(
+            $this->app->make(AnalystRegistry::class),
+            $this->app->make(FactService::class),
+            $this->app->make(KnowledgeService::class),
+            $this->app->make(MarketingHealthService::class),
+        );
+
+        $this->observation->refresh();
+        $this->assertEquals('failed', $this->observation->status);
         $this->assertDatabaseCount('facts', 0);
     }
 

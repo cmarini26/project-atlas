@@ -3,13 +3,19 @@
 namespace Tests\Unit\AI;
 
 use App\AI\AiResponse;
+use App\AI\Exceptions\LocalAiModelMissingException;
+use App\AI\Exceptions\LocalAiOutOfMemoryException;
+use App\AI\Exceptions\LocalAiUnavailableException;
+use App\AI\Exceptions\RetryableAiException;
 use App\AI\Prompts\FactExtractionPrompt;
 use App\AI\Prompts\Prompt;
 use App\AI\Providers\OllamaAiProvider;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
+use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -326,18 +332,101 @@ class OllamaAiProviderTest extends TestCase
         }
     }
 
-    public function test_wraps_ollama_http_errors_with_status_and_api_error(): void
+    public function test_model_not_found_is_a_non_retryable_model_missing_error(): void
     {
+        $history = [];
         $provider = $this->makeProvider([
-            new Response(404, [], json_encode([
-                'error' => 'model qwen3:14b not found',
+            new Response(404, [], json_encode(['error' => 'model "qwen3:14b" not found, try pulling it first'], JSON_THROW_ON_ERROR)),
+        ], $history);
+
+        try {
+            $provider->complete($this->plainPrompt());
+            $this->fail('Expected LocalAiModelMissingException.');
+        } catch (LocalAiModelMissingException $e) {
+            $this->assertSame('model_missing', $e->category);
+            $this->assertFalse($e->retryable);
+            $this->assertStringContainsString('ollama pull qwen3:14b', $e->guidance);
+        }
+
+        $this->assertCount(1, $history, 'A missing model must not be retried.');
+    }
+
+    public function test_out_of_memory_is_a_non_retryable_error(): void
+    {
+        $history = [];
+        $provider = $this->makeProvider([
+            new Response(500, [], json_encode(['error' => 'model requires more system memory than is available'], JSON_THROW_ON_ERROR)),
+        ], $history);
+
+        $this->expectException(LocalAiOutOfMemoryException::class);
+
+        try {
+            $provider->complete($this->plainPrompt());
+        } finally {
+            $this->assertCount(1, $history, 'An out-of-memory error must not be retried.');
+        }
+    }
+
+    public function test_retries_a_transient_server_error_then_succeeds(): void
+    {
+        $history = [];
+        $provider = $this->makeProvider([
+            new Response(503, [], json_encode(['error' => 'server busy'], JSON_THROW_ON_ERROR)),
+            new Response(200, [], json_encode([
+                'model' => 'qwen3:14b',
+                'message' => ['role' => 'assistant', 'content' => 'Recovered.'],
+                'done' => true,
+                'done_reason' => 'stop',
+                'prompt_eval_count' => 5,
+                'eval_count' => 1,
             ], JSON_THROW_ON_ERROR)),
-        ]);
+        ], $history);
 
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Ollama API request failed (HTTP 404): model qwen3:14b not found');
+        $result = $provider->complete($this->plainPrompt());
 
-        $provider->complete($this->plainPrompt());
+        $this->assertSame('Recovered.', $result->content);
+        $this->assertCount(2, $history);
+    }
+
+    public function test_persistent_transient_failure_throws_bounded_retryable_error(): void
+    {
+        $history = [];
+        $provider = $this->makeProvider([
+            new Response(503, [], 'busy'),
+            new Response(503, [], 'busy'),
+            new Response(503, [], 'busy'),
+            new Response(503, [], 'busy'),
+            new Response(503, [], 'busy'),
+        ], $history);
+
+        try {
+            $provider->complete($this->plainPrompt());
+            $this->fail('Expected LocalAiUnavailableException.');
+        } catch (LocalAiUnavailableException $e) {
+            $this->assertInstanceOf(RetryableAiException::class, $e);
+            $this->assertTrue($e->retryable);
+        }
+
+        $this->assertCount(4, $history, 'Retries are bounded to 4 attempts total.');
+    }
+
+    public function test_connection_failures_are_retried_then_surfaced_as_unavailable(): void
+    {
+        $history = [];
+        $provider = $this->makeProvider([
+            new ConnectException('Connection refused', $this->request()),
+            new ConnectException('Connection refused', $this->request()),
+            new ConnectException('Connection refused', $this->request()),
+            new ConnectException('Connection refused', $this->request()),
+        ], $history);
+
+        $this->expectException(LocalAiUnavailableException::class);
+
+        try {
+            $provider->complete($this->plainPrompt());
+        } finally {
+            $this->assertCount(4, $history);
+        }
     }
 
     public function test_rejects_invalid_json_responses(): void
@@ -408,7 +497,13 @@ class OllamaAiProviderTest extends TestCase
             baseUrl: 'http://127.0.0.1:11434',
             contextLength: 8192,
             think: $think,
+            retryDelaysMs: [0, 0, 0],
         );
+    }
+
+    private function request(): Request
+    {
+        return new Request('POST', 'http://127.0.0.1:11434/api/chat');
     }
 
     private function plainPrompt(): Prompt

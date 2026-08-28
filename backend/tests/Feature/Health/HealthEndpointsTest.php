@@ -2,6 +2,13 @@
 
 namespace Tests\Feature\Health;
 
+use App\AI\Health\LocalAiHealthService;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Request;
+use GuzzleHttp\Psr7\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -125,5 +132,50 @@ class HealthEndpointsTest extends TestCase
         $body = $response->json();
 
         $this->assertSame('ok', $body['checks']['cache']['status']);
+    }
+
+    // --- /api/ready : local inference (Ollama) ---
+
+    private function bindOllamaHealth(array $responses): void
+    {
+        config()->set('ai.provider', 'ollama');
+        config()->set('services.ollama.base_url', 'http://127.0.0.1:11434');
+        config()->set('services.ollama.model', 'qwen3:14b');
+
+        $this->app->instance(LocalAiHealthService::class, new LocalAiHealthService(
+            new Client(['handler' => HandlerStack::create(new MockHandler($responses))]),
+        ));
+    }
+
+    public function test_ready_omits_the_ollama_check_when_ollama_is_not_the_active_provider(): void
+    {
+        // Test env default provider is 'fake'.
+        $body = $this->getJson('/api/ready')->json();
+
+        $this->assertArrayNotHasKey('ollama', $body['checks']);
+    }
+
+    public function test_ready_includes_the_ollama_check_when_ollama_is_active(): void
+    {
+        $this->bindOllamaHealth([
+            new Response(200, [], json_encode(['models' => [['name' => 'qwen3:14b']]], JSON_THROW_ON_ERROR)),
+        ]);
+
+        $response = $this->getJson('/api/ready');
+
+        $response->assertOk()->assertJsonFragment(['status' => 'ok']);
+        $this->assertSame('ok', $response->json()['checks']['ollama']['status']);
+    }
+
+    public function test_ready_is_degraded_when_active_local_model_is_unreachable(): void
+    {
+        $this->bindOllamaHealth([
+            new ConnectException('Connection refused', new Request('GET', 'http://127.0.0.1:11434/api/tags')),
+        ]);
+
+        $response = $this->getJson('/api/ready');
+
+        $response->assertStatus(503)->assertJsonFragment(['status' => 'degraded']);
+        $this->assertSame('error', $response->json()['checks']['ollama']['status']);
     }
 }
