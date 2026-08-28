@@ -77,6 +77,34 @@ describe('Onboarding/Index', () => {
     }
   })
 
+  it('shows a "Needs setup" indicator only for enabled channels that need connecting', async () => {
+    const wrapper = mount(Index, { props: { ...baseProps, initial_step: 4 } })
+
+    const chips = wrapper.findAll('label')
+    const chipFor = (label: string) => chips.find((c) => c.text().includes(label))!
+
+    // Nothing enabled yet — no chip shows the indicator.
+    expect(chips.some((c) => c.text().includes('Needs setup'))).toBe(false)
+
+    // Instagram is oauth -> shows the indicator once enabled.
+    await chipFor('Instagram').find('input[type="checkbox"]').setValue(true)
+    expect(chipFor('Instagram').text()).toContain('Needs setup')
+
+    // Events is a manual/offline channel -> no indicator even when enabled.
+    await chipFor('Events').find('input[type="checkbox"]').setValue(true)
+    expect(chipFor('Events').text()).not.toContain('Needs setup')
+
+    // Website is collected inline (kind: none) -> no indicator.
+    await chipFor('Website').find('input[type="checkbox"]').setValue(true)
+    expect(chipFor('Website').text()).not.toContain('Needs setup')
+  })
+
+  it('updates the step 4 subtitle to say selections are recorded now and connected later', () => {
+    const wrapper = mount(Index, { props: { ...baseProps, initial_step: 4 } })
+
+    expect(wrapper.text()).toContain('We record your selections now — you connect each channel afterward')
+  })
+
   it('does not ask the user to pick primary assets — it is auto-defaulted', async () => {
     // Milestone: UI rethink Workstream C.2 — picking "primary" assets was
     // removed from onboarding entirely; it's auto-defaulted server-side

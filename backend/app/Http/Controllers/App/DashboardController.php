@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\App;
 
+use App\Domain\Onboarding\PendingChannelSetup;
 use App\Http\Controllers\Controller;
 use App\Models\Campaign;
 use App\Models\Company;
@@ -134,6 +135,9 @@ class DashboardController extends Controller
             })->values()->all(),
             'health' => $health,
             'has_campaign_history' => $hasCampaignHistory,
+            // Channels declared during onboarding that still need connecting.
+            // Live — reconnecting one in Settings drops it from this list.
+            'pending_channel_setup' => PendingChannelSetup::forCompany($company),
         ]);
     }
 }

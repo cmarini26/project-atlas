@@ -210,6 +210,42 @@ class DashboardControllerTest extends TestCase
             );
     }
 
+    public function test_dashboard_lists_declared_but_unconnected_channels_for_the_setup_reminder(): void
+    {
+        [$user, $company] = $this->userWithCompanyAndIntegration();
+
+        MarketingChannel::create([
+            'company_id' => $company->id, 'type' => 'instagram', 'display_name' => 'Instagram',
+            'status' => 'active', 'importance' => 'secondary', 'objective' => ['awareness'], 'is_connected' => false,
+        ]);
+        MarketingChannel::create([
+            'company_id' => $company->id, 'type' => 'events', 'display_name' => 'Events',
+            'status' => 'active', 'importance' => 'secondary', 'objective' => ['awareness'], 'is_connected' => false,
+        ]);
+
+        $this->actingAs($user)
+            ->get('/app')
+            ->assertInertia(fn ($page) => $page
+                ->has('pending_channel_setup', 1)
+                ->where('pending_channel_setup.0.type', 'instagram')
+                ->where('pending_channel_setup.0.requirement', 'oauth')
+            );
+    }
+
+    public function test_dashboard_setup_reminder_is_empty_when_every_channel_is_satisfied(): void
+    {
+        [$user, $company] = $this->userWithCompanyAndIntegration();
+
+        MarketingChannel::create([
+            'company_id' => $company->id, 'type' => 'instagram', 'display_name' => 'Instagram',
+            'status' => 'active', 'importance' => 'secondary', 'objective' => ['awareness'], 'is_connected' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->get('/app')
+            ->assertInertia(fn ($page) => $page->where('pending_channel_setup', []));
+    }
+
     /** @return array{User, Company} */
     private function userWithCompanyAndIntegration(string $role = 'owner'): array
     {

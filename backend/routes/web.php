@@ -186,6 +186,7 @@ Route::middleware(['auth', 'company'])->prefix('app')->name('app.')->group(funct
 
     // Post-onboarding checklist
     Route::post('/checklist/dismiss', [OnboardingChecklistController::class, 'dismiss'])->name('checklist.dismiss');
+    Route::post('/channel-setup/dismiss', [OnboardingChecklistController::class, 'dismissChannelSetup'])->name('channel-setup.dismiss');
 
     // Feedback
     Route::post('/feedback', [FeedbackController::class, 'store'])->name('feedback.store');

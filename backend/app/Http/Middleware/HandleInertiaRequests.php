@@ -29,6 +29,7 @@ class HandleInertiaRequests extends Middleware
                     'email' => $request->user()->email,
                     'has_completed_tour' => $request->user()->product_tour_completed_at !== null,
                     'has_dismissed_checklist' => $request->user()->checklist_dismissed_at !== null,
+                    'has_dismissed_channel_setup' => $request->user()->channel_setup_reminder_dismissed_at !== null,
                 ] : null,
             ],
             // Lazy: HandleInertiaRequests is global 'web' middleware and runs

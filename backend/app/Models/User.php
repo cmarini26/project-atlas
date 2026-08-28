@@ -24,6 +24,7 @@ class User extends Authenticatable implements FilamentUser
         'is_superadmin',
         'product_tour_completed_at',
         'checklist_dismissed_at',
+        'channel_setup_reminder_dismissed_at',
     ];
 
     protected $hidden = [
@@ -39,6 +40,7 @@ class User extends Authenticatable implements FilamentUser
             'is_superadmin' => 'boolean',
             'product_tour_completed_at' => 'datetime',
             'checklist_dismissed_at' => 'datetime',
+            'channel_setup_reminder_dismissed_at' => 'datetime',
         ];
     }
 

@@ -5,6 +5,7 @@ import SummaryCard from '@/Components/Dashboard/SummaryCard.vue'
 import HealthCard from '@/Components/Dashboard/HealthCard.vue'
 import RecommendationPrompt from '@/Components/Dashboard/RecommendationPrompt.vue'
 import OnboardingChecklist from '@/Components/Dashboard/OnboardingChecklist.vue'
+import ChannelSetupReminder, { type PendingChannel } from '@/Components/Dashboard/ChannelSetupReminder.vue'
 import EmptyState from '@/Components/UI/EmptyState.vue'
 import Badge from '@/Components/UI/Badge.vue'
 import PageHeader from '@/Components/UI/PageHeader.vue'
@@ -55,6 +56,7 @@ interface DashboardProps {
   recent_campaigns: Campaign[]
   recent_executions: RecentExecution[]
   has_campaign_history: boolean
+  pending_channel_setup: PendingChannel[]
 }
 
 defineProps<DashboardProps>()
@@ -101,6 +103,11 @@ function formatDate(date: string | null): string {
     />
 
     <OnboardingChecklist v-if="!page.props.auth.user?.has_dismissed_checklist" />
+
+    <ChannelSetupReminder
+      v-if="pending_channel_setup.length > 0 && !page.props.auth.user?.has_dismissed_channel_setup"
+      :channels="pending_channel_setup"
+    />
 
     <!-- Pending recommendation prompt -->
     <div v-if="pending_recommendation" data-tour="recommendation-prompt">

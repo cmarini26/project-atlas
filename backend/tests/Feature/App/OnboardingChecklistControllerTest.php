@@ -43,6 +43,27 @@ class OnboardingChecklistControllerTest extends TestCase
             ->assertInertia(fn ($page) => $page->where('auth.user.has_dismissed_checklist', true));
     }
 
+    public function test_dismiss_channel_setup_sets_its_own_timestamp_and_shared_prop(): void
+    {
+        [$user] = $this->userWithCompany();
+
+        $this->assertNull($user->channel_setup_reminder_dismissed_at);
+
+        $this->actingAs($user)
+            ->get('/app/settings')
+            ->assertInertia(fn ($page) => $page->where('auth.user.has_dismissed_channel_setup', false));
+
+        $this->actingAs($user)->post('/app/channel-setup/dismiss')->assertRedirect();
+
+        $this->assertNotNull($user->fresh()->channel_setup_reminder_dismissed_at);
+        // The checklist dismissal is independent.
+        $this->assertNull($user->fresh()->checklist_dismissed_at);
+
+        $this->actingAs($user)
+            ->get('/app/settings')
+            ->assertInertia(fn ($page) => $page->where('auth.user.has_dismissed_channel_setup', true));
+    }
+
     /** @return array{User, Company} */
     private function userWithCompany(string $role = 'owner'): array
     {

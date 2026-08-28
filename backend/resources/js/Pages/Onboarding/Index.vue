@@ -17,6 +17,7 @@ import {
   MARKETING_OWNER_OPTIONS,
   PRIMARY_CTA_OPTIONS,
   MONTH_OPTIONS,
+  needsChannelConnection,
 } from '@/lib/onboardingAssets'
 
 interface EnabledAsset {
@@ -283,7 +284,7 @@ function startDiscovery(): void {
     <!-- Step 4: Marketing Assets -->
     <div v-else-if="step === 4">
       <h1 class="text-[length:var(--text-subheading)] font-semibold text-[var(--color-text-primary)] mb-1">Where can customers find your business?</h1>
-      <p class="text-[length:var(--text-body)] text-[var(--color-text-muted)] mb-5">Enable everything that applies — you can add the details later.</p>
+      <p class="text-[length:var(--text-body)] text-[var(--color-text-muted)] mb-5">Enable everything that applies. We record your selections now — you connect each channel afterward from Marketing Presence.</p>
 
       <form class="space-y-4" @submit.prevent="submitAssets">
         <div class="space-y-2">
@@ -294,9 +295,19 @@ function startDiscovery(): void {
             class="w-full"
             @update:model-value="toggleEnabled(asset.type)"
           >
-            {{ asset.label }}
+            <span>{{ asset.label }}</span>
+            <span
+              v-if="enabledTypes.includes(asset.type) && needsChannelConnection(asset)"
+              class="ml-auto rounded-full bg-amber-100 px-2 py-0.5 text-[length:var(--text-caption)] font-medium text-amber-800"
+              :title="asset.integrationRequirement.summary"
+            >
+              Needs setup
+            </span>
           </ChoiceChip>
         </div>
+        <p class="text-[length:var(--text-caption)] text-[var(--color-text-muted)]">
+          “Needs setup” means the channel is recorded but not yet connected. You can continue now and finish later.
+        </p>
         <p v-if="assetsForm.errors.enabled" class="text-xs text-rose-600">{{ assetsForm.errors.enabled }}</p>
 
         <div class="flex gap-3">
