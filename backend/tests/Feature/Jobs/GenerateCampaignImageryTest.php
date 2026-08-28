@@ -28,7 +28,7 @@ class GenerateCampaignImageryTest extends TestCase
         parent::setUp();
 
         Storage::fake('public');
-        $this->images = new FakeImageProvider;
+        $this->images = new FakeImageProvider();
         $this->app->instance(ImageProvider::class, $this->images);
     }
 

@@ -13,7 +13,7 @@ class FakeImageProviderTest extends TestCase
 {
     public function test_it_returns_the_requested_number_of_images_against_the_interface(): void
     {
-        $provider = new FakeImageProvider;
+        $provider = new FakeImageProvider();
 
         $images = $provider->generate(new ImageGenerationRequest('a warm product photo', count: 2));
 
@@ -26,7 +26,7 @@ class FakeImageProviderTest extends TestCase
 
     public function test_placeholder_bytes_are_a_valid_png_sized_to_the_aspect_ratio(): void
     {
-        $provider = new FakeImageProvider;
+        $provider = new FakeImageProvider();
 
         [$image] = $provider->generate(new ImageGenerationRequest('x', ImageAspectRatio::Landscape));
 
@@ -41,7 +41,7 @@ class FakeImageProviderTest extends TestCase
 
     public function test_queued_exception_is_thrown_instead_of_generating(): void
     {
-        $provider = new FakeImageProvider;
+        $provider = new FakeImageProvider();
         $provider->queueException(ImageGenerationException::transient('fake', 'boom'));
 
         $this->expectException(ImageGenerationException::class);

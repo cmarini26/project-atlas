@@ -16,13 +16,13 @@ class CampaignImagePromptTest extends TestCase
     {
         return new BusinessBrain(
             company: $company,
-            twin: new DigitalTwin,
-            activeFacts: new Collection,
-            activeKnowledge: new Collection,
-            recentObservations: new Collection,
+            twin: new DigitalTwin(),
+            activeFacts: new Collection(),
+            activeKnowledge: new Collection(),
+            recentObservations: new Collection(),
             catalog: null,
-            featuredItems: new Collection,
-            recentCampaigns: new Collection,
+            featuredItems: new Collection(),
+            recentCampaigns: new Collection(),
         );
     }
 

@@ -13,7 +13,7 @@ class ImageStorageTest extends TestCase
     {
         Storage::fake('public');
 
-        $stored = (new ImageStorage)->store('company-123', new GeneratedImage(
+        $stored = (new ImageStorage())->store('company-123', new GeneratedImage(
             binary: 'fake-bytes',
             mimeType: 'image/png',
             width: 1024,
@@ -35,7 +35,7 @@ class ImageStorageTest extends TestCase
     public function test_delete_removes_the_stored_file_and_tolerates_null(): void
     {
         Storage::fake('public');
-        $storage = new ImageStorage;
+        $storage = new ImageStorage();
 
         $stored = $storage->store('c1', new GeneratedImage('b', 'image/png', 1, 1, 'fake', 'm', 0.0));
         Storage::disk('public')->assertExists($stored->path);

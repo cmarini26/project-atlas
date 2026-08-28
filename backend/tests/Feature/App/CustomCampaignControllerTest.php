@@ -41,10 +41,10 @@ class CustomCampaignControllerTest extends TestCase
 
         Storage::fake('public');
 
-        $this->fake = new FakeAiProvider;
+        $this->fake = new FakeAiProvider();
         $this->app->instance(AiProvider::class, $this->fake);
 
-        $this->fakeImages = new FakeImageProvider;
+        $this->fakeImages = new FakeImageProvider();
         $this->app->instance(ImageProvider::class, $this->fakeImages);
     }
 
