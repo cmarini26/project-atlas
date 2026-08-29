@@ -1,6 +1,6 @@
 # SCRUM-71 — Visual Asset Generation for Content Drafts
 
-**Status:** designed, not implemented
+**Status:** Slices A + B implemented locally (2026-08-27) — abstraction, fake provider, storage service, channel gating, guardrails, generated-image metadata marker, and an "AI-generated" preview label. Real vendor provider still pending the §5 vendor decision.
 **Date:** 2026-08-10
 **Scope:** social + blog drafts first
 **Reason this exists:** SCRUM-70 is now complete locally; the clearest remaining Adobe-comparison gap on Atlas's current content path is that content drafting is still text-only.
@@ -141,13 +141,18 @@ The codebase does not yet contain an image-generation integration pattern, so th
 
 ## 6. Acceptance criteria
 
-- [ ] Atlas has an `ImageGenerationProvider` abstraction and registry, with no direct vendor coupling inside `ContentGenerationAnalyst`.
-- [ ] Social (`instagram`/`facebook`) and blog drafts can include one generated image proposal alongside generated copy.
-- [ ] Generated images are stored as part of the draft content asset's `media` payload and render in the existing recommendation preview.
-- [ ] Approval flow remains unchanged in safety terms: generated images are never auto-published outside the existing approval boundary.
-- [ ] A cost/rate-limit guard exists before the feature is treated as production-ready.
-- [ ] Feature tests cover: image generated for supported channels, no image generated for unsupported channels, failures degrade honestly, and recommendation preview still works.
-- [ ] Full verification passes: `php artisan test`, `npm run build`.
+- [x] Atlas has an `ImageGenerationProvider` abstraction and registry, with no direct vendor coupling inside `ContentGenerationAnalyst`. (`app/Services/Imaging/*`, wired via `ImagingServiceProvider`; the analyst only knows `GeneratedImageService`.)
+- [x] Social (`instagram`/`facebook`) and blog drafts can include one generated image proposal alongside generated copy. (`config('imaging.channels')`; `GeneratedImageService::proposeFor()` called from `ContentGenerationAnalyst::resolveMedia()`.)
+- [x] Generated images are stored as part of the draft content asset's `media` payload and render in the existing recommendation preview. (Stored on the `imaging.disk` filesystem under `generated-content/{company}/{campaign}/{channel}/`; returned in the `ContentAssetData.media` shape the preview already reads.)
+- [x] Approval flow remains unchanged in safety terms: generated images are never auto-published outside the existing approval boundary. (Media only enters the same `ContentAsset` that already passes through approval; no publish path touched.)
+- [x] A cost/rate-limit guard exists before the feature is treated as production-ready. (Off by default via `imaging.enabled`; `imaging.per_company_daily_limit` caps generated images per company per day.)
+- [x] Feature tests cover: image generated for supported channels, no image generated for unsupported channels, failures degrade honestly, and daily-limit / disabled behaviour. (`tests/Feature/Imaging/GeneratedImageServiceTest.php`, `tests/Feature/Campaign/ContentGenerationAnalystGeneratedImageTest.php`.)
+- [x] Full verification passes: `php artisan test` (1506 passing; 5 pre-existing `AiProviderConfigurationTest` failures unrelated, green on CI), `npm test`, `npm run build`, PHPStan level max, Pint.
+- [x] Slice B — the image is marked AI-generated (`metadata.generated_image` + `metadata.image_prompt_version`, set in `ContentGenerationAnalyst`) and `ContentPreview.vue` shows an "AI-generated · draft proposal" label so it is never mistaken for real inventory (§7). Covered by `ContentPreview.spec.ts` and two `ContentGenerationAnalystGeneratedImageTest` cases.
+- [x] Slice C (retention/cleanup, §7) — `App\Jobs\PruneGeneratedImages` runs weekly on the `maintenance` queue and deletes any stored generated image under `generated-content/` that no live (non-archived, non-deleted) `ContentAsset` still references, once it is older than `imaging.retention_days` (default 30, `IMAGE_GENERATION_RETENTION_DAYS`). Status-agnostic — rejected drafts, superseded assets and cancelled campaigns are all covered without enumerating statuses, and a just-created file is never raced. Covered by `PruneGeneratedImagesTest`.
+
+### Still open (deliberately deferred)
+- Real hosted image provider — blocked on the §5 vendor decision (Slice A's real-provider step). A separate `SCRUM-71-Image-Provider-Vendor-Options.md` note works that decision.
 
 ---
 
