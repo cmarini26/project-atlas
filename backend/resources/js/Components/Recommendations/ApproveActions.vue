@@ -120,6 +120,7 @@ function reject(): void {
     <div class="grid gap-3">
       <Button
         variant="primary"
+        size="lg"
         full-width
         :disabled="approveForm.processing || rejectForm.processing || !hasSelectedContent"
         :loading="approveForm.processing"

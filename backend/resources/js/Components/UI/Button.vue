@@ -2,7 +2,7 @@
 withDefaults(
   defineProps<{
     variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
-    size?: 'sm' | 'md'
+    size?: 'sm' | 'md' | 'lg'
     fullWidth?: boolean
     as?: 'button' | 'a'
     href?: string
@@ -34,6 +34,9 @@ const variantClasses: Record<string, string> = {
 const sizeClasses: Record<string, string> = {
   sm: 'py-2 px-3 text-sm',
   md: 'py-2.5 px-4 text-sm',
+  // System.md §9: ~48px tall, 24px horizontal, 15px text — the single hero
+  // CTA per screen (e.g. Approve on the recommendation page).
+  lg: 'py-3.5 px-6 text-[length:var(--text-body)]',
 }
 </script>
 
