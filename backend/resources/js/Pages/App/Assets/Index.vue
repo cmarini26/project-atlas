@@ -127,7 +127,7 @@ function dateLabel(value: string | null): string {
           <Link
             v-if="assets.some((asset) => asset.status === 'ready')"
             href="/app/campaigns/create"
-            class="inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-accent-300)] bg-white px-4 py-2 text-sm font-semibold text-[var(--color-accent-700)] hover:bg-[var(--color-accent-50)]"
+            class="inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-accent-200)] bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-accent-700)] hover:bg-[var(--color-accent-50)]"
           >
             Create campaign
           </Link>

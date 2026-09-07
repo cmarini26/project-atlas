@@ -71,6 +71,12 @@ const objectiveReady = computed(() => form.objective.trim().length >= 20)
 const canSubmit = computed(() => objectiveReady.value && props.channels.length > 0 && !form.processing)
 const selectedAssetCount = computed(() => form.source_asset_ids.length)
 
+// Same treatment the Input/Select/Textarea primitives apply. Phase-0 fix so
+// these raw controls stop rendering as unstyled browser defaults; CM-107
+// replaces them with the primitives outright.
+const fieldClass =
+  'w-full px-3 py-2 text-sm rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] placeholder-[var(--color-text-placeholder)] focus:outline-none focus:ring-1 focus:ring-[var(--color-border-focus)] focus:border-[var(--color-border-focus)] transition-colors duration-[var(--duration-fast)]'
+
 function submit(): void {
   if (!canSubmit.value) return
   form.post('/app/campaigns', { preserveScroll: true })
@@ -104,7 +110,7 @@ function submit(): void {
             maxlength="2000"
             rows="5"
             autofocus
-            class="w-full rounded-[var(--radius-sm)] border-[var(--color-border)] text-base"
+            :class="[fieldClass, 'text-base']"
             placeholder="e.g. Invite past customers back for our fall service special — 15% off any detail package booked before October. Warm, appreciative tone, with a clear booking link."
           />
           <span class="flex items-center justify-between text-xs font-normal text-[var(--color-text-muted)]">
@@ -117,13 +123,13 @@ function submit(): void {
         <div class="mt-4 grid gap-4 md:grid-cols-2">
           <label class="space-y-1.5 text-sm font-medium text-[var(--color-text-secondary)]">
             Campaign title <span class="font-normal text-[var(--color-text-muted)]">(optional)</span>
-            <input v-model="form.title" maxlength="255" class="w-full rounded-[var(--radius-sm)] border-[var(--color-border)]" placeholder="Fall customer appreciation" />
+            <input v-model="form.title" maxlength="255" :class="fieldClass" placeholder="Fall customer appreciation" />
             <span class="block text-xs font-normal text-[var(--color-text-muted)]">Atlas generates one from your description if you leave this blank.</span>
             <span v-if="form.errors.title" class="block text-xs text-rose-700">{{ form.errors.title }}</span>
           </label>
           <label class="space-y-1.5 text-sm font-medium text-[var(--color-text-secondary)]">
             Primary goal
-            <select v-model="form.goal" class="w-full rounded-[var(--radius-sm)] border-[var(--color-border)] bg-white">
+            <select v-model="form.goal" :class="fieldClass">
               <option value="awareness">Build awareness</option>
               <option value="conversion">Drive action or sales</option>
               <option value="re_engagement">Re-engage customers</option>
@@ -134,22 +140,22 @@ function submit(): void {
         <div class="mt-4 grid gap-4 md:grid-cols-2">
           <label class="space-y-1.5 text-sm font-medium text-[var(--color-text-secondary)]">
             Audience <span class="font-normal text-[var(--color-text-muted)]">(optional)</span>
-            <textarea v-model="form.audience" maxlength="1000" rows="2" class="w-full rounded-[var(--radius-sm)] border-[var(--color-border)]" placeholder="Who should this reach?" />
+            <textarea v-model="form.audience" maxlength="1000" rows="2" :class="fieldClass" placeholder="Who should this reach?" />
           </label>
           <label class="space-y-1.5 text-sm font-medium text-[var(--color-text-secondary)]">
             Additional guidance <span class="font-normal text-[var(--color-text-muted)]">(optional)</span>
-            <textarea v-model="form.guidance" maxlength="2000" rows="2" class="w-full rounded-[var(--radius-sm)] border-[var(--color-border)]" placeholder="Offer details, tone, constraints, or calls to action" />
+            <textarea v-model="form.guidance" maxlength="2000" rows="2" :class="fieldClass" placeholder="Offer details, tone, constraints, or calls to action" />
           </label>
         </div>
 
         <div class="mt-4 grid gap-4 md:grid-cols-2">
           <label class="space-y-1.5 text-sm font-medium text-[var(--color-text-secondary)]">
             Starts <span class="font-normal text-[var(--color-text-muted)]">(optional)</span>
-            <input v-model="form.starts_at" type="datetime-local" class="w-full rounded-[var(--radius-sm)] border-[var(--color-border)]" />
+            <input v-model="form.starts_at" type="datetime-local" :class="fieldClass" />
           </label>
           <label class="space-y-1.5 text-sm font-medium text-[var(--color-text-secondary)]">
             Ends <span class="font-normal text-[var(--color-text-muted)]">(optional)</span>
-            <input v-model="form.ends_at" type="datetime-local" class="w-full rounded-[var(--radius-sm)] border-[var(--color-border)]" />
+            <input v-model="form.ends_at" type="datetime-local" :class="fieldClass" />
             <span v-if="form.errors.ends_at" class="block text-xs text-rose-700">{{ form.errors.ends_at }}</span>
           </label>
         </div>
