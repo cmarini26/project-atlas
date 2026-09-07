@@ -18,7 +18,7 @@ const labels: Record<string, string> = {
     <div
       v-for="(value, key) in rationaleDisplay"
       :key="key"
-      class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-[var(--radius-md)] p-5 shadow-[var(--shadow-card)]"
+      class="bg-[var(--color-surface-subtle)] border border-[var(--color-border)] rounded-[var(--radius-md)] p-5"
     >
       <h3 class="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-[0.12em] mb-2">
         {{ labels[key] ?? String(key).replace(/_/g, ' ') }}
