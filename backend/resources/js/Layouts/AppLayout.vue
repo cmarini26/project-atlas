@@ -178,6 +178,7 @@ function logout(): void {
               v-for="link in group.links"
               :key="link.href"
               :href="link.href"
+              :aria-current="isActive(link.href) ? 'page' : undefined"
               :class="[
                 'relative flex items-center gap-3 px-3 h-10 rounded-[var(--radius-sm)] text-sm transition-colors duration-[var(--duration-fast)]',
                 isActive(link.href)
@@ -202,6 +203,7 @@ function logout(): void {
       <div class="border-t border-[var(--color-border)] p-3 space-y-1 shrink-0">
         <Link
           href="/app/publishing"
+          :aria-current="isActive('/app/publishing') ? 'page' : undefined"
           :class="[
             'relative flex items-center gap-3 px-3 h-10 rounded-[var(--radius-sm)] text-sm transition-colors duration-[var(--duration-fast)]',
             isActive('/app/publishing')
@@ -221,6 +223,7 @@ function logout(): void {
 
         <Link
           href="/app/settings"
+          :aria-current="isActive('/app/settings') ? 'page' : undefined"
           :class="[
             'relative flex items-center gap-3 px-3 h-10 rounded-[var(--radius-sm)] text-sm transition-colors duration-[var(--duration-fast)]',
             isActive('/app/settings')
