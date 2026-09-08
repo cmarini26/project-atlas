@@ -85,8 +85,9 @@ class FakeImageProvider implements ImageProvider
             return base64_decode(self::PIXEL_PNG_BASE64, true) ?: '';
         }
 
-        $image = imagecreatetruecolor($width, $height);
-        imagefill($image, 0, 0, imagecolorallocate($image, 226, 232, 240));
+        $image = imagecreatetruecolor(max(1, $width), max(1, $height));
+        $background = imagecolorallocate($image, 226, 232, 240);
+        imagefill($image, 0, 0, $background === false ? 0 : $background);
 
         ob_start();
         imagepng($image);

@@ -63,11 +63,12 @@ class BillingCheckoutService
     public function startBillingPortal(Company $company, string $returnUrl): BillingPortalSession
     {
         $profile = $this->profiles->find($company);
+        $customerId = $profile?->stripe_customer_id;
 
-        if ($profile === null || ! $profile->hasStripeCustomer()) {
+        if ($profile === null || ! $profile->hasStripeCustomer() || $customerId === null) {
             throw new BillingException('This company has no Stripe customer yet — start checkout first.');
         }
 
-        return $this->billing->createBillingPortalSession($profile->stripe_customer_id, $returnUrl);
+        return $this->billing->createBillingPortalSession($customerId, $returnUrl);
     }
 }

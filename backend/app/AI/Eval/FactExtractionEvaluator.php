@@ -25,7 +25,7 @@ class FactExtractionEvaluator
     /**
      * @param  list<string>  $providerNames
      * @param  list<EvalCase>  $cases
-     * @return array<string, mixed> machine-readable report
+     * @return array{generated_at: string, git_sha: string, case_count: int, cases: list<string>, providers: list<array<string, mixed>>} machine-readable report
      */
     public function run(array $providerNames, array $cases): array
     {

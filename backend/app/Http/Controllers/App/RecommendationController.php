@@ -146,21 +146,22 @@ class RecommendationController extends Controller
             return [];
         }
 
-        return $brief->imageGenerations
-            ->sortBy('created_at')
-            ->map(fn (CampaignImageGeneration $g): array => [
-                'id' => $g->id,
-                'status' => $g->status,
-                'url' => $g->mediaUrl(),
-                'width' => $g->width,
-                'height' => $g->height,
-                'provider' => $g->provider,
-                'model' => $g->model,
-                'cost_usd' => (float) $g->cost_usd,
-                'error' => $g->error,
-            ])
-            ->values()
-            ->all();
+        return array_values(
+            $brief->imageGenerations
+                ->sortBy('created_at')
+                ->map(fn (CampaignImageGeneration $g): array => [
+                    'id' => $g->id,
+                    'status' => $g->status,
+                    'url' => $g->mediaUrl(),
+                    'width' => $g->width,
+                    'height' => $g->height,
+                    'provider' => $g->provider,
+                    'model' => $g->model,
+                    'cost_usd' => (float) $g->cost_usd,
+                    'error' => $g->error,
+                ])
+                ->all()
+        );
     }
 
     public function approve(Request $request, Recommendation $recommendation): RedirectResponse

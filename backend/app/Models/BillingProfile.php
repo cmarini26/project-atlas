@@ -6,6 +6,7 @@ use App\Domain\Shared\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * The minimum billing truth Atlas persists for a company: Stripe customer +
@@ -13,6 +14,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * operator override. Stripe remains the source of truth — these fields are a
  * cache updated from webhooks (CM-75) and read by the access gate (CM-78).
  *
+ * @property string|null $stripe_customer_id
+ * @property string|null $stripe_subscription_id
+ * @property string|null $subscription_status
+ * @property string|null $price_id
+ * @property Carbon|null $current_period_ends_at
+ * @property bool $cancel_at_period_end
+ * @property bool $beta_access_override
  * @property-read bool $grants_access
  */
 class BillingProfile extends Model

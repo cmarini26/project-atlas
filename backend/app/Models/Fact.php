@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property mixed $value JSON-cast — a stored fact value may be a scalar or a structured array.
+ */
 class Fact extends Model
 {
     use BelongsToCompany, HasUlids;
