@@ -114,7 +114,7 @@ function formatDate(date: string | null): string {
                 :href="execution.result.url"
                 target="_blank"
                 rel="noreferrer"
-                class="mt-2 inline-flex text-xs font-medium text-[var(--color-accent)] hover:underline"
+                class="mt-2 inline-flex text-xs font-medium text-[var(--color-text-link)] hover:underline"
               >
                 View published post
               </a>

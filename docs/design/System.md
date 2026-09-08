@@ -163,63 +163,62 @@ All sizes in `rem` (base 16px). Collapsed from 9 steps to 6 in the 2026-07-14 re
 
 ### Philosophy
 
-One accent, used with real range. Neutral warmth everywhere else, tinted toward the accent hue rather than pure gray. Status communicated through 4 muted hues, never through saturation.
+One accent, used with real range. Neutral warmth everywhere else, tinted warm rather than pure gray. Status communicated through 4 muted hues, never through saturation.
 
-The base neutral is still **stone** (Tailwind's warm gray family), but every neutral now carries a whisper of the accent's violet hue folded in — this is the single highest-leverage "feels designed, not default" move (the same trick Linear/Vercel use on their own gray ramps): nobody consciously notices it, they just perceive the palette as more cohesive.
+The base neutral is a **warm cream/stone** (`--color-surface` ≈ `#f8f6f1`), not a cool gray. This is the highest-leverage "feels designed, not default" move: the whole product reads calmer and warmer than the cool-white-and-indigo look every Tailwind demo ships with, without anyone consciously noticing why.
 
-The accent is **"Signal"** — a deeper blue-violet (`#6d5ce8`), not stock indigo. Indigo-500 is the single most-reused SaaS accent in the world (default shadcn/ui, every Tailwind demo); shifting hue (~265°→~285°) and pulling chroma down slightly de-genericizes it immediately while staying in the same "calm, trustworthy" register. Used exclusively for interactive elements: primary buttons, links, focus rings, active nav items, and now also "in progress/queued" status (see below). Nothing decorative is accent-colored outside 2-3 deliberate "moment" locations (marketing hero, onboarding completion, first-recommendation empty state).
+The accent is a **clear operational blue** (`--color-accent-500` = `#3159d6`) — deeper and slightly less saturated than stock `indigo-500`/`blue-600`. Used exclusively for interactive elements: primary buttons, links, focus rings, active nav items, the Inertia progress bar, and "in progress / queued" status. Nothing decorative is accent-colored outside 2–3 deliberate "moment" locations (marketing hero, onboarding completion, first-recommendation empty state). A few secondary domain hues (coral, amber, teal, forest) exist for concept color-coding but are used sparingly.
+
+> **History:** a 2026-07-14 revision proposed a blue-violet "Signal" accent (`#6d5ce8`) with violet-tinted neutrals. The shipped palette in `app.css` went a different way — the operational blue and warm cream above. This section documents what shipped.
 
 ### Semantic Token System
 
-Define semantic tokens in `@theme {}`. Implementation references tokens, never raw colors. **The values below are documentation of intent — `backend/resources/css/app.css` is the authoritative source; check it directly if the two ever disagree.**
+Define semantic tokens in `@theme {}`. Implementation references tokens, never raw colors. **`backend/resources/css/app.css` is the single source of truth for the values** — the block below is a shape reference, kept in sync by hand; if the two ever disagree, the CSS wins.
 
 ```css
 @theme {
-  /* ── Surfaces ─────────────────────────────────── */
-  --color-surface:           #f7f6f4;   /* page background, violet-tinted stone */
-  --color-surface-elevated:  #ffffff;   /* cards, panels — the one pure-white anchor */
-  --color-surface-subtle:    #efeeea;   /* inputs, code, hover */
-  --color-surface-overlay:   #1b1a2e;   /* modal backdrop dark — violet-tinted charcoal */
+  /* ── Surfaces — warm cream/stone, layered ──────────────── */
+  --color-surface:           #f8f6f1;   /* page background */
+  --color-surface-elevated:  #fffdfa;   /* cards, panels — the near-white anchor */
+  --color-surface-subtle:    #efe9de;   /* inputs, code, hover */
+  --color-surface-panel:     #f4efe6;   /* card headers, inset panels */
+  --color-surface-nav:       #f1ece3;   /* sidebar / nav ground */
+  --color-surface-overlay:   #d8d0c3;   /* modal backdrop (used at ~50% opacity) */
 
   /* ── Borders ──────────────────────────────────── */
-  --color-border:            #e5e2dc;   /* default borders — reserved for NESTED content, see §8 */
-  --color-border-strong:     #d3cec4;   /* structural dividers only (sidebar rule, table header) */
-  --color-border-focus:      #6d5ce8;   /* focus ring */
+  --color-border:            #e3ddd1;   /* default borders — reserved for NESTED content, see §8 */
+  --color-border-strong:     #d2c9ba;   /* structural dividers only (sidebar rule, table header) */
+  --color-border-focus:      #2563eb;   /* focus ring */
 
-  /* ── Text ─────────────────────────────────────── */
-  --color-text-primary:      #18161f;   /* headings, emphasis — violet-tinted near-black */
-  --color-text-secondary:    #433f4d;   /* body text */
-  --color-text-muted:        #736d7a;   /* captions, labels */
-  --color-text-placeholder:  #a29da8;   /* input placeholders */
-  --color-text-disabled:     #d3cec4;   /* disabled elements */
-  --color-text-inverse:      #f7f6f4;   /* text on dark */
-  --color-text-link:         #5641d6;   /* inline links */
+  /* ── Text — ink-first; muted/placeholder meet WCAG AA (§20) ── */
+  --color-text-primary:      #181713;   /* headings, emphasis */
+  --color-text-secondary:    #4d473f;   /* body text */
+  --color-text-muted:        #6d6757;   /* captions, labels — ≥4.5:1 on every light surface */
+  --color-text-placeholder:  #8f8471;   /* input placeholders — ≥3:1 */
+  --color-text-disabled:     #c8c0b3;
+  --color-text-link:         #1d4ed8;   /* inline links */
 
-  /* ── Accent — "Signal" blue-violet ─────────────── */
-  --color-accent-50:         #f1f0fe;
-  --color-accent-100:        #e3e1fc;
-  --color-accent-200:        #c7c3f9;
-  --color-accent-400:        #8b7ff2;   /* dark-surface accent text */
-  --color-accent-500:        #6d5ce8;   /* primary buttons, active states */
-  --color-accent-600:        #5641d6;   /* hover on primary               */
-  --color-accent-700:        #4531ad;   /* pressed / links on light       */
-  --color-accent-900:        #241a5c;   /* text-on-accent-tint, dark hero bg */
+  /* ── Accent — operational blue ("Signal") ──────────────── */
+  --color-accent-50:         #eef3ff;
+  --color-accent-100:        #dce7ff;
+  --color-accent-200:        #bfd2ff;
+  --color-accent-400:        #688fff;
+  --color-accent-500:        #3159d6;   /* primary buttons, active states, progress bar */
+  --color-accent-600:        #2747ad;   /* hover on primary */
+  --color-accent-700:        #213d92;   /* pressed / accent text on a light tint */
+  --color-accent-900:        #182b65;
 
-  /* ── Semantic feedback — 4 hues (collapsed from 7) ── */
-  --color-success-surface:   #f0faf3;
-  --color-success-border:    #c3e8cf;
-  --color-success-text:      #146c43;
-  --color-danger-surface:    #fdf1f2;
-  --color-danger-border:     #f5cdd2;
-  --color-danger-text:       #9f2a3a;
-  --color-warning-surface:   #fdf7ec;
-  --color-warning-border:    #f2debb;
-  --color-warning-text:      #8a5a10;
-  /* "info"/"in progress"/"queued" reuse the accent ramp directly —
-     no separate blue or violet hue competing with the accent anymore. */
-  --color-info-surface:      var(--color-accent-50);
-  --color-info-border:       var(--color-accent-200);
-  --color-info-text:         var(--color-accent-700);
+  /* ── Secondary domain hues — concept color-coding, used sparingly ── */
+  --color-coral-500:  #e11d48;  --color-amber-500: #d97706;
+  --color-teal-500:   #0f766e;  --color-forest-500: #15803d;
+
+  /* ── Semantic feedback — 4 hues; "info"/"queued" reuse the accent ── */
+  --color-success-surface: #f0faf3;  --color-success-border: #c3e8cf;  --color-success-text: #146c43;
+  --color-danger-surface:  #fdf1f2;  --color-danger-border:  #f5cdd2;  --color-danger-text:  #9f2a3a;
+  --color-warning-surface: #fdf7ec;  --color-warning-border: #f2debb;  --color-warning-text: #8a5a10;
+  --color-info-surface:    var(--color-accent-50);
+  --color-info-border:     var(--color-accent-200);
+  --color-info-text:       var(--color-accent-700);
 }
 ```
 
@@ -1269,7 +1268,7 @@ All text must meet WCAG 2.1 AA at minimum. Target AAA for body text.
 | Status badge text on badge background | 4.5:1 | — |
 | White text on accent-500 (primary button) | 4.5:1 | — |
 
-Check computed values: `--color-accent-500 (#6d5ce8)` on white = ~5.4:1. Passes AA. `--color-text-muted (#736d7a)` on white = ~4.7:1. Passes AA.
+Check computed values (against the shipped palette): white on `--color-accent-500` (`#3159d6`) = ~5.95:1 — passes AA. `--color-text-muted` (`#6d6757`) on `--color-surface` (`#f8f6f1`) = ~5.2:1, and ≥4.5:1 on `--color-surface-panel`/`-subtle` too — passes AA. `--color-text-placeholder` (`#8f8471`) on `--color-surface-elevated` = ~3.6:1 — passes the 3:1 placeholder floor.
 
 ### Keyboard navigation
 

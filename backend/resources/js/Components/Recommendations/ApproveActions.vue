@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useForm } from '@inertiajs/vue3'
+import Button from '@/Components/UI/Button.vue'
 import ConfirmDialog from '@/Components/UI/ConfirmDialog.vue'
 import { CAPABILITY_LABELS, channelLabel, resolveChannelCapability } from '@/lib/channelCapability'
 import type { ChannelCapability } from '@/lib/channelCapability'
@@ -117,24 +118,30 @@ function reject(): void {
 <template>
   <div class="space-y-4">
     <div class="grid gap-3">
-      <button
-        type="button"
+      <Button
+        variant="primary"
+        size="lg"
+        full-width
         :disabled="approveForm.processing || rejectForm.processing || !hasSelectedContent"
-        class="w-full py-3 px-4 text-sm font-semibold rounded-[var(--radius-sm)] bg-[var(--color-surface-nav)] text-white hover:bg-black disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)] shadow-[var(--shadow-card)]"
+        :loading="approveForm.processing"
         @click="requestApproval"
       >
         {{ approveForm.processing ? 'Approving…' : 'Approve' }}
-      </button>
+      </Button>
 
-      <button
-        type="button"
+      <Button
+        variant="secondary"
+        full-width
         :disabled="approveForm.processing || rejectForm.processing || !hasSelectedContent"
-        class="w-full py-2.5 px-4 text-sm font-semibold rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-white text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-panel)] hover:text-[var(--color-text-primary)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-[var(--duration-fast)]"
         @click="emit('editAndApprove')"
       >
         Edit &amp; Approve
-      </button>
+      </Button>
 
+      <!-- Kept as a raw tertiary button: it is already legible, and the shared
+           Button's `ghost` variant renders link-blue — too loud for a reject
+           action (System.md §9 wants muted). Moving this onto the primitive is
+           folded into the §9 ghost-variant fix in CM-106. -->
       <button
         type="button"
         :disabled="approveForm.processing || rejectForm.processing || !hasSelectedContent"

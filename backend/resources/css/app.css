@@ -27,8 +27,8 @@
     /* ── Text (ink first, readable in dense workflows) ─────────── */
     --color-text-primary: #181713;
     --color-text-secondary: #4d473f;
-    --color-text-muted: #7a7469;
-    --color-text-placeholder: #a3998b;
+    --color-text-muted: #6d6757;
+    --color-text-placeholder: #8f8471;
     --color-text-disabled: #c8c0b3;
     --color-text-inverse: #181713;
     --color-text-link: #1d4ed8;

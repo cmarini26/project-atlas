@@ -20,6 +20,8 @@ createInertiaApp({
             .mount(el);
     },
     progress: {
-        color: '#6d5ce8',
+        // Matches --color-accent-500 in resources/css/app.css. Inertia reads
+        // this before app CSS is parsed, so it must be a literal, not a var().
+        color: '#3159d6',
     },
 });

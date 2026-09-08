@@ -13,7 +13,7 @@ defineEmits<{
 </script>
 
 <template>
-  <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-[var(--radius-md)] shadow-[var(--shadow-card)] overflow-hidden">
+  <div class="bg-[var(--color-surface-elevated)] rounded-[var(--radius-md)] shadow-[var(--shadow-card)] overflow-hidden">
     <div class="flex items-center justify-between gap-3 bg-[var(--color-surface-panel)] px-5 py-3 border-b border-[var(--color-border)]">
       <div class="flex items-center gap-2">
         <h3 class="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-[0.12em]">Content preview</h3>

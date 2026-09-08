@@ -9,6 +9,12 @@ withDefaults(
     clickable?: boolean
     accent?: 'none' | 'indigo' | 'amber' | 'teal' | 'rose'
     divided?: boolean
+    /**
+     * `default` — elevated surface, shadow only, no border (System.md §8).
+     * `inset` — nested content inside another card: border only, no shadow,
+     * subtle fill. Never gets an accent bar or hover elevation.
+     */
+    variant?: 'default' | 'inset'
   }>(),
   {
     as: 'div',
@@ -17,6 +23,7 @@ withDefaults(
     clickable: false,
     accent: 'none',
     divided: false,
+    variant: 'default',
   },
 )
 
@@ -40,15 +47,19 @@ const accentBorderClasses: Record<string, string> = {
     :is="href ? Link : as"
     :href="href"
     :class="[
-      'relative block bg-[var(--color-surface-elevated)] rounded-[var(--radius-md)] border border-[color:color-mix(in_oklch,var(--color-border)_88%,white)]',
+      'relative block rounded-[var(--radius-md)]',
       paddingClasses[padding],
       divided ? 'divide-y divide-[var(--color-border)]' : '',
-      href || clickable
-        ? 'hover:border-[var(--color-border-strong)] hover:shadow-[var(--shadow-raised)] transition-[border-color,box-shadow,transform] duration-[var(--duration-fast)] cursor-pointer hover:-translate-y-0.5'
-        : '',
-      accent !== 'none'
+      variant === 'inset'
+        ? 'bg-[var(--color-surface-subtle)] border border-[var(--color-border)]'
+        : 'bg-[var(--color-surface-elevated)]',
+      variant === 'default' && accent === 'none' ? 'shadow-[var(--shadow-card)]' : '',
+      variant === 'default' && accent !== 'none'
         ? ['border-l-4 shadow-[var(--shadow-accent)]', accentBorderClasses[accent]]
-        : 'shadow-[var(--shadow-card)]',
+        : '',
+      (href || clickable) && variant === 'default'
+        ? 'hover:shadow-[var(--shadow-raised)] transition-[box-shadow,transform] duration-[var(--duration-fast)] cursor-pointer hover:-translate-y-0.5'
+        : '',
     ]"
   >
     <div v-if="$slots.header" :class="['flex items-center justify-between gap-3', padding === 'none' ? 'px-4 py-3' : 'mb-4']">

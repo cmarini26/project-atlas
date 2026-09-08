@@ -34,7 +34,7 @@ const items = [
 </script>
 
 <template>
-  <div class="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-[var(--radius-md)] shadow-[var(--shadow-card)] mb-6 overflow-hidden">
+  <div class="bg-[var(--color-surface-elevated)] rounded-[var(--radius-md)] shadow-[var(--shadow-card)] mb-6 overflow-hidden">
     <div class="flex items-start justify-between gap-3 px-5 py-4 bg-[var(--color-surface-panel)] border-b border-[var(--color-border)]">
       <div>
         <h2 class="text-sm font-semibold text-[var(--color-text-primary)]">3 things to do first</h2>
