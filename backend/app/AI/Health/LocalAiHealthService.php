@@ -95,6 +95,7 @@ class LocalAiHealthService
     }
 
     /**
+     * @param  'ok'|'model_missing'|'unreachable'  $status
      * @param  list<string>  $models
      * @return array{status: 'ok'|'model_missing'|'unreachable', base_url: string, model: string, available_models: list<string>, latency_ms: int|null, error: string|null}
      */

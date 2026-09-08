@@ -75,7 +75,7 @@ class RunFactExtractionEval extends Command
     }
 
     /**
-     * @param  array<string, mixed>  $report
+     * @param  array{providers: list<array<string, mixed>>, ...}  $report
      * @return array{0: string, 1: list<string>}
      */
     private function evaluateGate(array $report, string $gate): array
@@ -86,7 +86,7 @@ class RunFactExtractionEval extends Command
             return ['not_gated', []];
         }
 
-        $t = $report['thresholds'];
+        $t = $report['thresholds'] ?? [];
         $reasons = [];
 
         if ($metrics['schema_valid_rate'] < $t['min_schema_valid_rate']) {

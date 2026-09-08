@@ -104,11 +104,16 @@ final class HealthController
             return ['status' => 'error', 'error' => $e->getMessage()];
         }
 
-        return [
+        $result = [
             'status' => $report['status'] === 'ok' ? 'ok' : 'error',
             'detail' => $report['status'],
             'model' => $report['model'],
-            ...($report['error'] !== null ? ['error' => $report['error']] : []),
         ];
+
+        if ($report['error'] !== null) {
+            $result['error'] = $report['error'];
+        }
+
+        return $result;
     }
 }
