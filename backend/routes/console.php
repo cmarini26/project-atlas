@@ -3,6 +3,7 @@
 use App\Jobs\ApplyLearnings;
 use App\Jobs\CheckChannelHealth;
 use App\Jobs\ExpireOpportunities;
+use App\Jobs\PruneGeneratedImages;
 use App\Jobs\PruneRawMetrics;
 use App\Jobs\PublishScheduledContent;
 use App\Jobs\SendFeedbackDigest;
@@ -38,6 +39,9 @@ Schedule::job(new CheckChannelHealth())->everyThirtyMinutes()
     ->withoutOverlapping()
     ->onOneServer();
 Schedule::job(new PruneRawMetrics())->monthly()
+    ->withoutOverlapping()
+    ->onOneServer();
+Schedule::job(new PruneGeneratedImages())->weekly()
     ->withoutOverlapping()
     ->onOneServer();
 // ApplyLearnings implements ShouldBeUnique (one run per company per day),

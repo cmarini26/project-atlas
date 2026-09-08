@@ -30,13 +30,19 @@ defineEmits<{
     </div>
 
     <div class="p-5">
-      <div v-if="asset.media?.[0]?.url" class="mb-4 overflow-hidden rounded-[var(--radius-md)] bg-[var(--color-surface)] ring-1 ring-[var(--color-border)]">
+      <div v-if="asset.media?.[0]?.url" class="relative mb-4 overflow-hidden rounded-[var(--radius-md)] bg-[var(--color-surface)] ring-1 ring-[var(--color-border)]">
         <img
           :src="asset.media[0].url"
           alt="Prepared campaign image"
           class="h-56 w-full object-cover"
           loading="lazy"
         />
+        <span
+          v-if="asset.media[0].source === 'ai_generated'"
+          class="absolute left-2 top-2 rounded-[var(--radius-sm)] bg-[var(--color-surface-elevated)]/90 px-2 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)] ring-1 ring-[var(--color-border)]"
+        >
+          AI-generated · draft proposal
+        </span>
       </div>
 
       <h4 v-if="asset.title" class="text-base font-semibold text-[var(--color-text-primary)] mb-2">{{ asset.title }}</h4>
