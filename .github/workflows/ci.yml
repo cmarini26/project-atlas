@@ -96,3 +96,44 @@ jobs:
       - name: Run tests
         working-directory: backend
         run: php artisan test --parallel
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Type-check
+        working-directory: backend
+        run: npm run typecheck
+
+      - name: Lint
+        working-directory: backend
+        run: npm run lint
+
+      - name: Unit tests
+        working-directory: backend
+        run: npm run test
+
+      - name: Build
+        working-directory: backend
+        run: npm run build
+
+      - name: Design-system regression gate
+        if: github.event_name == 'pull_request'
+        working-directory: backend
+        run: node scripts/check-design-system.mjs --base "${{ github.event.pull_request.base.sha }}"

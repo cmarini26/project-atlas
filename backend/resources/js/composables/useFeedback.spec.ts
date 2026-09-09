@@ -43,7 +43,7 @@ describe('useFeedback', () => {
   })
 
   it('submit posts the score and comment, then closes', () => {
-    const { state, open, submit } = useFeedback()
+    const { open, submit } = useFeedback()
     open()
 
     submit(9, 'Great so far')

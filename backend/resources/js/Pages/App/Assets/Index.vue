@@ -27,7 +27,7 @@ type SourceAsset = {
   opportunities_count: number
 }
 
-const props = defineProps<{ assets: SourceAsset[]; types: string[] }>()
+defineProps<{ assets: SourceAsset[]; types: string[] }>()
 const showForm = ref(false)
 const editingAsset = ref<SourceAsset | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)

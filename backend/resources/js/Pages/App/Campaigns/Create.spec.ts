@@ -4,7 +4,6 @@ import { reactive } from 'vue'
 import Create from './Create.vue'
 
 const postMock = vi.fn()
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let lastForm: any = null
 
 vi.mock('@inertiajs/vue3', () => ({
