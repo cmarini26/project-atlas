@@ -7,7 +7,7 @@ const props = defineProps<{
   processing?: boolean
 }>()
 
-const emit = defineEmits<{
+defineEmits<{
   cancel: []
   save: [{ title: string; body: string }]
 }>()
